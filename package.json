@@ -1,5 +1,9 @@
 {
   "name": "lentjs",
   "version": "0.0.0",
-  "workspaces": ["packages/*"]
+  "workspaces": ["packages/*"],
+  "packageManager": "bun@1.3.11",
+  "devDependencies": {
+    "turbo": "^2.8.20"
+  }
 }
