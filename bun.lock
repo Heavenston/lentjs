@@ -11,6 +11,9 @@
     "example": {
       "name": "example",
       "version": "0.0.0",
+      "dependencies": {
+        "lent": "workspace:*",
+      },
       "devDependencies": {
         "typescript": "~5.9.3",
         "vite": "^8.0.1",

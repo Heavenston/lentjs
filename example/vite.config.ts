@@ -4,4 +4,12 @@ export default defineConfig({
   server: {
     port: 1234,
   },
+
+  oxc: {
+    jsx: {
+      importSource: "lent",
+      pragma: "h",
+      pragmaFrag: "Fragment",
+    },
+  },
 });
