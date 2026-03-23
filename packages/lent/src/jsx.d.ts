@@ -28,7 +28,7 @@ export namespace JSX {
     // empty, libs can define requirements downstream
   }
   interface ElementAttributesProperty {
-    // empty, libs can define requirements downstream
+    props;
   }
   interface ElementChildrenAttribute {
     children: {};

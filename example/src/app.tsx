@@ -1,5 +1,14 @@
-import { Component } from "lent";
+import { Component, type JSXElement } from "lent";
 
-export default class App extends Component {
+type AppState = {
   
+};
+export default class App extends Component<AppState> {
+  protected readonly initialState: AppState = {
+  };
+
+  render(): JSXElement {
+    return <div class="container">
+    </div>;
+  }
 }

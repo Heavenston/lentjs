@@ -8,8 +8,6 @@ export default defineConfig({
   oxc: {
     jsx: {
       importSource: "lent",
-      pragma: "h",
-      pragmaFrag: "Fragment",
     },
   },
 });
