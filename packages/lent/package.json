@@ -10,5 +10,8 @@
   },
   "scripts": {
     "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "csstype": "^3.2.3"
   }
 }

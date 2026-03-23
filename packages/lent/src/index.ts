@@ -1,13 +1,13 @@
-import type { Lent } from "./jsx-runtime";
+import type { JSX } from "./jsx";
 
-export abstract class Component<S = {}, P = {}> implements Lent.IComponent<P> {
+export abstract class Component<S = {}, P = {}> {
   protected abstract state: S;
 
   constructor(public readonly props: Readonly<P>) {}
-  abstract render(): Lent.JSXOutput;
+  abstract render(): JSX.Element;
 }
 
-export function render(element: HTMLElement, jsx: Lent.JSXOutput) {
+export function render(element: HTMLElement, jsx: JSX.Element) {
   console.log(jsx);
 }
 
