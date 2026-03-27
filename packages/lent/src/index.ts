@@ -12,7 +12,7 @@ export type EventHandler<E> = (event: E) => unknown;
 
 export type Attributes = {
   children?: JSXElement,
-  class?: ClassList,
+  class?: ClassList | (() => ClassList),
 } & {
   [key in `on:${string}`]?: EventHandler<Event>
 } & {
@@ -162,6 +162,12 @@ function createElement(element: string, props: Attributes): JSXElement {
       const tv = v as Attributes["class"];
       if (typeof tv === "string")
         el.className = tv;
+      else if (typeof tv === "function") {
+        immediateTrack(tv, (class_list) => {
+          el.className = "";
+          el.classList.add(...renderClasslist(class_list));
+        });
+      }
       else if(tv)
         el.classList.add(...renderClasslist(tv));
     }
