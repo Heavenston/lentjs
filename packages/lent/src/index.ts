@@ -24,6 +24,8 @@ function isFunction(t: unknown): t is (...args: any) => any {
 }
 
 export abstract class Component<S extends object = {}, P = {}> {
+  public static is_component_class: true = true;
+
   #state: Store<S> | undefined;
   #onStateUpdate: (() => unknown)[] = [];
 
