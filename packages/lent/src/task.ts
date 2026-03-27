@@ -9,12 +9,11 @@ export function createTask(task: (ctx: TaskCtx) => void) {
   const cleanup_functions: (() => void)[] = [];
 
   const debounceRun = microtaskDebounce(() => task(ctx));
+
   const ctx: TaskCtx = {
     track: (track_cb) => {
-      const { end, unsubscribe } = startStoreReadListen(() => {
-        unsubscribe();
-        debounceRun();
-      });
+      const { end, unsubscribe } = startStoreReadListen(debounceRun, { once: true });
+      cleanup_functions.push(unsubscribe);
       const val = track_cb();
       end();
       return val;

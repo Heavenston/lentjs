@@ -175,7 +175,13 @@ function createElement(element: string, props: Attributes): JSXElement {
     else if (k.startsWith("spread:")) {
       const tv = v as Attributes[`spread:${string}`];
       if (isFunction(tv)) {
-        
+        const run = () => {
+          const { end } = startStoreReadListen(run, { once: true });
+          const value = tv();
+          end();
+          el.setAttribute(k.replace(/^spread:/, ""), value);
+        };
+        run();
       }
       else {
         el.setAttribute(k.replace(/^spread:/, ""), tv);
