@@ -2,6 +2,7 @@ export { createStore, type Store } from "./store";
 export { createTask } from "./task";
 
 import { type Store, createStore, startStoreReadListen } from "./store";
+import { microtaskDebounce } from "./utils";
 
 export type JSXElement = Node | number | string | null | undefined | JSXElement[] | (() => JSXElement);
 export type PropertyValue = string | number | (() => PropertyValue);
@@ -94,7 +95,7 @@ function addChild(parent: Node, child: JSXElement) {
       const end_comment = new Comment("lentjs end");
 
       // FIXME: Call unsubscribe
-      const { end, unsubscribe: _unsubscribe } = startStoreReadListen(() => {
+      const { end, unsubscribe: _unsubscribe } = startStoreReadListen(microtaskDebounce(() => {
         const new_nodes = child();
         const parentNodes = [...parent.childNodes];
 
@@ -115,7 +116,7 @@ function addChild(parent: Node, child: JSXElement) {
           }
           current = newnode;
         }
-      });
+      }));
       let nodes = child();
       end();
 
