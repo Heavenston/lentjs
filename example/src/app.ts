@@ -16,16 +16,10 @@ class Counter extends Component<CounterState> {
     return h("div", {
       children: [
         h("div", {
-          children: ["Count: ", () => {
-            console.log("Recomputing count text node (div)");
-            return `${this.state.count}`;
-          }],
+          children: ["Count: ", () => this.state.count],
         }),
         h("button", {
-          children: ["Increment ", () => {
-            console.log("Recomputing count text node (button)");
-            return `${this.state.count}`;
-          }],
+          children: ["Increment ", () => this.state.count],
           "on:click": () => {
             console.log(`Clicked ${this.state.count} -> ${this.state.count+1}`);
             this.state.count += 1;

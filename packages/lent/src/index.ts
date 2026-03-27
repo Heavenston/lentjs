@@ -1,4 +1,4 @@
-export type JSXElement = Node | string | null | undefined | JSXElement[] | (() => JSXElement);
+export type JSXElement = Node | number | string | null | undefined | JSXElement[] | (() => JSXElement);
 export type PropertyValue = string | number | (() => PropertyValue);
 export type ClassList = string | Partial<Record<string, boolean>> | ClassList[];
 
@@ -84,12 +84,15 @@ function constructComponent<P, C extends Component<any, P>, F extends ComponentF
 }
 
 function normalizeChildren(child: JSXElement): (Node | (() => Node[]))[] {
-  if (!child) return [];
+  if (child == null) return [];
   if (Array.isArray(child)) {
     return child.flatMap(normalizeChildren);
   }
   if (typeof child === "string") {
     return [document.createTextNode(child)];
+  }
+  if (typeof child === "number") {
+    return normalizeChildren(`${child}`);
   }
   if (isFunction(child)) {
     type InfiniteFunction<A, B> = A | (() => InfiniteFunction<B, B>);
@@ -122,9 +125,9 @@ function addChild(parent: Node, child: JSXElement) {
           const newnode = new_nodes[i]!;
           if (oldnode instanceof Text && newnode instanceof Text) {
             oldnode.textContent = newnode.textContent;
-          }
-          else if (oldnode) {
-            parent.replaceChild(oldnode, newnode);
+          } else
+          if (oldnode) {
+            parent.replaceChild(newnode, oldnode);
           }
           else {
             parent.insertBefore(newnode, current.nextSibling);
