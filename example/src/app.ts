@@ -18,18 +18,20 @@ class Counter extends Component<CounterState, CounterProps> {
 
   protected init(): void {
     createTask(({ track }) => {
-      track(() => this.clamp());
+      const val = this.state.count;
+      this.state.count = track(() => this.clamp(val));
     });
   }
 
-  clamp() {
-    console.log("CLAMP");
+  clamp(val: number) {
     const max = this.props.max();
     const min = this.props.min();
-    if (this.state.count > max)
-      this.state.count = max;
-    if (this.state.count < min)
-      this.state.count = min;
+
+    if (val > max)
+      return max;
+    if (val < min)
+      return min;
+    return val;
   }
 
   render(): JSXElement {
@@ -40,18 +42,18 @@ class Counter extends Component<CounterState, CounterProps> {
         }),
         h("button", {
           children: ["Increment to ", () => this.state.count + 1],
+          "spread:disabled": () => this.state.count >= this.props.max() ? "true" : undefined,
           "on:click": () => {
             console.log(`Increment ${this.state.count} -> ${this.state.count+1}`);
-            this.state.count += 1;
-            this.clamp();
+            this.state.count = this.clamp(this.state.count+1);
           },
         }),
         h("button", {
-          children: ["Decrement to ", () => this.state.count - 1],
+          children: ["Decrement to ", () => this.clamp(this.state.count-1)],
+          "spread:disabled": () => this.state.count <= this.props.min() ? "true" : undefined,
           "on:click": () => {
             console.log(`Decrement ${this.state.count} -> ${this.state.count-1}`);
-            this.state.count -= 1;
-            this.clamp();
+            this.state.count = this.clamp(this.state.count-1);
           },
         }),
       ],

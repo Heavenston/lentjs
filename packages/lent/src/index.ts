@@ -14,9 +14,9 @@ export type Attributes = {
   children?: JSXElement,
   class?: ClassList,
 } & {
-  [key in `on:${string}`]: EventHandler<Event>
+  [key in `on:${string}`]?: EventHandler<Event>
 } & {
-  [key in `spread:${string}`]: string | (() => string)
+  [key in `spread:${string}`]?: string | undefined | (() => string | undefined)
 };
 
 function isFunction(t: unknown): t is (...args: any) => any {
@@ -170,21 +170,34 @@ function createElement(element: string, props: Attributes): JSXElement {
     }
     else if (k.startsWith("on:")) {
       const tv = v as Attributes[`on:${string}`];
-      el.addEventListener(k.replace(/^on:/, ""), tv);
+      const tk = k.replace(/^on:/, "");
+      if (tv !== undefined)
+        el.addEventListener(tk, tv);
+      else
+        el.removeAttribute(tk);
     }
     else if (k.startsWith("spread:")) {
       const tv = v as Attributes[`spread:${string}`];
+      const tk = k.replace(/^spread:/, "");
+
       if (isFunction(tv)) {
         const run = () => {
-          const { end } = startStoreReadListen(run, { once: true });
+          const { end } = startStoreReadListen(debounced, { once: true });
           const value = tv();
           end();
-          el.setAttribute(k.replace(/^spread:/, ""), value);
+          if (value !== undefined)
+            el.setAttribute(tk, value);
+          else
+            el.removeAttribute(tk);
         };
+        const debounced = microtaskDebounce(run);
         run();
       }
       else {
-        el.setAttribute(k.replace(/^spread:/, ""), tv);
+        if (tv !== undefined)
+          el.setAttribute(tk, tv);
+        else
+          el.removeAttribute(tk);
       }
     }
     else {
