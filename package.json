@@ -7,6 +7,7 @@
     "turbo": "^2.8.20"
   },
   "scripts": {
-    "check-types": "turbo check-types"
+    "check-types": "turbo check-types",
+    "dev": "turbo dev"
   }
 }

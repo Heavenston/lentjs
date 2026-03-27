@@ -1,25 +1,38 @@
-export type JSXElement = Node | string | null | undefined | JSXElement[];
+export type JSXElement = Node | string | null | undefined | JSXElement[] | (() => JSXElement);
 export type PropertyValue = string | number | (() => PropertyValue);
 export type ClassList = string | Partial<Record<string, boolean>> | ClassList[];
 
-interface Attributes {
+export type EventHandler<E> = (event: E) => unknown;
+
+export type Attributes = {
   children?: JSXElement,
   class?: ClassList,
-}
+} & {
+  [key in `on:${string}`]: EventHandler<Event>
+};
 
 export abstract class Component<S = {}, P = {}> {
-  protected readonly abstract initialState: S;
   #state: S | undefined;
 
-  public get state(): S {
+  protected get state(): S {
     if (this.#state === undefined) {
-      this.#state = structuredClone(this.initialState);
+      this.#state = this.getInitialState();
     }
     return this.#state;
   }
 
   constructor(public readonly props: Readonly<P>) {}
+
+  protected abstract getInitialState(): S;
   abstract render(): JSXElement;
+}
+
+export type ComponentFactory<P, C extends Component<any, P>> = (((props: P) => C) & { is_component_class?: undefined }) | { is_component_class: true, new(props: P): C }
+function constructComponent<P, C extends Component<any, P>, F extends ComponentFactory<P, C>>(factory: F, props: P): C {
+  if (factory.is_component_class)
+    return new factory(props);
+  else
+    return factory(props);
 }
 
 function addChild(parent: Node, child: JSXElement) {
@@ -31,6 +44,9 @@ function addChild(parent: Node, child: JSXElement) {
   }
   if (typeof child === "string") {
     return addChild(parent, document.createTextNode(child));
+  }
+  if (typeof child === "function") {
+    return addChild(parent, child());
   }
   parent.appendChild(child);
 }
@@ -57,7 +73,7 @@ export function render(container: HTMLElement, jsx: { new(props: {}): Component 
 }
 
 export function h(element: string, props: Attributes): JSXElement;
-export function h<P>(element: Component<any, P>, props: P): JSXElement;
+export function h<P>(element: ComponentFactory<P, any>, props: P): JSXElement;
 export function h(element: any, props: any): JSXElement {
   if (typeof element === "string") {
     const el = document.createElement(element);
@@ -72,10 +88,20 @@ export function h(element: any, props: any): JSXElement {
         else
           el.classList.add(...renderClasslist(v as ClassList));
       }
+      else if (k.startsWith("on:")) {
+        // @ts-ignore
+        el.addEventListener(k.replace(/^on:/, ""), v);
+      }
       else {
         el.setAttribute(k, v as any);
       }
     }
     return el;
   }
+  // is a component factory
+  else {
+    return constructComponent(element, props).render();
+  }
+
+  throw new Error("no implemented");
 }
