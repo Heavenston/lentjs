@@ -11,12 +11,60 @@ export type Attributes = {
   [key in `on:${string}`]: EventHandler<Event>
 };
 
-export abstract class Component<S = {}, P = {}> {
-  #state: S | undefined;
+function isFunction(t: unknown): t is (...args: any) => any {
+  return typeof t === "function";
+}
 
-  protected get state(): S {
+const is_store = Symbol("is_store");
+export type Store<S> = S & { [is_store]: true };
+
+let current_store_read_callback: (() => void) | null = null;
+function createStore<S extends object>(initialValue: S): Store<S> {
+  let prop_callbacks = new Map<string | symbol, (() => void)[]>;
+  return new Proxy<any>({ ...initialValue }, {
+    set: (obj, prop, value) => {
+      const changed = obj[prop] !== value;
+      // @ts-ignore
+      obj[prop] = value;
+      if (changed) {
+        const arr = prop_callbacks.get(prop);
+        if (arr)
+          for (const cb of arr)
+            cb();
+      }
+      return true;
+    },
+    // FIX: There is no way to unsubscribe
+    get(obj, prop) {
+      if (current_store_read_callback !== null) {
+        const prop_array = prop_callbacks.get(prop) ?? prop_callbacks.set(prop, []).get(prop)!;
+        prop_array.push(current_store_read_callback);
+      }
+      return obj[prop];
+    },
+  });
+}
+
+export abstract class Component<S extends object = {}, P = {}> {
+  #state: Store<S> | undefined;
+  #onStateUpdate: (() => unknown)[] = [];
+
+  #createInitialState(): Store<S> {
+    return createStore(this.getInitialState());
+  }
+
+  public onStateUpdate(cb: () => unknown): () => void {
+    this.#onStateUpdate.push(cb);
+    return () => {
+      const idx = this.#onStateUpdate.findIndex(p => p === cb);
+      if (idx >= 0)
+        this.#onStateUpdate.splice(idx, 1);
+    }
+  }
+  
+  protected get state(): Store<S> {
     if (this.#state === undefined) {
-      this.#state = this.getInitialState();
+      this.#state = this.#createInitialState();
     }
     return this.#state;
   }
@@ -35,20 +83,62 @@ function constructComponent<P, C extends Component<any, P>, F extends ComponentF
     return factory(props);
 }
 
-function addChild(parent: Node, child: JSXElement) {
-  if (!child) return;
+function normalizeChildren(child: JSXElement): (Node | (() => Node[]))[] {
+  if (!child) return [];
   if (Array.isArray(child)) {
-    for (const c of child)
-      addChild(parent, c);
-    return;
+    return child.flatMap(normalizeChildren);
   }
   if (typeof child === "string") {
-    return addChild(parent, document.createTextNode(child));
+    return [document.createTextNode(child)];
   }
-  if (typeof child === "function") {
-    return addChild(parent, child());
+  if (isFunction(child)) {
+    type InfiniteFunction<A, B> = A | (() => InfiniteFunction<B, B>);
+    function fullCall<A, B>(n: InfiniteFunction<A, B>): A | B {
+      if (isFunction(n))
+        return fullCall(n());
+      return n;
+    }
+    return [() => normalizeChildren(child()).flatMap(fullCall)];
   }
-  parent.appendChild(child);
+  return [child];
+}
+
+function addChild(parent: Node, child: JSXElement) {
+  const normalizedChildren = normalizeChildren(child);
+  for (const child of normalizedChildren) {
+    if (isFunction(child)) {
+      const start_comment = new Comment("lentjs start");
+      const end_comment = new Comment("lentjs end");
+
+      const cb = () => {
+        const new_nodes = child();
+        const parentNodes = [...parent.childNodes];
+        const s = parentNodes.indexOf(start_comment);
+        const e = parentNodes.indexOf(end_comment);
+        for (let i = s + 1; i < e; i++) {
+          parent.removeChild(parentNodes[i]!);
+        }
+
+        let current: Node = start_comment;
+        for (const subchild of new_nodes) {
+          parent.insertBefore(subchild, current.nextSibling);
+          current = subchild;
+        }
+      };
+
+      current_store_read_callback = cb;
+      let nodes = child();
+      current_store_read_callback = null;
+
+      parent.appendChild(start_comment);
+      for (const subchild of nodes)
+        parent.appendChild(subchild);
+      parent.appendChild(end_comment);
+    }
+    else {
+      parent.appendChild(child);
+    }
+  }
 }
 
 function renderClasslist(list: ClassList): string[] {
@@ -67,8 +157,6 @@ function renderClasslist(list: ClassList): string[] {
 export function render(container: HTMLElement, jsx: { new(props: {}): Component }) {
   const p = new jsx({});
   const output = p.render();
-  console.log("output", output);
-  console.log(container);
   addChild(container, output);
 }
 
