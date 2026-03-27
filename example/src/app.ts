@@ -42,7 +42,7 @@ class Counter extends Component<CounterState, CounterProps> {
         }),
         h("button", {
           children: ["Increment to ", () => this.state.count + 1],
-          "spread:disabled": () => this.state.count >= this.props.max() ? "true" : undefined,
+          "attr:disabled": () => this.state.count >= this.props.max() ? "true" : undefined,
           "on:click": () => {
             console.log(`Increment ${this.state.count} -> ${this.state.count+1}`);
             this.state.count = this.clamp(this.state.count+1);
@@ -50,7 +50,7 @@ class Counter extends Component<CounterState, CounterProps> {
         }),
         h("button", {
           children: ["Decrement to ", () => this.clamp(this.state.count-1)],
-          "spread:disabled": () => this.state.count <= this.props.min() ? "true" : undefined,
+          "attr:disabled": () => this.state.count <= this.props.min() ? "true" : undefined,
           "on:click": () => {
             console.log(`Decrement ${this.state.count} -> ${this.state.count-1}`);
             this.state.count = this.clamp(this.state.count-1);
@@ -81,9 +81,9 @@ export default class App extends Component<AppState> {
           children: [
             "Min: ",
             h("input", {
-              "spread:type": "number",
-              "spread:value": () => `${this.state.min}`,
-              "spread:max": () => `${this.state.max}`,
+              "attr:type": "number",
+              "attr:value": () => `${this.state.min}`,
+              "attr:max": () => `${this.state.max}`,
               "on:change": e => {
                 if (!(e instanceof Event)) return;
                 const el = e.currentTarget;
@@ -98,9 +98,9 @@ export default class App extends Component<AppState> {
           children: [
             "Max: ",
             h("input", {
-              "spread:type": "number",
-              "spread:value": () => `${this.state.max}`,
-              "spread:min": () => `${this.state.min}`,
+              "attr:type": "number",
+              "attr:value": () => `${this.state.max}`,
+              "attr:min": () => `${this.state.min}`,
               "on:change": e => {
                 if (!(e instanceof Event)) return;
                 const el = e.currentTarget;

@@ -16,7 +16,7 @@ export type Attributes = {
 } & {
   [key in `on:${string}`]?: EventHandler<Event>
 } & {
-  [key in `spread:${string}`]?: string | undefined | (() => string | undefined)
+  [key in `attr:${string}`]?: string | undefined | (() => string | undefined)
 };
 
 function isFunction(t: unknown): t is (...args: any) => any {
@@ -176,9 +176,9 @@ function createElement(element: string, props: Attributes): JSXElement {
       else
         el.removeAttribute(tk);
     }
-    else if (k.startsWith("spread:")) {
-      const tv = v as Attributes[`spread:${string}`];
-      const tk = k.replace(/^spread:/, "");
+    else if (k.startsWith("attr:")) {
+      const tv = v as Attributes[`attr:${string}`];
+      const tk = k.replace(/^attr:/, "");
 
       if (isFunction(tv)) {
         const run = () => {
