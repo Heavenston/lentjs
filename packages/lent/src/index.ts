@@ -13,6 +13,7 @@ export type EventHandler<E> = (event: E) => unknown;
 export type Attributes = {
   children?: JSXElement,
   class?: ClassList | (() => ClassList),
+  value?: string | (() => string),
 } & {
   [key in `on:${string}`]?: EventHandler<Event>
 } & {
@@ -27,19 +28,9 @@ export abstract class Component<S extends object = {}, P = {}> {
   public static is_component_class: true = true;
 
   #state: Store<S> | undefined;
-  #onStateUpdate: (() => unknown)[] = [];
 
   #createInitialState(): Store<S> {
     return createStore(this.getInitialState());
-  }
-
-  public onStateUpdate(cb: () => unknown): () => void {
-    this.#onStateUpdate.push(cb);
-    return () => {
-      const idx = this.#onStateUpdate.findIndex(p => p === cb);
-      if (idx >= 0)
-        this.#onStateUpdate.splice(idx, 1);
-    }
   }
   
   protected get state(): Store<S> {
@@ -172,6 +163,19 @@ function createElement(element: string, props: Attributes): JSXElement {
       }
       else if(tv)
         el.classList.add(...renderClasslist(tv));
+    }
+    else if (k === "value") {
+      const tv = v as Attributes["value"];
+      if (isFunction(tv)) {
+        immediateTrack(tv, (value) => {
+          // @ts-ignore
+          el.value = value;
+        });
+      }
+      else {
+        // @ts-ignore
+        el.value = tv;
+      }
     }
     else if (k.startsWith("on:")) {
       const tv = v as Attributes[`on:${string}`];
