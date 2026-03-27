@@ -113,19 +113,28 @@ function addChild(parent: Node, child: JSXElement) {
       const cb = () => {
         const new_nodes = child();
         const parentNodes = [...parent.childNodes];
+
         const s = parentNodes.indexOf(start_comment);
         const e = parentNodes.indexOf(end_comment);
-        for (let i = s + 1; i < e; i++) {
-          parent.removeChild(parentNodes[i]!);
-        }
-
         let current: Node = start_comment;
-        for (const subchild of new_nodes) {
-          parent.insertBefore(subchild, current.nextSibling);
-          current = subchild;
+        for (let i = 0; i < new_nodes.length; i++) {
+          const oldnode = s+i+1 < e ? parentNodes[s + i + 1] : null;
+          const newnode = new_nodes[i]!;
+          if (oldnode instanceof Text && newnode instanceof Text) {
+            oldnode.textContent = newnode.textContent;
+          }
+          else if (oldnode) {
+            parent.replaceChild(oldnode, newnode);
+          }
+          else {
+            parent.insertBefore(newnode, current.nextSibling);
+          }
+          current = newnode;
         }
       };
 
+      if (current_store_read_callback !== null)
+        throw new Error("Recursive dynamic childs not yet supported");
       current_store_read_callback = cb;
       let nodes = child();
       current_store_read_callback = null;
