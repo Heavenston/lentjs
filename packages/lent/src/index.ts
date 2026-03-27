@@ -64,16 +64,14 @@ function constructComponent<P, C extends Component<any, P>, F extends ComponentF
     return factory(props);
 }
 
-function normalizeChildren(child: JSXElement): (Node | (() => Node[]))[] {
+type NormalizedNode = string | Node;
+function normalizeChildren(child: JSXElement): (NormalizedNode | (() => NormalizedNode[]))[] {
   if (child == null) return [];
   if (Array.isArray(child)) {
     return child.flatMap(normalizeChildren);
   }
-  if (typeof child === "string") {
-    return [document.createTextNode(child)];
-  }
-  if (typeof child === "number") {
-    return normalizeChildren(`${child}`);
+  if (typeof child === "string" || typeof child === "number") {
+    return [child.toString()];
   }
   if (isFunction(child)) {
     type InfiniteFunction<A, B> = A | (() => InfiniteFunction<B, B>);
@@ -87,6 +85,7 @@ function normalizeChildren(child: JSXElement): (Node | (() => Node[]))[] {
   return [child];
 }
 
+const nodify = (n: NormalizedNode) => typeof n === "string" ? document.createTextNode(n) : n;
 function addChild(parent: Node, child: JSXElement) {
   const normalizedChildren = normalizeChildren(child);
   for (const child of normalizedChildren) {
@@ -105,16 +104,21 @@ function addChild(parent: Node, child: JSXElement) {
         for (let i = 0; i < new_nodes.length; i++) {
           const oldnode = s+i+1 < e ? parentNodes[s + i + 1] : null;
           const newnode = new_nodes[i]!;
-          if (oldnode instanceof Text && newnode instanceof Text) {
-            oldnode.textContent = newnode.textContent;
-          } else
-          if (oldnode) {
-            parent.replaceChild(newnode, oldnode);
+
+          if (typeof newnode === "string" && oldnode instanceof Text) {
+            oldnode.textContent = newnode;
+            current = oldnode;
           }
           else {
-            parent.insertBefore(newnode, current.nextSibling);
+            const n = nodify(newnode);
+            if (oldnode) {
+              parent.replaceChild(n, oldnode);
+            }
+            else {
+              parent.insertBefore(n, current.nextSibling);
+            }
+            current = n;
           }
-          current = newnode;
         }
       }));
       let nodes = child();
@@ -122,11 +126,11 @@ function addChild(parent: Node, child: JSXElement) {
 
       parent.appendChild(start_comment);
       for (const subchild of nodes)
-        parent.appendChild(subchild);
+        parent.appendChild(nodify(subchild));
       parent.appendChild(end_comment);
     }
     else {
-      parent.appendChild(child);
+      parent.appendChild(nodify(child));
     }
   }
 }

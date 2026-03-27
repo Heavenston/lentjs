@@ -29,10 +29,17 @@ class Counter extends Component<CounterState, CounterProps> {
           children: ["Count: ", () => this.state.count],
         }),
         h("button", {
-          children: ["Increment ", () => this.state.count],
+          children: ["Increment to ", () => this.state.count + 1],
           "on:click": () => {
-            console.log(`Clicked ${this.state.count} -> ${this.state.count+1}`);
+            console.log(`Increment ${this.state.count} -> ${this.state.count+1}`);
             this.state.count += 1;
+          },
+        }),
+        h("button", {
+          children: ["Decrement to ", () => this.state.count - 1],
+          "on:click": () => {
+            console.log(`Decrement ${this.state.count} -> ${this.state.count-1}`);
+            this.state.count -= 1;
           },
         }),
       ],
