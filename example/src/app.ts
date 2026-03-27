@@ -1,18 +1,25 @@
-import { h, Component, type JSXElement } from "lent";
+import { h, Component, type JSXElement, createTask } from "lent";
 
 type CounterState = {
   count: number,
 };
 type CounterProps = {
-  start: number,
+  start: () => number,
 };
 class Counter extends Component<CounterState, CounterProps> {
   public static is_component_class: true = true;
 
   protected getInitialState(): CounterState {
     return {
-      count: this.props.start,
+      count: this.props.start(),
     };
+  }
+
+  protected init(): void {
+    createTask(({ track }) => {
+      console.log("Task!");
+      this.state.count = track(() => this.props.start());
+    });
   }
 
   render(): JSXElement {
@@ -53,18 +60,18 @@ export default class App extends Component<AppState> {
               "spread:type": "number",
               "spread:value": `${this.state.start}`,
               "spread:min": "0",
-              "spread:max": "10",
               "on:change": e => {
-                if (!(e instanceof InputEvent)) return;
+                if (!(e instanceof Event)) return;
                 const el = e.currentTarget;
                 if (!(el instanceof HTMLInputElement)) return;
+                console.log(`Changed: ${el.valueAsNumber}`);
                 this.state.start = isNaN(el.valueAsNumber) ? 0 : el.valueAsNumber;
               }
             }),
           ],
         }),
         h(Counter, {
-          start: this.state.start,
+          start: () => this.state.start,
         }),
       ],
     });

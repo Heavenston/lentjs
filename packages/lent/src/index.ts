@@ -1,3 +1,8 @@
+export { createStore, type Store } from "./store";
+export { createTask } from "./task";
+
+import { type Store, createStore, startStoreReadListen } from "./store";
+
 export type JSXElement = Node | number | string | null | undefined | JSXElement[] | (() => JSXElement);
 export type PropertyValue = string | number | (() => PropertyValue);
 export type ClassList = string | Partial<Record<string, boolean>> | ClassList[];
@@ -10,41 +15,11 @@ export type Attributes = {
 } & {
   [key in `on:${string}`]: EventHandler<Event>
 } & {
-  [key in `spread:${string}`]: string
+  [key in `spread:${string}`]: string | (() => string)
 };
 
 function isFunction(t: unknown): t is (...args: any) => any {
   return typeof t === "function";
-}
-
-const is_store = Symbol("is_store");
-export type Store<S> = S & { [is_store]: true };
-
-let current_store_read_callback: (() => void) | null = null;
-function createStore<S extends object>(initialValue: S): Store<S> {
-  let prop_callbacks = new Map<string | symbol, (() => void)[]>;
-  return new Proxy<any>({ ...initialValue }, {
-    set: (obj, prop, value) => {
-      const changed = obj[prop] !== value;
-      // @ts-ignore
-      obj[prop] = value;
-      if (changed) {
-        const arr = prop_callbacks.get(prop);
-        if (arr)
-          for (const cb of arr)
-            cb();
-      }
-      return true;
-    },
-    // FIX: There is no way to unsubscribe
-    get(obj, prop) {
-      if (current_store_read_callback !== null) {
-        const prop_array = prop_callbacks.get(prop) ?? prop_callbacks.set(prop, []).get(prop)!;
-        prop_array.push(current_store_read_callback);
-      }
-      return obj[prop];
-    },
-  });
 }
 
 export abstract class Component<S extends object = {}, P = {}> {
@@ -71,8 +46,11 @@ export abstract class Component<S extends object = {}, P = {}> {
     return this.#state;
   }
 
-  constructor(public readonly props: Readonly<P>) {}
+  constructor(public readonly props: Readonly<P>) {
+    this.init?.();
+  }
 
+  protected init?(): void;
   protected abstract getInitialState(): S;
   abstract render(): JSXElement;
 }
@@ -115,7 +93,8 @@ function addChild(parent: Node, child: JSXElement) {
       const start_comment = new Comment("lentjs start");
       const end_comment = new Comment("lentjs end");
 
-      const cb = () => {
+      // FIXME: Call unsubscribe
+      const { end, unsubscribe: _unsubscribe } = startStoreReadListen(() => {
         const new_nodes = child();
         const parentNodes = [...parent.childNodes];
 
@@ -136,13 +115,9 @@ function addChild(parent: Node, child: JSXElement) {
           }
           current = newnode;
         }
-      };
-
-      if (current_store_read_callback !== null)
-        throw new Error("Recursive dynamic childs not yet supported");
-      current_store_read_callback = cb;
+      });
       let nodes = child();
-      current_store_read_callback = null;
+      end();
 
       parent.appendChild(start_comment);
       for (const subchild of nodes)
@@ -174,41 +149,48 @@ export function render(container: HTMLElement, jsx: { new(props: {}): Component 
   addChild(container, output);
 }
 
+function createElement(element: string, props: Attributes): JSXElement {
+  const el = document.createElement(element);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === "children") {
+      const tv = v as Attributes["children"];
+      addChild(el, tv);
+    }
+    else if (k === "class") {
+      const tv = v as Attributes["class"];
+      if (typeof tv === "string")
+        el.className = tv;
+      else if(tv)
+        el.classList.add(...renderClasslist(tv));
+    }
+    else if (k.startsWith("on:")) {
+      const tv = v as Attributes[`on:${string}`];
+      el.addEventListener(k.replace(/^on:/, ""), tv);
+    }
+    else if (k.startsWith("spread:")) {
+      const tv = v as Attributes[`spread:${string}`];
+      if (isFunction(tv)) {
+        
+      }
+      else {
+        el.setAttribute(k.replace(/^spread:/, ""), tv);
+      }
+    }
+    else {
+      throw new Error(`Unsupported attribute ${k}`);
+    }
+  }
+  return el;
+}
+
 export function h(element: string, props: Attributes): JSXElement;
 export function h<P>(element: ComponentFactory<P, any>, props: P): JSXElement;
 export function h(element: any, props: any): JSXElement {
   if (typeof element === "string") {
-    const el = document.createElement(element);
-    for (const [k, v] of Object.entries(props)) {
-      if (k === "children") {
-        addChild(el, v as JSXElement);
-        continue;
-      }
-      else if (k === "class") {
-        if (typeof v === "string")
-          el.className = v;
-        else
-          el.classList.add(...renderClasslist(v as ClassList));
-      }
-      else if (k.startsWith("on:")) {
-        // @ts-ignore
-        el.addEventListener(k.replace(/^on:/, ""), v);
-      }
-      else if (k.startsWith("spread:")) {
-        // @ts-ignore
-        el.setAttribute(k.replace(/^spread:/, ""), v);
-      }
-      else {
-        // @ts-ignore
-        el.setAttribute(k, v);
-      }
-    }
-    return el;
+    return createElement(element, props);
   }
   // is a component factory
   else {
     return constructComponent(element, props).render();
   }
-
-  throw new Error("no implemented");
 }
