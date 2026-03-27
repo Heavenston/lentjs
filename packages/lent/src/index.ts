@@ -9,6 +9,8 @@ export type Attributes = {
   class?: ClassList,
 } & {
   [key in `on:${string}`]: EventHandler<Event>
+} & {
+  [key in `spread:${string}`]: string
 };
 
 function isFunction(t: unknown): t is (...args: any) => any {
@@ -192,8 +194,13 @@ export function h(element: any, props: any): JSXElement {
         // @ts-ignore
         el.addEventListener(k.replace(/^on:/, ""), v);
       }
+      else if (k.startsWith("spread:")) {
+        // @ts-ignore
+        el.setAttribute(k.replace(/^spread:/, ""), v);
+      }
       else {
-        el.setAttribute(k, v as any);
+        // @ts-ignore
+        el.setAttribute(k, v);
       }
     }
     return el;

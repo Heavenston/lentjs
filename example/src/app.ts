@@ -3,12 +3,15 @@ import { h, Component, type JSXElement } from "lent";
 type CounterState = {
   count: number,
 };
-class Counter extends Component<CounterState> {
+type CounterProps = {
+  start: number,
+};
+class Counter extends Component<CounterState, CounterProps> {
   public static is_component_class: true = true;
 
   protected getInitialState(): CounterState {
     return {
-      count: 0,
+      count: this.props.start,
     };
   }
 
@@ -31,21 +34,38 @@ class Counter extends Component<CounterState> {
 }
 
 type AppState = {
-  
+  start: number,
 };
 export default class App extends Component<AppState> {
   protected getInitialState(): AppState {
-    return {};
+    return {
+      start: 5,
+    };
   }
   
   render(): JSXElement {
     return h("div", {
       class: ["a", "b b"],
       children: [
-        h("span", {
-          children: "Test",
+        h("div", {
+          children: [
+            h("input", {
+              "spread:type": "number",
+              "spread:value": `${this.state.start}`,
+              "spread:min": "0",
+              "spread:max": "10",
+              "on:change": e => {
+                if (!(e instanceof InputEvent)) return;
+                const el = e.currentTarget;
+                if (!(el instanceof HTMLInputElement)) return;
+                this.state.start = isNaN(el.valueAsNumber) ? 0 : el.valueAsNumber;
+              }
+            }),
+          ],
         }),
-        h(Counter, {}),
+        h(Counter, {
+          start: this.state.start,
+        }),
       ],
     });
   }
