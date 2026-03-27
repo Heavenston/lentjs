@@ -25,3 +25,16 @@ export function createTask(task: (ctx: TaskCtx) => void) {
   
   debounceRun();
 }
+
+export function immediateTrack<T, R>(getValue: () => T, fn1: (val: T) => R, fn2?: (val: T) => void): R {
+  const run = () => {
+    const { end } = startStoreReadListen(debounced, { once: true });
+    const val = getValue();
+    end();
+    return val;
+  };
+  const debounced = microtaskDebounce(() => {
+    (fn2 ?? fn1)(run());
+  });
+  return fn1(run());
+}

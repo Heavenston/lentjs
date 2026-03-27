@@ -1,8 +1,8 @@
 export { createStore, type Store } from "./store";
 export { createTask } from "./task";
 
-import { type Store, createStore, startStoreReadListen } from "./store";
-import { microtaskDebounce } from "./utils";
+import { type Store, createStore } from "./store";
+import { immediateTrack } from "./task";
 
 export type JSXElement = Node | number | string | null | undefined | JSXElement[] | (() => JSXElement);
 export type PropertyValue = string | number | (() => PropertyValue);
@@ -94,8 +94,12 @@ function addChild(parent: Node, child: JSXElement) {
       const end_comment = new Comment("lentjs end");
 
       // FIXME: Call unsubscribe
-      const { end, unsubscribe: _unsubscribe } = startStoreReadListen(microtaskDebounce(() => {
-        const new_nodes = child();
+      immediateTrack(child, nodes => {
+        parent.appendChild(start_comment);
+        for (const subchild of nodes)
+          parent.appendChild(nodify(subchild));
+        parent.appendChild(end_comment);
+      }, (new_nodes) => {
         const parentNodes = [...parent.childNodes];
 
         const s = parentNodes.indexOf(start_comment);
@@ -120,14 +124,7 @@ function addChild(parent: Node, child: JSXElement) {
             current = n;
           }
         }
-      }));
-      let nodes = child();
-      end();
-
-      parent.appendChild(start_comment);
-      for (const subchild of nodes)
-        parent.appendChild(nodify(subchild));
-      parent.appendChild(end_comment);
+      });
     }
     else {
       parent.appendChild(nodify(child));
@@ -181,17 +178,12 @@ function createElement(element: string, props: Attributes): JSXElement {
       const tk = k.replace(/^attr:/, "");
 
       if (isFunction(tv)) {
-        const run = () => {
-          const { end } = startStoreReadListen(debounced, { once: true });
-          const value = tv();
-          end();
+        immediateTrack(tv, (value) => {
           if (value !== undefined)
             el.setAttribute(tk, value);
           else
             el.removeAttribute(tk);
-        };
-        const debounced = microtaskDebounce(run);
-        run();
+        });
       }
       else {
         if (tv !== undefined)
