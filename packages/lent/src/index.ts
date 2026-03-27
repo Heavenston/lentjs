@@ -207,9 +207,10 @@ function createElement(element: string, props: Attributes): JSXElement {
   return el;
 }
 
-export function h(element: string, props: Attributes): JSXElement;
+export function h(element: string, props?: Attributes): JSXElement;
+export function h(element: ComponentFactory<{}, any>): JSXElement;
 export function h<P>(element: ComponentFactory<P, any>, props: P): JSXElement;
-export function h(element: any, props: any): JSXElement {
+export function h(element: any, props: any = {}): JSXElement {
   if (typeof element === "string") {
     return createElement(element, props);
   }
