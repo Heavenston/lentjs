@@ -92,6 +92,9 @@ function addChild(parent: Node, child: JSXElement) {
             current = n;
           }
         }
+        for (let i = new_nodes.length+s+1; i < e; i++) {
+          parent.removeChild(parentNodes[i]!);
+        }
       });
     }
     else {

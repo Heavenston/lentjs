@@ -8,6 +8,7 @@ type TaskState = {
 
 type TaskProps = {
   task: () => TaskState,
+  onDelete?: () => void,
 };
 class Task extends Component<{}, TaskProps> {
   protected getInitialState(): {} { return {} }
@@ -27,6 +28,12 @@ class Task extends Component<{}, TaskProps> {
             if (!(el instanceof HTMLInputElement)) return;
             this.props.task().done = el.checked;
           },
+        }),
+        h("button", {
+          "on:click": () => {
+            this.props.onDelete?.();
+          },
+          children: "delete",
         }),
       ],
     });
@@ -88,7 +95,13 @@ export default class Todo extends Component<TodoState> {
         h("div", {
           children: h(For<TaskState>, {
             each: () => this.state.tasks,
-            children: (_idx, task) => h(Task, { task }),
+            children: (_idx, task) => h(Task, {
+              task,
+              onDelete: () => {
+                console.log("delete :(");
+                this.state.tasks = this.state.tasks.filter(t => t !== task());
+              },
+            }),
           }),
         }),
       ],
