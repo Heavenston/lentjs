@@ -117,19 +117,24 @@ function renderClasslist(list: ClassList): string[] {
     .map(([k, _]) => k);
 }
 
-function setAttribute(element: HTMLElement, name: string, value: AttributeValue) {
-  if (value !== undefined && value !== false)
-    element.setAttribute(name, value.toString());
-  else
-    element.removeAttribute(name);
-}
 export function render(container: HTMLElement, jsx: { new(props: {}): Component }) {
   const p = new jsx({});
   const output = p.render();
   addChild(container, output);
 }
 
-function createElement(element: string, props: Attributes): JSXElement {
+export function renderToString(jsx: { new(props: {}): Component }): string {
+  const p = new jsx({});
+  return "test";
+}
+
+function setAttribute(element: HTMLElement, name: string, value: AttributeValue) {
+  if (value !== undefined && value !== false)
+    element.setAttribute(name, value.toString());
+  else
+    element.removeAttribute(name);
+}
+function createElement(element: string, props: Attributes): HTMLElement {
   const el = document.createElement(element);
   for (const [k, v] of Object.entries(props)) {
     if (k === "children") {
