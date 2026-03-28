@@ -64,12 +64,12 @@ export default class Todo extends Component<TodoState> {
             const el = e.currentTarget;
             if (!(el instanceof HTMLFormElement)) return;
             this.addTask(this.state.input_text);
-            el.reset();
+            this.state.input_text = "";
           },
           children: [
             h("input", {
               "value": () => this.state.input_text,
-              "on:change": e => {
+              "on:input": e => {
                 const el = e.currentTarget;
                 if (!(el instanceof HTMLInputElement)) return;
                 this.state.input_text = el.value;
