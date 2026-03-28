@@ -21,8 +21,9 @@ class Task extends Component<{}, TaskProps> {
           children: () => this.props.task().text,
         }),
         h("input", {
+          "checked": () => this.props.task().done,
+
           "attr:type": "checkbox",
-          "attr:checked": () => this.props.task().done,
           "on:change": (e) => {
             const el = e.currentTarget;
             if (!(el instanceof HTMLInputElement)) return;
@@ -48,11 +49,8 @@ type TodoState = {
 export default class Todo extends Component<TodoState> {
   protected override getInitialState(): TodoState {
     return {
-      input_text: "Example",
-      tasks: [
-        createStore({ text: "Bonjour!", done: false }),
-        createStore({ text: "Aurevoir!", done: true }),
-      ],
+      input_text: "",
+      tasks: [],
     };
   }
 

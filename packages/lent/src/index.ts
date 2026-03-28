@@ -17,6 +17,7 @@ export type Attributes = {
   children?: JSXElement,
   class?: ClassList | (() => ClassList),
   value?: string | (() => string),
+  checked?: boolean | (() => boolean),
 } & {
   [key in `on:${string}`]?: EventHandler<Event>
 } & {
@@ -159,6 +160,19 @@ function createElement(element: string, props: Attributes): JSXElement {
       else {
         // @ts-ignore
         el.value = tv;
+      }
+    }
+    else if (k === "checked") {
+      const tv = v as Attributes["checked"];
+      if (isFunction(tv)) {
+        immediateTrack(tv, (checked) => {
+          // @ts-ignore
+          el.checked = checked;
+        });
+      }
+      else {
+        // @ts-ignore
+        el.checked = tv;
       }
     }
     else if (k.startsWith("on:")) {
