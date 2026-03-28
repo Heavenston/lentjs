@@ -1,6 +1,7 @@
 import { Component, deserialize } from ".";
 import { constructComponent } from "./component";
 import { isClassMethod } from "./serialize";
+import { isSignalAccessor, isSignalSetter, signals } from "./store";
 import { isBindableThis, isFunction } from "./utils";
 
 function closureBind(f: Function, new_this: object | null): Function {
@@ -22,6 +23,7 @@ function closureBind(f: Function, new_this: object | null): Function {
 function rebindFunctions<O extends object>(obj: O, new_this: object | null) {
   for (const [k, v] of Object.entries(obj) as [keyof O, O[keyof O]][]) {
     let new_val: any = v;
+    if (isSignalAccessor(v) || isSignalSetter(v)) continue;
     if (isFunction(v)) {
       new_val = closureBind(v, new_this);
     }
@@ -40,7 +42,21 @@ function run(n: Node, ctx: RunCtx) {
     if (n instanceof Comment) {
       const parts = n.textContent.split(" ", 3);
       if (parts[0] !== "lentjs") return;
+      const parts_rest = n.textContent.replace(/^([^ ]+ +){3}/, "");
+
       switch (parts[1]) {
+      case "state":
+      if (parts[2] === "signals") {
+        const ser_signals = deserialize(parts_rest) as [string, any][];
+        console.log(ser_signals);
+        for (const [id, val] of ser_signals) {
+          signals.set(id, {
+            callbacks: [],
+            currentValue: val,
+          });
+        }
+      }
+        break;
       case "start":
         const previous_comp = ctx.component_stack.at(-1)?.instance ?? null;
 
@@ -49,7 +65,7 @@ function run(n: Node, ctx: RunCtx) {
         if (!factory) {
           console.warn(`Could not find the component with id`, cid);
         }
-        const { props, state } = deserialize(n.textContent.replace(/^([^ ]+ ){3}/, "")) as any;
+        const { props, state } = deserialize(parts_rest) as any;
         rebindFunctions(props, previous_comp);
         rebindFunctions(state, previous_comp);
 

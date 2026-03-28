@@ -12,7 +12,7 @@ export function createTask(task: (ctx: TaskCtx) => void) {
 
   const ctx: TaskCtx = {
     track: (track_cb) => {
-      const { end, unsubscribe } = startStoreReadListen(debounceRun, { once: true });
+      const { end, unsubscribe } = startStoreReadListen({ onUpdate: debounceRun }, { once: true });
       cleanup_functions.push(unsubscribe);
       const val = track_cb();
       end();
@@ -29,7 +29,7 @@ export function createTask(task: (ctx: TaskCtx) => void) {
 export function immediateTrack<T, R>(getValue: (previous?: T) => T, fn1: (val: T) => R, fn2?: (val: T) => void): R {
   let previous_val: T | undefined;
   const run = () => {
-    const { end } = startStoreReadListen(debounced, { once: true });
+    const { end } = startStoreReadListen({ onUpdate: debounced }, { once: true });
     const val = getValue(previous_val);
     end();
     previous_val = val;

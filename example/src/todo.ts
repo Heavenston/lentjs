@@ -16,6 +16,10 @@ class Task extends Component<{}, TaskProps> {
 
   protected getInitialState(): {} { return {} }
 
+  protected init(): void {
+    console.log("Task:", this.props.task());
+  }
+
   private onChangeDone(e: Event) {
     const el = e.currentTarget;
     if (!(el instanceof HTMLInputElement)) return;

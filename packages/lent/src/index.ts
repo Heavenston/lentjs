@@ -9,6 +9,7 @@ import { constructComponent, type Component, type ComponentFactory } from "./com
 import { immediateTrack } from "./task";
 import { serialize, deserialize } from "./serialize";
 import { isFunction } from "./utils";
+import { signals } from "./store";
 
 const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
@@ -171,7 +172,13 @@ function stringifyJSXElement(el: JSXElement): string {
 export function renderToString(jsx: { new(props: {}): Component }): string {
   global_h_config = "ssr";
   const p = new jsx({});
-  return stringifyJSXElement(p.render());
+  const el = stringifyJSXElement(p.render());
+  const ser_signals: [string, any][] = [];
+  for (const [id, { currentValue }] of signals.entries()) {
+    ser_signals.push([id, currentValue]);
+  }
+  signals.clear();
+  return `<!--lentjs state signals ${serialize(ser_signals)}-->${el}`;
 }
 
 function setAttribute(element: HTMLElement, name: string, value: AttributeValue) {

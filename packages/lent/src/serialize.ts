@@ -1,7 +1,7 @@
 import * as devalue from "devalue";
 import { Component } from ".";
 import { isFunction } from "./utils";
-import { isSignalAccessor } from "./store";
+import { isSignalAccessor, isSignalSetter, signalAccessorFromId, signalSetterFromId } from "./store";
 
 const isClassMethodSymbol = Symbol("is-class-method-symbol");
 
@@ -43,13 +43,18 @@ export function serialize(value: unknown): string {
       if (!isFunction(f)) return;
       return cf.function_to_name.get(f);
     },
-    closure: (f: unknown) => {
-      if (isFunction(f)) return f.toString();
-    },
     signalAccessor: (f: unknown) => {
       if (isSignalAccessor(f)) {
-        return "signal_accessor";
+        return f.signalId;
       }
+    },
+    signalSetter: (f: unknown) => {
+      if (isSignalSetter(f)) {
+        return f.signalId;
+      }
+    },
+    closure: (f: unknown) => {
+      if (isFunction(f)) return f.toString();
     },
   });
 }
@@ -59,6 +64,12 @@ export function deserialize(text: string): unknown {
     componentFunction: f => {
       console.log("componentFunction", f);
       return getComponentFunctions().name_to_function.get(`${f[0]} ${f[1]}`);
+    },
+    signalAccessor: (id: string) => {
+      return signalAccessorFromId(id);
+    },
+    signalSetter: (id: string) => {
+      return signalSetterFromId(id);
     },
     closure: f => {
       return (new Function(`return ${f}`))();
