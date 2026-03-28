@@ -1,13 +1,12 @@
 import { Component } from "./component";
-import { createStore, untrack, type JSXElement } from ".";
+import { createSignal, createStore, untrack, type JSXElement } from ".";
+import type { SignalSetter } from "./store";
 
 type ElementState<T> = {
-  value: JSXElement,
-  el: { value: T },
-  dispose: () => void,
+  setEl: SignalSetter<T>,
 };
 type ForState<T> = {
-  // elements: ElementState<T>[],
+  elements: ElementState<T>[],
 };
 export type ForProps<T> = {
   each: () => T[],
@@ -22,35 +21,37 @@ export class For<T> extends Component<ForState<T>, ForProps<T>> {
     };
   }
 
-  #compute(): JSXElement[] {
+  #compute(previous: JSXElement): JSXElement {
+    const old_jsx_elements = Array.isArray(previous) ? previous : [previous];
+
     const new_elements: ElementState<T>[] = [];
-    const old_elements: ElementState<T>[] = [];
+    const old_elements: ElementState<T>[] = untrack(() => this.state.elements);
+    const jsx_elements: JSXElement[] = [];
+
     const each = this.props.each();
     for (let i = 0; i < each.length; i++) {
       const val: T = each[i]!;
       if (i < old_elements.length) {
         const el = old_elements[i]!;
-        el.el.value = val;
+        el.setEl(val);
         new_elements.push(el);
       }
       else {
-        const el = createStore({ value: val });
+        const [el, setEl] = createSignal(val);
         new_elements.push({
-          // TODO
-          dispose: () => {},
-          el,
-          value: untrack(() => this.props.children(i, () => el.value)),
+          setEl,
         });
+        const child = untrack(() => this.props.children(i, el));
+        jsx_elements.push(child);
       }
     }
-    for (let i = each.length; i < old_elements.length; i++) {
-      old_elements[i]!.dispose();
-    }
-    // this.state.elements = new_elements;
-    return new_elements.map(el => el.value);
+
+    this.state.elements = new_elements;
+
+    return jsx_elements;
   }
 
   override render(): JSXElement {
-    return () => this.#compute();
+    return previous => this.#compute(previous);
   }
 }

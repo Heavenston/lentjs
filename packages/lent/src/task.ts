@@ -26,11 +26,13 @@ export function createTask(task: (ctx: TaskCtx) => void) {
   debounceRun();
 }
 
-export function immediateTrack<T, R>(getValue: () => T, fn1: (val: T) => R, fn2?: (val: T) => void): R {
+export function immediateTrack<T, R>(getValue: (previous?: T) => T, fn1: (val: T) => R, fn2?: (val: T) => void): R {
+  let previous_val: T | undefined;
   const run = () => {
     const { end } = startStoreReadListen(debounced, { once: true });
-    const val = getValue();
+    const val = getValue(previous_val);
     end();
+    previous_val = val;
     return val;
   };
   const debounced = microtaskDebounce(() => {

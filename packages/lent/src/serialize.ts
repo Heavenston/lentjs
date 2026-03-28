@@ -1,6 +1,7 @@
 import * as devalue from "devalue";
 import { Component } from ".";
 import { isFunction } from "./utils";
+import { isSignalAccessor } from "./store";
 
 const isClassMethodSymbol = Symbol("is-class-method-symbol");
 
@@ -44,6 +45,11 @@ export function serialize(value: unknown): string {
     },
     closure: (f: unknown) => {
       if (isFunction(f)) return f.toString();
+    },
+    signalAccessor: (f: unknown) => {
+      if (isSignalAccessor(f)) {
+        return "signal_accessor";
+      }
     },
   });
 }

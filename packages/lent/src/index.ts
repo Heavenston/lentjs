@@ -1,5 +1,5 @@
 export { Component, type ComponentFactory } from "./component";
-export { createStore, untrack, type Store } from "./store";
+export { createStore, untrack, type Store, createSignal } from "./store";
 export { createTask } from "./task";
 export { For } from "./for";
 export { startRuntime } from "./runtime";
@@ -12,7 +12,7 @@ import { isFunction } from "./utils";
 
 const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
-export type JSXElement = Node | number | string | null | undefined | JSXElement[] | (() => JSXElement) | SSRElement;
+export type JSXElement = Node | number | string | null | undefined | JSXElement[] | ((previous?: JSXElement) => JSXElement) | SSRElement;
 export type PropertyValue = string | number | (() => PropertyValue);
 export type ClassList = string | Partial<Record<string, boolean>> | ClassList[];
 
@@ -42,7 +42,7 @@ function fullCall<A, B>(n: InfiniteFunction<A, B>): A | B {
 }
 
 type NormalizedNode = string | Node | SSRElement;
-function normalizeChildren(child: JSXElement): (NormalizedNode | (() => NormalizedNode[]))[] {
+function normalizeChildren(child: JSXElement): (NormalizedNode | ((previous?: JSXElement) => NormalizedNode[]))[] {
   if (child == null) return [];
   if (Array.isArray(child)) {
     return child.flatMap(normalizeChildren);
@@ -51,7 +51,7 @@ function normalizeChildren(child: JSXElement): (NormalizedNode | (() => Normaliz
     return [child.toString()];
   }
   if (isFunction(child)) {
-    return [() => normalizeChildren(child()).flatMap(fullCall)];
+    return [(previous) => normalizeChildren(child(previous)).flatMap(fullCall)];
   }
   return [child];
 }
@@ -80,7 +80,6 @@ function addChild(parent: Node, child: JSXElement) {
       const start_comment = new Comment("lentjs start");
       const end_comment = new Comment("lentjs end");
 
-      // FIXME: Call unsubscribe
       immediateTrack(child, nodes => {
         parent.appendChild(start_comment);
         for (const subchild of nodes)
