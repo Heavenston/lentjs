@@ -1,6 +1,33 @@
 import { Component, deserialize } from ".";
 import { constructComponent } from "./component";
-import { isFunction } from "./utils";
+import { isClassMethod } from "./serialize";
+import { isBindableThis, isFunction } from "./utils";
+
+function closureBind(f: Function, new_this: object | null): Function {
+  if (isClassMethod(f) || isBindableThis(f)) {
+    return f.bind(new_this);
+  }
+  else {
+    console.warn("Rebinding closure: ", f.toString());
+    try {
+      return new Function("return " + f.toString()).call(new_this);
+    }
+    catch(e) {
+      console.error("Error rebinding:", e);
+      return () => { throw new Error("Error rebinding this function") };
+    }
+  }
+}
+
+function rebindFunctions<O extends object>(obj: O, new_this: object | null) {
+  for (const [k, v] of Object.entries(obj) as [keyof O, O[keyof O]][]) {
+    let new_val: any = v;
+    if (isFunction(v)) {
+      new_val = closureBind(v, new_this);
+    }
+    obj[k] = new_val;
+  }
+}
 
 type RunCtx = {
   component_stack: {
@@ -23,16 +50,8 @@ function run(n: Node, ctx: RunCtx) {
           console.warn(`Could not find the component with id`, cid);
         }
         const { props, state } = deserialize(n.textContent.replace(/^([^ ]+ ){3}/, "")) as any;
-        for (const [k, v] of Object.entries(props)) {
-          if (isFunction(v)) {
-            props[k] = new Function("return " + v.toString()).bind(previous_comp)();
-          }
-        }
-        for (const [k, v] of Object.entries(state)) {
-          if (isFunction(v)) {
-            state[k] = new Function("return " + v.toString()).bind(previous_comp)();
-          }
-        }
+        rebindFunctions(props, previous_comp);
+        rebindFunctions(state, previous_comp);
 
         ctx.component_stack.push({
           id: cid,
@@ -53,13 +72,15 @@ function run(n: Node, ctx: RunCtx) {
       for (const t of n.attributes) {
         if (t.name.startsWith("lentjs:on:")) {
           const event = t.name.replace(/^lentjs:on:/, "");
-          const cb = new Function("return " + t.value).bind(current_comp)();
+          // @ts-ignore
+          const cb: any = closureBind(deserialize(t.value), current_comp);
           n.addEventListener(event, cb);
         }
 
         if (t.name.startsWith("lentjs:attr:")) {
-          const attr = t.name.replace(/^lentjs:attr:/, "");
-          const cb = new Function("return " + t.value).bind(current_comp)();
+          // TODO
+          // const attr = t.name.replace(/^lentjs:attr:/, "");
+          // const cb = new Function("return " + t.value).bind(current_comp)();
         }
       }
     }

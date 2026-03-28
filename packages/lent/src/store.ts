@@ -34,10 +34,6 @@ export function createStore<S extends object>(initialValue: S): Store<S> {
       return true;
     },
     get(obj, prop) {
-      if (prop === "toJSON") {
-        return () => obj;
-      }
-
       if (current_store_read_callback !== null) {
         const prop_array = prop_callbacks.get(prop) ?? prop_callbacks.set(prop, []).get(prop)!;
         prop_array.push(current_store_read_callback);

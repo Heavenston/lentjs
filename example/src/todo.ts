@@ -2,6 +2,7 @@ import { h, Component, type JSXElement, createStore, For } from "lent";
 import c from "./todo.module.scss";
 
 type TaskState = {
+  id: string,
   text: string,
   done: boolean,
 };
@@ -15,6 +16,12 @@ class Task extends Component<{}, TaskProps> {
 
   protected getInitialState(): {} { return {} }
 
+  private onChangeDone(e: Event) {
+    const el = e.currentTarget;
+    if (!(el instanceof HTMLInputElement)) return;
+    this.props.task().done = el.checked;
+  }
+
   override render(): JSXElement {
     return h("div", {
       class: () => [c["task"], { [c["task-completed"]]: this.props.task().done }],
@@ -26,11 +33,7 @@ class Task extends Component<{}, TaskProps> {
           "checked": () => this.props.task().done,
 
           "attr:type": "checkbox",
-          "on:change": (e) => {
-            const el = e.currentTarget;
-            if (!(el instanceof HTMLInputElement)) return;
-            this.props.task().done = el.checked;
-          },
+          "on:change": this.onChangeDone,
         }),
         h("button", {
           "on:click": () => {
@@ -56,6 +59,7 @@ export default class Todo extends Component<TodoState> {
       input_text: "",
       tasks: [
         {
+          id: crypto.randomUUID(),
           done: false,
           text: "Hi!",
         },
@@ -63,11 +67,28 @@ export default class Todo extends Component<TodoState> {
     };
   }
 
-  private addTask(text: string) {
+  private addTask(text: string): string {
+    const id = crypto.randomUUID();
     this.state.tasks = [...this.state.tasks, createStore({
+      id,
       done: false,
       text,
     })];
+    return id;
+  }
+
+  private deleteTask(id: string) {
+    this.state.tasks = this.state.tasks.filter(t => t.id !== id);
+  }
+
+  private taskRender(_idx: number, task: () => TaskState) {
+    return h(Task, {
+      task,
+      onDelete: () => {
+        console.log("delete :(");
+        this.deleteTask(task().id);
+      },
+    });
   }
 
   override render(): JSXElement {
@@ -87,6 +108,7 @@ export default class Todo extends Component<TodoState> {
             h("input", {
               "value": () => this.state.input_text,
               "on:input": e => {
+                console.log("change", this);
                 const el = e.currentTarget;
                 if (!(el instanceof HTMLInputElement)) return;
                 this.state.input_text = el.value;
@@ -102,13 +124,7 @@ export default class Todo extends Component<TodoState> {
         h("div", {
           children: h(For<TaskState>, {
             each: () => this.state.tasks,
-            children: (_idx, task) => h(Task, {
-              task,
-              onDelete: () => {
-                console.log("delete :(");
-                this.state.tasks = this.state.tasks.filter(t => t !== task());
-              },
-            }),
+            children: this.taskRender,
           }),
         }),
       ],

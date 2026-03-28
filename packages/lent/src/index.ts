@@ -302,14 +302,14 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
       const tv = v as Attributes[`on:${string}`];
       const tk = k.replace(/^on:/, "");
       if (tv !== undefined)
-        t += `lentjs:on:${tk}="${escapeHtmlAttribute(tv.toString())}" `;
+        t += `lentjs:on:${tk}="${escapeHtmlAttribute(serialize(tv))}" `;
     }
     else if (k.startsWith("attr:")) {
       const tv = v as Attributes[`attr:${string}`];
       const tk = k.replace(/^attr:/, "");
 
       if (isFunction(tv)) {
-        t += `lentjs:attr:${tk}="${escapeHtmlAttribute(tv.toString())}" `;
+        t += `lentjs:attr:${tk}="${escapeHtmlAttribute(serialize(tv))}" `;
       }
 
       const val = isFunction(tv) ? tv() : tv;
@@ -353,11 +353,7 @@ export function h(element: any, props: any = {}): JSXElement {
     if (global_h_config === "ssr") {
       const constructed = constructComponent(comp, props);
       const t = stringifyJSXElement(constructed.render());
-      const { children: _, ...propsWithoutChildren } = props;
-      return { [SSRElementMarker]: true, t: `<!--lentjs start ${comp.id} ${serialize({
-        props: propsWithoutChildren,
-        state: constructed.state,
-      })}-->${t}<!--lentjs end-->` };
+      return { [SSRElementMarker]: true, t: `<!--lentjs start ${comp.id} ${serialize({ props, state: constructed.state, })}-->${t}<!--lentjs end-->` };
     }
     else if (global_h_config === "dom") {
       return constructComponent(comp, props).render();
