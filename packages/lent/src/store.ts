@@ -48,8 +48,11 @@ export function resumeStore<S extends object>(store_id: string, obj: S): Store<S
         const arr = props_callbacks.get(prop);
         if (arr) {
           filterInPlace(arr, cb => cb.is_stopped !== true);
-          for (const cb of arr)
+          for (const cb of arr) {
             cb.onUpdate?.();
+            if (cb.once)
+              cb.is_stopped = true;
+          }
           filterInPlace(arr, cb => cb.once !== true);
         }
       }
@@ -165,13 +168,19 @@ export function isSignalSetter(val: unknown): val is SignalSetter<never> {
   return typeof val === "function" && val !== null && signalSetterSymbol in val && val[signalSetterSymbol] === true;
 }
 
-export function subscribeToStoreRead(cb: () => void, reads: StoreRead[]) {
+export function subscribeToStoreRead(cb: StoreReadCallback, reads: StoreRead[]) {
   for (const read of reads) {
     if (read.kind === "store") {
-      
+      const store = stores.get(read.id);
+      if (!store) throw new Error(`No such store with id ${read.id}`);
+      let arr = store.props_callbacks.get(read.property);
+      if (!arr) store.props_callbacks.set(read.property, arr = []);
+      arr.push(cb);
     }
     else if (read.kind === "signal") {
-      
+      const signal = signals.get(read.id);
+      if (!signal) throw new Error(`No such signal with id ${read.id}`);
+      signal.callbacks.push(cb);
     }
     else {
       read satisfies never;

@@ -1,5 +1,5 @@
 import { Component } from "./component";
-import { createSignal, createStore, untrack, type JSXElement } from ".";
+import { createSignal, untrack, type JSXElement } from ".";
 import type { SignalSetter } from "./store";
 
 type ElementState<T> = {
@@ -21,7 +21,7 @@ export class For<T> extends Component<ForState<T>, ForProps<T>> {
     };
   }
 
-  #compute(previous: JSXElement): JSXElement {
+  private compute(previous: JSXElement): JSXElement {
     const old_jsx_elements = Array.isArray(previous) ? previous : [previous];
 
     const new_elements: ElementState<T>[] = [];
@@ -52,6 +52,6 @@ export class For<T> extends Component<ForState<T>, ForProps<T>> {
   }
 
   override render(): JSXElement {
-    return previous => this.#compute(previous);
+    return previous => this.compute(previous);
   }
 }

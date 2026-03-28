@@ -1,10 +1,11 @@
-import { Component, deserialize } from ".";
+import type { JsxElement } from "typescript";
+import { applyNewNodeList, Component, deserialize, normalizeChildren, type JSXElement } from ".";
 import { constructComponent } from "./component";
 import { isClassMethod } from "./serialize";
-import { isSignalAccessor, isSignalSetter, resumeStore, signals, type StoreReadCallback } from "./store";
-import { isBindableThis, isFunction } from "./utils";
+import { isSignalAccessor, isSignalSetter, resumeStore, signals, subscribeToStoreRead, type StoreRead, type StoreReadCallback } from "./store";
+import { fullCall, isBindableThis, isFunction, microtaskDebounce } from "./utils";
 
-function closureBind(f: Function, new_this: object | null): Function {
+function closureBind<F extends Function>(f: F, new_this: object | null): F {
   if (isClassMethod(f) || isBindableThis(f)) {
     return f.bind(new_this);
   }
@@ -15,6 +16,7 @@ function closureBind(f: Function, new_this: object | null): Function {
     }
     catch(e) {
       console.error("Error rebinding:", e);
+      // @ts-ignore
       return () => { throw new Error("Error rebinding this function") };
     }
   }
@@ -35,6 +37,12 @@ type RunCtx = {
   component_stack: {
     id: string,
     instance: Component<any, any> | null,
+  }[],
+  dynamic_stack: {
+    found_reads: StoreRead[],
+    update: (previous?: JSXElement) => JSXElement,
+
+    start: ChildNode,
   }[],
 };
 function run(n: Node, ctx: RunCtx) {
@@ -83,6 +91,38 @@ function run(n: Node, ctx: RunCtx) {
       case "end-component":
         ctx.component_stack.pop();
         break;
+      case "start-dynamic": {
+        const current_component = ctx.component_stack.at(-1)?.instance ?? null;
+        let { found_reads, el } = deserialize(parts_rest) as { found_reads: StoreRead[], el: (previous?: JSXElement) => JSXElement };
+
+        ctx.dynamic_stack.push({
+          found_reads,
+          start: n,
+          update: closureBind(el, current_component),
+        });
+
+        break;
+      }
+      case "end-dynamic": {
+        const { found_reads, start, update } = ctx.dynamic_stack.pop()!;
+        const end = n;
+        const parent = n.parentNode!;
+
+        subscribeToStoreRead({
+          once: true,
+          onUpdate: microtaskDebounce(() => {
+            const previous = [];
+            let current: Node | null = start;
+            while (current?.nextSibling && current?.nextSibling !== end) {
+              previous.push(current?.nextSibling);
+              current = current?.nextSibling;
+            }
+            const new_nodes = normalizeChildren(update(previous)).flatMap(fullCall);
+            applyNewNodeList(parent, start, end, new_nodes);
+          }),
+        }, found_reads);
+        break;
+      }
       default:
         console.warn(`Uknown runtime directive ${parts[1]}`);
       }
@@ -114,7 +154,7 @@ function run(n: Node, ctx: RunCtx) {
 
 export function startRuntime(rootElement: HTMLElement) {
   console.time("startRuntime");
-  run(rootElement, { component_stack: [] });
+  run(rootElement, { component_stack: [], dynamic_stack: [] });
   console.timeEnd("startRuntime");
 }
 

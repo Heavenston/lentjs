@@ -20,3 +20,10 @@ export function isFunction(t: unknown): t is (...args: any) => any {
 export function isBindableThis(fn: Function): boolean {
   return Object.prototype.hasOwnProperty.call(fn, "prototype");
 }
+
+export type InfiniteFunction<A, B> = A | (() => InfiniteFunction<B, B>);
+export function fullCall<A, B>(n: InfiniteFunction<A, B>): A | B {
+  if (isFunction(n))
+    return fullCall(n());
+  return n;
+}

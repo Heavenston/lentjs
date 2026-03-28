@@ -8,7 +8,7 @@ export { serialize, deserialize } from "./serialize";
 import { constructComponent, type Component, type ComponentFactory } from "./component";
 import { immediateTrack } from "./task";
 import { serialize, deserialize } from "./serialize";
-import { isFunction } from "./utils";
+import { fullCall, isFunction } from "./utils";
 import { signals, startStoreReadListen, stores, type StoreReadCallback } from "./store";
 
 const SSRElementMarker = Symbol("ssr-element-marker");
@@ -35,15 +35,8 @@ function isSSRElement(t: unknown): t is SSRElement {
   return typeof t === "object" && t !== null && SSRElementMarker in t && t[SSRElementMarker] === true;
 }
 
-type InfiniteFunction<A, B> = A | (() => InfiniteFunction<B, B>);
-function fullCall<A, B>(n: InfiniteFunction<A, B>): A | B {
-  if (isFunction(n))
-    return fullCall(n());
-  return n;
-}
-
 type NormalizedNode = string | Node | SSRElement;
-function normalizeChildren(child: JSXElement): (NormalizedNode | ((previous?: JSXElement) => NormalizedNode[]))[] {
+export function normalizeChildren(child: JSXElement): (NormalizedNode | ((previous?: JSXElement) => NormalizedNode[]))[] {
   if (child == null) return [];
   if (Array.isArray(child)) {
     return child.flatMap(normalizeChildren);
@@ -71,6 +64,41 @@ const nodify = (n: NormalizedNode): Node => {
     return n;
   }
 };
+
+export function applyNewNodeList(parent: Node, start: ChildNode, end: ChildNode, new_nodes: NormalizedNode[]) {
+  const parentNodes = [...parent.childNodes];
+
+  const s = parentNodes.indexOf(start);
+  const e = parentNodes.indexOf(end);
+  let current: Node = start;
+  for (let i = 0; i < new_nodes.length; i++) {
+    const oldnode = s+i+1 < e ? parentNodes[s + i + 1] : null;
+    const newnode = new_nodes[i]!;
+
+    if (typeof newnode === "string" && oldnode instanceof Text) {
+      oldnode.textContent = newnode;
+      current = oldnode;
+    }
+    else if (oldnode === newnode) {
+      // Do nothing
+      current = newnode;
+    }
+    else {
+      const n = nodify(newnode);
+      if (oldnode) {
+        parent.replaceChild(n, oldnode);
+      }
+      else {
+        parent.insertBefore(n, current.nextSibling);
+      }
+      current = n;
+    }
+  }
+  for (let i = new_nodes.length+s+1; i < e; i++) {
+    parent.removeChild(parentNodes[i]!);
+  }
+}
+
 function addChild(parent: Node, child: JSXElement) {
   if (typeof document === "undefined")
     throw new Error("Called add_child not from a browser");
@@ -87,37 +115,7 @@ function addChild(parent: Node, child: JSXElement) {
           parent.appendChild(nodify(subchild));
         parent.appendChild(end_comment);
       }, (new_nodes) => {
-        const parentNodes = [...parent.childNodes];
-
-        const s = parentNodes.indexOf(start_comment);
-        const e = parentNodes.indexOf(end_comment);
-        let current: Node = start_comment;
-        for (let i = 0; i < new_nodes.length; i++) {
-          const oldnode = s+i+1 < e ? parentNodes[s + i + 1] : null;
-          const newnode = new_nodes[i]!;
-
-          if (typeof newnode === "string" && oldnode instanceof Text) {
-            oldnode.textContent = newnode;
-            current = oldnode;
-          }
-          else if (oldnode === newnode) {
-            // Do nothing
-            current = newnode;
-          }
-          else {
-            const n = nodify(newnode);
-            if (oldnode) {
-              parent.replaceChild(n, oldnode);
-            }
-            else {
-              parent.insertBefore(n, current.nextSibling);
-            }
-            current = n;
-          }
-        }
-        for (let i = new_nodes.length+s+1; i < e; i++) {
-          parent.removeChild(parentNodes[i]!);
-        }
+        applyNewNodeList(parent, start_comment, end_comment, new_nodes);
       });
     }
     else {
@@ -157,10 +155,7 @@ function stringifyJSXElement(el: JSXElement): string {
     const val = fullCall(el);
     end();
 
-    const prefix = `<!--lentjs start-dynamic ${serialize({
-      found_reads,
-      el,
-    })}-->`
+    const prefix = `<!--lentjs start-dynamic ${serialize({ found_reads, el })}-->`
     const suffix = `<!--lentjs end-dynamic-->`
     return `${prefix}${stringifyJSXElement(val)}${suffix}`;
   }
@@ -181,24 +176,32 @@ function stringifyJSXElement(el: JSXElement): string {
 
 export function renderToString(jsx: { new(props: {}): Component }): string {
   global_h_config = "ssr";
-  const p = new jsx({});
-  const el = stringifyJSXElement(p.render());
+  try {
+    const p = new jsx({});
+    const el = stringifyJSXElement(p.render());
 
-  const ser_signals: [string, any][] = [];
-  for (const [id, { currentValue }] of signals.entries()) {
-    ser_signals.push([id, currentValue]);
+    const ser_signals: [string, any][] = [];
+    for (const [id, { currentValue }] of signals.entries()) {
+      ser_signals.push([id, currentValue]);
+    }
+    signals.clear();
+    const signals_data = `<!--lentjs signals ${serialize(ser_signals)}-->`;
+
+    const ser_stores: [string, any][] = [];
+    for (const [id, { obj }] of stores.entries()) {
+      ser_stores.push([id, obj]);
+    }
+    stores.clear();
+    const stores_data = `<!--lentjs stores ${serialize(ser_stores)}-->`;
+
+    return `${signals_data}${stores_data}${el}`;
   }
-  signals.clear();
-  const signals_data = `<!--lentjs signals ${serialize(ser_signals)}-->`;
-
-  const ser_stores: [string, any][] = [];
-  for (const [id, { obj }] of stores.entries()) {
-    ser_stores.push([id, obj]);
+  catch(e) {
+    throw e;
   }
-  stores.clear();
-  const stores_data = `<!--lentjs stores ${serialize(ser_stores)}-->`;
-
-  return `${signals_data}${stores_data}${el}`;
+  finally {
+    global_h_config = "dom";
+  }
 }
 
 function setAttribute(element: HTMLElement, name: string, value: AttributeValue) {
