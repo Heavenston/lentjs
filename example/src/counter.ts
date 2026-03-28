@@ -40,7 +40,7 @@ class CounterButton extends Component<CounterButtonState, CounterButtonProps> {
         }),
         h("button", {
           children: ["Increment to ", () => this.state.count + 1],
-          "attr:disabled": () => this.state.count >= this.props.max() ? "true" : undefined,
+          "attr:disabled": () => this.state.count >= this.props.max(),
           "on:click": () => {
             console.log(`Increment ${this.state.count} -> ${this.state.count+1}`);
             this.state.count = this.clamp(this.state.count+1);
@@ -48,7 +48,7 @@ class CounterButton extends Component<CounterButtonState, CounterButtonProps> {
         }),
         h("button", {
           children: ["Decrement to ", () => this.clamp(this.state.count-1)],
-          "attr:disabled": () => this.state.count <= this.props.min() ? "true" : undefined,
+          "attr:disabled": () => this.state.count <= this.props.min(),
           "on:click": () => {
             console.log(`Decrement ${this.state.count} -> ${this.state.count-1}`);
             this.state.count = this.clamp(this.state.count-1);
@@ -80,8 +80,8 @@ export default class Counter extends Component<CounterState> {
             "Min: ",
             h("input", {
               "attr:type": "number",
-              "attr:value": () => `${this.state.min}`,
-              "attr:max": () => `${this.state.max}`,
+              "attr:value": this.state.min,
+              "attr:max": this.state.max,
               "on:change": e => {
                 if (!(e instanceof Event)) return;
                 const el = e.currentTarget;
@@ -97,8 +97,8 @@ export default class Counter extends Component<CounterState> {
             "Max: ",
             h("input", {
               "attr:type": "number",
-              "attr:value": () => `${this.state.max}`,
-              "attr:min": () => `${this.state.min}`,
+              "attr:value": this.state.max,
+              "attr:min": this.state.min,
               "on:change": e => {
                 if (!(e instanceof Event)) return;
                 const el = e.currentTarget;

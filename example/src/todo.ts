@@ -1,4 +1,5 @@
 import { h, Component, type JSXElement, createStore, For } from "lent";
+import c from "./todo.module.scss";
 
 type TaskState = {
   text: string,
@@ -13,14 +14,14 @@ class Task extends Component<{}, TaskProps> {
 
   override render(): JSXElement {
     return h("div", {
-      class: () => ["task", { "task-completed": this.props.task().done }],
+      class: () => [c["task"], { [c["task-completed"]]: this.props.task().done }],
       children: [
         h("span", {
           children: () => this.props.task().text,
         }),
         h("input", {
           "attr:type": "checkbox",
-          "attr:checked": () => this.props.task().done ? "" : undefined,
+          "attr:checked": () => this.props.task().done,
           "on:change": (e) => {
             const el = e.currentTarget;
             if (!(el instanceof HTMLInputElement)) return;
@@ -63,7 +64,9 @@ export default class Todo extends Component<TodoState> {
             e.preventDefault();
             const el = e.currentTarget;
             if (!(el instanceof HTMLFormElement)) return;
-            this.addTask(this.state.input_text);
+            const trimmed = this.state.input_text.trim();
+            if (!trimmed) return;
+            this.addTask(trimmed);
             this.state.input_text = "";
           },
           children: [
@@ -76,7 +79,8 @@ export default class Todo extends Component<TodoState> {
               },
             }),
             h("button", {
-              children: "create",
+              children: "Create Task",
+              "attr:disabled": () => !this.state.input_text.trim(),
             }),
           ],
         }),

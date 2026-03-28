@@ -12,6 +12,7 @@ export type ClassList = string | Partial<Record<string, boolean>> | ClassList[];
 
 export type EventHandler<E> = (event: E) => unknown;
 
+type AttributeValue = string | boolean | number | undefined;
 export type Attributes = {
   children?: JSXElement,
   class?: ClassList | (() => ClassList),
@@ -19,7 +20,7 @@ export type Attributes = {
 } & {
   [key in `on:${string}`]?: EventHandler<Event>
 } & {
-  [key in `attr:${string}`]?: string | undefined | (() => string | undefined)
+  [key in `attr:${string}`]?: AttributeValue | (() => AttributeValue)
 };
 
 function isFunction(t: unknown): t is (...args: any) => any {
@@ -112,6 +113,12 @@ function renderClasslist(list: ClassList): string[] {
     .map(([k, _]) => k);
 }
 
+function setAttribute(element: HTMLElement, name: string, value: AttributeValue) {
+  if (value !== undefined && value !== false)
+    element.setAttribute(name, value.toString());
+  else
+    element.removeAttribute(name);
+}
 export function render(container: HTMLElement, jsx: { new(props: {}): Component }) {
   const p = new jsx({});
   const output = p.render();
@@ -165,17 +172,11 @@ function createElement(element: string, props: Attributes): JSXElement {
 
       if (isFunction(tv)) {
         immediateTrack(tv, (value) => {
-          if (value !== undefined)
-            el.setAttribute(tk, value);
-          else
-            el.removeAttribute(tk);
+          setAttribute(el, tk, value);
         });
       }
       else {
-        if (tv !== undefined)
-          el.setAttribute(tk, tv);
-        else
-          el.removeAttribute(tk);
+        setAttribute(el, tk, tv);
       }
     }
     else {
