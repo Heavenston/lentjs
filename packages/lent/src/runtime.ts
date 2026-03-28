@@ -62,7 +62,7 @@ function run(n: Node, ctx: RunCtx) {
         }
       }
         break;
-      case "start":
+      case "start-component":
         const previous_comp = ctx.component_stack.at(-1)?.instance ?? null;
 
         const cid = parts[2]!;
@@ -79,7 +79,7 @@ function run(n: Node, ctx: RunCtx) {
           instance: factory ? constructComponent(factory, props, state) : null,
         });
         break;
-      case "end":
+      case "end-component":
         ctx.component_stack.pop();
         break;
       default:

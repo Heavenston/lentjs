@@ -391,7 +391,7 @@ export function h(element: any, props: any = {}): JSXElement {
     if (global_h_config === "ssr") {
       const constructed = constructComponent(comp, props);
       const t = stringifyJSXElement(constructed.render());
-      return { [SSRElementMarker]: true, t: `<!--lentjs start ${comp.id} ${serialize({ props, state: constructed.state, })}-->${t}<!--lentjs end-->` };
+      return { [SSRElementMarker]: true, t: `<!--lentjs start-component ${comp.id} ${serialize({ props, state: constructed.state, })}-->${t}<!--lentjs end-component-->` };
     }
     else if (global_h_config === "dom") {
       return constructComponent(comp, props).render();
