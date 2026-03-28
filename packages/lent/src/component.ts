@@ -1,5 +1,5 @@
 import type { JSXElement } from ".";
-import { createStore, type Store } from "./store";
+import { createStore, isStore, type Store } from "./store";
 
 export abstract class Component<S extends object = {}, P = {}> {
   static #components: Map<string, ComponentFactory<any, any, any>> = new Map;
@@ -47,7 +47,7 @@ export abstract class Component<S extends object = {}, P = {}> {
     }
 
     if (state !== undefined)
-      this.#state = createStore(state);
+      this.#state = isStore(state) ? state : createStore(state);
 
     this.props = props;
     this.init?.();

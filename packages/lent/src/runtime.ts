@@ -1,7 +1,7 @@
 import { Component, deserialize } from ".";
 import { constructComponent } from "./component";
 import { isClassMethod } from "./serialize";
-import { isSignalAccessor, isSignalSetter, signals, type StoreReadCallback } from "./store";
+import { isSignalAccessor, isSignalSetter, resumeStore, signals, type StoreReadCallback } from "./store";
 import { isBindableThis, isFunction } from "./utils";
 
 function closureBind(f: Function, new_this: object | null): Function {
@@ -9,7 +9,7 @@ function closureBind(f: Function, new_this: object | null): Function {
     return f.bind(new_this);
   }
   else {
-    console.warn("Rebinding closure: ", f.toString());
+    // console.warn("Rebinding closure: ", f.toString());
     try {
       return new Function("return " + f.toString()).call(new_this);
     }
@@ -45,15 +45,20 @@ function run(n: Node, ctx: RunCtx) {
       const parts_rest = n.textContent.replace(/^([^ ]+ +){3}/, "");
 
       switch (parts[1]) {
-      case "state":
-      if (parts[2] === "signals") {
-        const ser_signals = deserialize(parts_rest) as [string, any][];
-        console.log(ser_signals);
-        for (const [id, val] of ser_signals) {
-          signals.set(id, {
-            callbacks: [],
-            currentValue: val,
-          });
+      case "state": {
+        const state_data = deserialize(parts_rest) as [string, any][];
+        if (parts[2] === "signals") {
+          for (const [id, val] of state_data) {
+            signals.set(id, {
+              callbacks: [],
+              currentValue: val,
+            });
+          }
+        }
+        else if (parts[2] === "stores") {
+          for (const [id, val] of state_data) {
+            resumeStore(id, val);
+          }
         }
       }
         break;

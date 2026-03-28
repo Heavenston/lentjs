@@ -9,7 +9,7 @@ import { constructComponent, type Component, type ComponentFactory } from "./com
 import { immediateTrack } from "./task";
 import { serialize, deserialize } from "./serialize";
 import { isFunction } from "./utils";
-import { signals, startStoreReadListen, type StoreReadCallback } from "./store";
+import { signals, startStoreReadListen, stores, type StoreReadCallback } from "./store";
 
 const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
@@ -173,12 +173,22 @@ export function renderToString(jsx: { new(props: {}): Component }): string {
   global_h_config = "ssr";
   const p = new jsx({});
   const el = stringifyJSXElement(p.render());
+
   const ser_signals: [string, any][] = [];
   for (const [id, { currentValue }] of signals.entries()) {
     ser_signals.push([id, currentValue]);
   }
   signals.clear();
-  return `<!--lentjs state signals ${serialize(ser_signals)}-->${el}`;
+  const signals_data = `<!--lentjs state signals ${serialize(ser_signals)}-->`;
+
+  const ser_stores: [string, any][] = [];
+  for (const [id, { obj }] of stores.entries()) {
+    ser_stores.push([id, obj]);
+  }
+  stores.clear();
+  const stores_data = `<!--lentjs state stores ${serialize(ser_stores)}-->`;
+
+  return `${signals_data}${stores_data}${el}`;
 }
 
 function setAttribute(element: HTMLElement, name: string, value: AttributeValue) {

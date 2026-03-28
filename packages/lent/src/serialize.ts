@@ -1,7 +1,7 @@
 import * as devalue from "devalue";
 import { Component } from ".";
 import { isFunction } from "./utils";
-import { isSignalAccessor, isSignalSetter, signalAccessorFromId, signalSetterFromId } from "./store";
+import { getStoreId, isSignalAccessor, isSignalSetter, isStore, signalAccessorFromId, signalSetterFromId, storeFromId } from "./store";
 
 const isClassMethodSymbol = Symbol("is-class-method-symbol");
 
@@ -56,6 +56,9 @@ export function serialize(value: unknown): string {
     closure: (f: unknown) => {
       if (isFunction(f)) return f.toString();
     },
+    store: (f: unknown) => {
+      if (isStore(f)) return getStoreId(f);
+    },
   });
 }
 
@@ -72,6 +75,12 @@ export function deserialize(text: string): unknown {
     },
     closure: f => {
       return (new Function(`return ${f}`))();
+    },
+    store: (id) => {
+      const store = storeFromId(id);
+      if (store === null)
+        throw new Error(`No store with id ${id}`);
+      return store;
     },
   });
 }

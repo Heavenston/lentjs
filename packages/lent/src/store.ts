@@ -22,11 +22,22 @@ export type StoreReadCallback = {
 };
 
 let current_store_read_callback: StoreReadCallback | null = null;
-export function createStore<S extends object>(initialValue: S): Store<S> {
-  let prop_callbacks = new Map<string | symbol, StoreReadCallback[]>;
-  const store_id = crypto.randomUUID();
+type StoreState = {
+  props_callbacks: Map<string | symbol, StoreReadCallback[]>,
+  obj: any,
+  store: Store<any>,
+};
+export let stores = new Map<string, StoreState>;
 
-  return new Proxy<any>(initialValue, {
+export function resumeStore<S extends object>(store_id: string, obj: S): Store<S> {
+  let props_callbacks = new Map<string | symbol, StoreReadCallback[]>;
+
+  const store = new Proxy<any>(obj, {
+    has: (obj, prop) => {
+      return prop === isStoreSymbol ||
+        prop === storeIdSymbol ||
+        prop in obj;
+    },
     set: (obj, prop, value) => {
       if (prop === isStoreSymbol && prop === storeIdSymbol) { return false; }
 
@@ -34,7 +45,7 @@ export function createStore<S extends object>(initialValue: S): Store<S> {
       // @ts-ignore
       obj[prop] = value;
       if (changed) {
-        const arr = prop_callbacks.get(prop);
+        const arr = props_callbacks.get(prop);
         if (arr) {
           filterInPlace(arr, cb => cb.is_stopped !== true);
           for (const cb of arr)
@@ -49,7 +60,7 @@ export function createStore<S extends object>(initialValue: S): Store<S> {
       if (prop === storeIdSymbol) { return store_id; }
 
       if (current_store_read_callback !== null) {
-        const prop_array = prop_callbacks.get(prop) ?? prop_callbacks.set(prop, []).get(prop)!;
+        const prop_array = props_callbacks.get(prop) ?? props_callbacks.set(prop, []).get(prop)!;
         if (!prop_array.includes(current_store_read_callback)) {
           prop_array.push(current_store_read_callback);
           current_store_read_callback.found_reads?.push({ kind: "store", id: store_id, property: prop })
@@ -59,10 +70,30 @@ export function createStore<S extends object>(initialValue: S): Store<S> {
       return obj[prop];
     },
   });
+
+  stores.set(store_id, {
+    obj,
+    props_callbacks,
+    store,
+  });
+
+  return store;
+}
+
+export function createStore<S extends object>(obj: S): Store<S> {
+  return resumeStore(crypto.randomUUID(), obj);
+}
+
+export function isStore<S>(s: S): s is Store<S> {
+  return typeof s === "object" && s !== null && isStoreSymbol in s && s[isStoreSymbol] === true;
 }
 
 export function getStoreId(store: Store<unknown>): string {
   return store[storeIdSymbol];
+}
+
+export function storeFromId(id: string): Store<unknown> | null {
+  return stores.get(id)?.store;
 }
 
 type SignalState = {
@@ -132,6 +163,12 @@ export function isSignalAccessor(val: unknown): val is SignalAccessor<unknown> {
 
 export function isSignalSetter(val: unknown): val is SignalSetter<never> {
   return typeof val === "function" && val !== null && signalSetterSymbol in val && val[signalSetterSymbol] === true;
+}
+
+export function subscribeToStoreRead(cb: () => void, reads: StoreRead[]) {
+  for (const read of reads) {
+    
+  }
 }
 
 /// Starting after this function returns, and until the returned `end` function is called
