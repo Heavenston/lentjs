@@ -346,6 +346,15 @@ export function h(element: any, props: any = {}): JSXElement {
   }
   // is a component factory
   else {
-    return constructComponent(element, props).render();
+    if (global_h_config === "ssr") {
+      const t = stringifyJSXElement(constructComponent(element, props).render());
+      return { [SSRElementMarker]: true, t: `<!--lentjs-start component="${element.name}"-->${t}<!--lentjs-end-->` };
+    }
+    else if (global_h_config === "dom") {
+      return constructComponent(element, props).render();
+    }
+    else {
+      throw new Error("Invalid global_h_config value");
+    }
   }
 }

@@ -5,6 +5,7 @@ export abstract class Component<S extends object = {}, P = {}> {
   public static is_component_class: true = true;
 
   #state: Store<S> | undefined;
+  public readonly props: Readonly<P>;
 
   #createInitialState(): Store<S> {
     return createStore(this.getInitialState());
@@ -17,7 +18,8 @@ export abstract class Component<S extends object = {}, P = {}> {
     return this.#state;
   }
 
-  constructor(public readonly props: Readonly<P>) {
+  constructor(props: Readonly<P>) {
+    this.props = props;
     this.init?.();
   }
 
