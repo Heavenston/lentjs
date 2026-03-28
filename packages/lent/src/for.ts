@@ -14,6 +14,8 @@ export type ForProps<T> = {
   children: (idx: number, element: () => T) => JSXElement,
 };
 export class For<T> extends Component<ForState<T>, ForProps<T>> {
+  static { this.register("__lentjs_for") }
+
   protected override getInitialState(): ForState<T> {
     return {
       elements: [],

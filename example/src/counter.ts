@@ -8,6 +8,8 @@ type CounterButtonProps = {
   max: () => number,
 };
 class CounterButton extends Component<CounterButtonState, CounterButtonProps> {
+  static { this.register("____RANDOM_ID") }
+
   protected getInitialState(): CounterButtonState {
     return {
       count: this.props.min(),
@@ -64,6 +66,8 @@ type CounterState = {
   max: number,
 };
 export default class Counter extends Component<CounterState> {
+  static { this.register("____RANDOM_ID") }
+
   protected getInitialState(): CounterState {
     return {
       min: 0,

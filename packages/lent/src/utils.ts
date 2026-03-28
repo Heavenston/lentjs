@@ -12,3 +12,7 @@ export function microtaskDebounce(cb: () => void): () => void {
     });
   };
 }
+
+export function isFunction(t: unknown): t is (...args: any) => any {
+  return typeof t === "function";
+}

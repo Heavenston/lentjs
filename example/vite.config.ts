@@ -54,6 +54,24 @@ export default defineConfig({
 
   plugins: [
     (() => ({
+      name: "lent-id",
+
+      transform: {
+        filter: {
+          id: /\.ts$/,
+        },
+        async handler(code) {
+          if (!/____RANDOM_ID/.test(code)) return;
+
+          const d = new Uint32Array(await crypto.subtle.digest("SHA-512", Uint8Array.from(code)));
+          let i = 0;
+          return {
+            code: code.replace(/____RANDOM_ID/g, () => d[i++].toString()),
+          };
+        },
+      },
+    }) satisfies Plugin)(),
+    (() => ({
       name: "lent-ssr",
       enforce: "pre",
 

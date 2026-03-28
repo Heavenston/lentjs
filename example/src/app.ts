@@ -7,6 +7,8 @@ type AppState = {
   max: number,
 };
 export default class App extends Component<AppState> {
+  static { this.register("____RANDOM_ID") }
+
   protected getInitialState(): AppState {
     return {
       min: 0,

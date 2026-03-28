@@ -1,3 +1,4 @@
+import "./app";
 import { startRuntime } from "lent";
 
 console.log("Client entry point");

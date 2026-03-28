@@ -11,6 +11,8 @@ type TaskProps = {
   onDelete?: () => void,
 };
 class Task extends Component<{}, TaskProps> {
+  static { this.register("____RANDOM_ID") }
+
   protected getInitialState(): {} { return {} }
 
   override render(): JSXElement {
@@ -47,10 +49,17 @@ type TodoState = {
 };
 
 export default class Todo extends Component<TodoState> {
+  static { this.register("____RANDOM_ID") }
+
   protected override getInitialState(): TodoState {
     return {
       input_text: "",
-      tasks: [],
+      tasks: [
+        {
+          done: false,
+          text: "Hi!",
+        },
+      ],
     };
   }
 

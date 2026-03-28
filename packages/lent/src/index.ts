@@ -3,9 +3,12 @@ export { createStore, untrack, type Store } from "./store";
 export { createTask } from "./task";
 export { For } from "./for";
 export { startRuntime } from "./runtime";
+export { serialize, deserialize } from "./serialize";
 
 import { constructComponent, type Component, type ComponentFactory } from "./component";
 import { immediateTrack } from "./task";
+import { serialize, deserialize } from "./serialize";
+import { isFunction } from "./utils";
 
 const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
@@ -26,10 +29,6 @@ export type Attributes = {
 } & {
   [key in `attr:${string}`]?: AttributeValue | (() => AttributeValue)
 };
-
-function isFunction(t: unknown): t is (...args: any) => any {
-  return typeof t === "function";
-}
 
 function isSSRElement(t: unknown): t is SSRElement {
   return typeof t === "object" && t !== null && SSRElementMarker in t && t[SSRElementMarker] === true;
@@ -309,6 +308,10 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
       const tv = v as Attributes[`attr:${string}`];
       const tk = k.replace(/^attr:/, "");
 
+      if (isFunction(tv)) {
+        t += `lentjs:attr:${tk}="${escapeHtmlAttribute(tv.toString())}" `;
+      }
+
       const val = isFunction(tv) ? tv() : tv;
       if (val === true) {
         t += `${tk} `;
@@ -330,8 +333,8 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
 let global_h_config: "ssr" | "dom" = "dom";
 
 export function h(element: string, props?: Attributes): JSXElement;
-export function h(element: ComponentFactory<{}, any>): JSXElement;
-export function h<P>(element: ComponentFactory<P, any>, props: P): JSXElement;
+export function h(element: ComponentFactory<{}, any, any>): JSXElement;
+export function h<P>(element: ComponentFactory<P, any, any>, props: P): JSXElement;
 export function h(element: any, props: any = {}): JSXElement {
   if (typeof element === "string") {
     if (global_h_config === "ssr") {
@@ -346,12 +349,18 @@ export function h(element: any, props: any = {}): JSXElement {
   }
   // is a component factory
   else {
+    const comp: ComponentFactory<{}, any, any> = element;
     if (global_h_config === "ssr") {
-      const t = stringifyJSXElement(constructComponent(element, props).render());
-      return { [SSRElementMarker]: true, t: `<!--lentjs-start component="${element.name}"-->${t}<!--lentjs-end-->` };
+      const constructed = constructComponent(comp, props);
+      const t = stringifyJSXElement(constructed.render());
+      const { children: _, ...propsWithoutChildren } = props;
+      return { [SSRElementMarker]: true, t: `<!--lentjs start ${comp.id} ${serialize({
+        props: propsWithoutChildren,
+        state: constructed.state,
+      })}-->${t}<!--lentjs end-->` };
     }
     else if (global_h_config === "dom") {
-      return constructComponent(element, props).render();
+      return constructComponent(comp, props).render();
     }
     else {
       throw new Error("Invalid global_h_config value");
