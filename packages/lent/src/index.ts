@@ -9,7 +9,7 @@ import { constructComponent, type Component, type ComponentFactory } from "./com
 import { immediateTrack } from "./task";
 import { serialize, deserialize } from "./serialize";
 import { isFunction } from "./utils";
-import { signals } from "./store";
+import { signals, startStoreReadListen, type StoreReadCallback } from "./store";
 
 const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
@@ -314,11 +314,23 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
       const tv = v as Attributes[`attr:${string}`];
       const tk = k.replace(/^attr:/, "");
 
+      let val: AttributeValue;
+
       if (isFunction(tv)) {
-        t += `lentjs:attr:${tk}="${escapeHtmlAttribute(serialize(tv))}" `;
+        const found_reads: NonNullable<StoreReadCallback["found_reads"]> = [];
+        const { end } = startStoreReadListen({ found_reads });
+        val = tv();
+        end();
+
+        t += `lentjs:attr:${tk}="${escapeHtmlAttribute(serialize({
+          callback: tv,
+          found_reads,
+        }))}" `;
+      }
+      else {
+        val = tv;
       }
 
-      const val = isFunction(tv) ? tv() : tv;
       if (val === true) {
         t += `${tk} `;
       }

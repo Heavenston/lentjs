@@ -62,7 +62,6 @@ export function serialize(value: unknown): string {
 export function deserialize(text: string): unknown {
   return devalue.parse(text, {
     componentFunction: f => {
-      console.log("componentFunction", f);
       return getComponentFunctions().name_to_function.get(`${f[0]} ${f[1]}`);
     },
     signalAccessor: (id: string) => {

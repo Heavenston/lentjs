@@ -115,7 +115,7 @@ export function signalSetterFromId(id: string): SignalSetter<unknown> {
     state.currentValue = new_value;
 
     if (changed) {
-      filterInPlace(state.callbacks, cb => cb.is_stopped !== true);
+      filterInPlace(state.callbacks, cb => cb.is_stopped !== true || cb.onUpdate === undefined);
       for (const cb of state.callbacks)
         cb.onUpdate?.();
       filterInPlace(state.callbacks, cb => cb.once !== true);
@@ -137,10 +137,9 @@ export function isSignalSetter(val: unknown): val is SignalSetter<never> {
 /// Starting after this function returns, and until the returned `end` function is called
 /// Any value read from a store will cause the given callback to be registered
 /// to be called everytime these read values are modified
-export function startStoreReadListen(cb: StoreReadCallback, options?: { once?: boolean }): { unsubscribe: () => void, end: () => void } {
+export function startStoreReadListen(cb: StoreReadCallback): { unsubscribe: () => void, end: () => void } {
   if (current_store_read_callback !== null)
     throw new Error("Recursive startStoreReadListen not supported");
-  cb.once = options?.once ?? false;
   current_store_read_callback = cb;
   return {
     unsubscribe: () => {

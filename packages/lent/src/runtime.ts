@@ -1,7 +1,7 @@
 import { Component, deserialize } from ".";
 import { constructComponent } from "./component";
 import { isClassMethod } from "./serialize";
-import { isSignalAccessor, isSignalSetter, signals } from "./store";
+import { isSignalAccessor, isSignalSetter, signals, type StoreReadCallback } from "./store";
 import { isBindableThis, isFunction } from "./utils";
 
 function closureBind(f: Function, new_this: object | null): Function {
@@ -95,8 +95,9 @@ function run(n: Node, ctx: RunCtx) {
 
         if (t.name.startsWith("lentjs:attr:")) {
           // TODO
-          // const attr = t.name.replace(/^lentjs:attr:/, "");
-          // const cb = new Function("return " + t.value).bind(current_comp)();
+          const attr = t.name.replace(/^lentjs:attr:/, "");
+          const cb = deserialize(t.value) as { found_reads: NonNullable<StoreReadCallback["found_reads"]>, callback: () => any };
+          console.log(attr, cb);
         }
       }
     }
