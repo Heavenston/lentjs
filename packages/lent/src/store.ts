@@ -9,6 +9,10 @@ function filterInPlace<T>(arr: T[], pred: (v: T) => boolean) {
   // arr.length = j;
 }
 
+function newId(): string {
+  return crypto.randomUUID().split("-",1)[0]!;
+}
+
 const isStoreSymbol = Symbol("is_store");
 export const storeIdSymbol = Symbol("store_id");
 
@@ -18,10 +22,12 @@ export type StoreReadCallback = {
   is_stopped?: boolean,
   once?: boolean,
   onUpdate?: () => void,
-  found_reads?: StoreRead[],
+};
+export type StoreReadListener = {
+  found_reads: StoreRead[],
 };
 
-let current_store_read_callback: StoreReadCallback | null = null;
+let current_store_read_listener: StoreReadListener | null = null;
 type StoreState = {
   props_callbacks: Map<string | symbol, StoreReadCallback[]>,
   obj: any,
@@ -47,13 +53,13 @@ export function resumeStore<S extends object>(store_id: string, obj: S): Store<S
       if (changed) {
         const arr = props_callbacks.get(prop);
         if (arr) {
-          filterInPlace(arr, cb => cb.is_stopped !== true);
           for (const cb of arr) {
-            cb.onUpdate?.();
+            if (!cb.is_stopped)
+              cb.onUpdate?.();
             if (cb.once)
               cb.is_stopped = true;
           }
-          filterInPlace(arr, cb => cb.once !== true);
+          filterInPlace(arr, cb => cb.is_stopped !== true);
         }
       }
       return true;
@@ -62,12 +68,9 @@ export function resumeStore<S extends object>(store_id: string, obj: S): Store<S
       if (prop === isStoreSymbol) { return true; }
       if (prop === storeIdSymbol) { return store_id; }
 
-      if (current_store_read_callback !== null) {
-        const prop_array = props_callbacks.get(prop) ?? props_callbacks.set(prop, []).get(prop)!;
-        if (!prop_array.includes(current_store_read_callback)) {
-          prop_array.push(current_store_read_callback);
-          current_store_read_callback.found_reads?.push({ kind: "store", id: store_id, property: prop })
-        }
+      if (current_store_read_listener !== null) {
+        if (!current_store_read_listener.found_reads.some(e => e.kind === "store" && e.id === store_id && e.property === prop))
+          current_store_read_listener.found_reads.push({ kind: "store", id: store_id, property: prop });
       }
 
       return obj[prop];
@@ -84,7 +87,7 @@ export function resumeStore<S extends object>(store_id: string, obj: S): Store<S
 }
 
 export function createStore<S extends object>(obj: S): Store<S> {
-  return resumeStore(crypto.randomUUID(), obj);
+  return resumeStore(newId(), obj);
 }
 
 export function isStore<S>(s: S): s is Store<S> {
@@ -112,7 +115,7 @@ export type SignalAccessor<V> = (() => V) & { [signalAccessorSymbol]: true } & S
 export type SignalSetter<V> = ((new_val: V) => void) & { [signalSetterSymbol]: true } & SignalData;
 
 export function createSignal<V>(initialValue: V): [SignalAccessor<V>, SignalSetter<V>] {
-  const id = crypto.randomUUID();
+  const id = newId();
   signals.set(id, {
     callbacks: [],
     currentValue: initialValue,
@@ -122,21 +125,20 @@ export function createSignal<V>(initialValue: V): [SignalAccessor<V>, SignalSett
   return [signalAccessorFromId(id), signalSetterFromId(id)];
 }
 
-export function signalAccessorFromId(id: string): SignalAccessor<unknown> {
+export function signalAccessorFromId(signal_id: string): SignalAccessor<unknown> {
   const accessor: SignalAccessor<unknown> = () => {
-    const state = signals.get(id);
-    if (!state) throw new Error(`No signal found with id ${id}`);
+    const state = signals.get(signal_id);
+    if (!state) throw new Error(`No signal found with id ${signal_id}`);
 
-    if (current_store_read_callback !== null) {
-      if (!state.callbacks.includes(current_store_read_callback)) {
-        state.callbacks.push(current_store_read_callback);
-        current_store_read_callback.found_reads?.push({ kind: "signal", id });
-      }
+    if (current_store_read_listener !== null) {
+      if (!current_store_read_listener.found_reads.some(e => e.kind === "store" && e.id === signal_id))
+        current_store_read_listener.found_reads.push({ kind: "signal", id: signal_id });
     }
+
     return state.currentValue;
   };
   accessor[signalAccessorSymbol] = true;
-  accessor.signalId = id;
+  accessor.signalId = signal_id;
   return accessor;
 }
 
@@ -149,10 +151,13 @@ export function signalSetterFromId(id: string): SignalSetter<unknown> {
     state.currentValue = new_value;
 
     if (changed) {
-      filterInPlace(state.callbacks, cb => cb.is_stopped !== true || cb.onUpdate === undefined);
-      for (const cb of state.callbacks)
-        cb.onUpdate?.();
-      filterInPlace(state.callbacks, cb => cb.once !== true);
+      for (const cb of state.callbacks) {
+        if (!cb.is_stopped)
+          cb.onUpdate?.();
+        if (cb.once)
+          cb.is_stopped = true;
+      }
+      filterInPlace(state.callbacks, cb => cb.is_stopped !== true);
     }
   };
   setter[signalSetterSymbol] = true;
@@ -168,49 +173,64 @@ export function isSignalSetter(val: unknown): val is SignalSetter<never> {
   return typeof val === "function" && val !== null && signalSetterSymbol in val && val[signalSetterSymbol] === true;
 }
 
-export function subscribeToStoreRead(cb: StoreReadCallback, reads: StoreRead[]) {
+export type Unsubscribe = () => void;
+export function subscribeToStoreReads(cb: () => void, reads: StoreRead[], options?: { once?: boolean }): Unsubscribe {
+  const callback: StoreReadCallback = {
+    onUpdate: cb,
+    once: options?.once ?? false,
+  };
+
   for (const read of reads) {
     if (read.kind === "store") {
       const store = stores.get(read.id);
       if (!store) throw new Error(`No such store with id ${read.id}`);
       let arr = store.props_callbacks.get(read.property);
       if (!arr) store.props_callbacks.set(read.property, arr = []);
-      arr.push(cb);
+      arr.push(callback);
     }
     else if (read.kind === "signal") {
       const signal = signals.get(read.id);
       if (!signal) throw new Error(`No such signal with id ${read.id}`);
-      signal.callbacks.push(cb);
+      signal.callbacks.push(callback);
     }
     else {
       read satisfies never;
     }
   }
-}
 
-/// Starting after this function returns, and until the returned `end` function is called
-/// Any value read from a store will cause the given callback to be registered
-/// to be called everytime these read values are modified
-export function startStoreReadListen(cb: StoreReadCallback): { unsubscribe: () => void, end: () => void } {
-  if (current_store_read_callback !== null)
-    throw new Error("Recursive startStoreReadListen not supported");
-  current_store_read_callback = cb;
-  return {
-    unsubscribe: () => {
-      cb.is_stopped = true;
-    },
-    end: () => {
-      if (current_store_read_callback !== cb)
-        throw new Error("Invalid state after store read listen");
-      current_store_read_callback = null;
-    },
+  return () => {
+    callback.is_stopped = true;
   };
 }
 
+export function listenForStoreReads<T>(cb: () => T): [T, StoreRead[]] {
+  if (current_store_read_listener !== null)
+    throw new Error("Recursive listenForStoreReads not supported");
+  const found_reads: StoreRead[] = [];
+  current_store_read_listener = { found_reads };
+  try {
+    const val = cb();
+    return [val, found_reads];
+  }
+  catch(e) {
+    throw e;
+  }
+  finally {
+    current_store_read_listener = null;
+  }
+}
+
 export function untrack<T>(cb: () => T): T {
-  const old_read_callback = current_store_read_callback;
-  current_store_read_callback = null;
-  const val = cb();
-  current_store_read_callback = old_read_callback;
-  return val;
+  const old_read_callback = current_store_read_listener;
+  current_store_read_listener = null;
+
+  try {
+    return cb();
+  }
+  catch(e) {
+    throw e;
+  }
+  finally {
+    current_store_read_listener = old_read_callback;
+  }
 }

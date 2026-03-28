@@ -9,7 +9,7 @@ import { constructComponent, type Component, type ComponentFactory } from "./com
 import { immediateTrack } from "./task";
 import { serialize, deserialize } from "./serialize";
 import { fullCall, isFunction } from "./utils";
-import { signals, startStoreReadListen, stores, type StoreReadCallback } from "./store";
+import { listenForStoreReads, signals, stores, type StoreRead, type StoreReadCallback } from "./store";
 
 const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
@@ -150,11 +150,7 @@ function stringifyJSXElement(el: JSXElement): string {
     return el.toString();
   }
   else if (isFunction(el)) {
-    const found_reads: NonNullable<StoreReadCallback["found_reads"]> = [];
-    const { end } = startStoreReadListen({ found_reads });
-    const val = fullCall(el);
-    end();
-
+    const [val, found_reads] = listenForStoreReads(() => fullCall(el));
     const prefix = `<!--lentjs start-dynamic ${serialize({ found_reads, el })}-->`
     const suffix = `<!--lentjs end-dynamic-->`
     return `${prefix}${stringifyJSXElement(val)}${suffix}`;
@@ -175,6 +171,9 @@ function stringifyJSXElement(el: JSXElement): string {
 }
 
 export function renderToString(jsx: { new(props: {}): Component }): string {
+  signals.clear();
+  stores.clear();
+
   global_h_config = "ssr";
   try {
     const p = new jsx({});
@@ -184,14 +183,12 @@ export function renderToString(jsx: { new(props: {}): Component }): string {
     for (const [id, { currentValue }] of signals.entries()) {
       ser_signals.push([id, currentValue]);
     }
-    signals.clear();
     const signals_data = `<!--lentjs signals ${serialize(ser_signals)}-->`;
 
     const ser_stores: [string, any][] = [];
     for (const [id, { obj }] of stores.entries()) {
       ser_stores.push([id, obj]);
     }
-    stores.clear();
     const stores_data = `<!--lentjs stores ${serialize(ser_stores)}-->`;
 
     return `${signals_data}${stores_data}${el}`;
@@ -204,7 +201,7 @@ export function renderToString(jsx: { new(props: {}): Component }): string {
   }
 }
 
-function setAttribute(element: HTMLElement, name: string, value: AttributeValue) {
+export function setAttribute(element: HTMLElement, name: string, value: AttributeValue) {
   if (value !== undefined && value !== false)
     element.setAttribute(name, value.toString());
   else
@@ -340,11 +337,8 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
       let val: AttributeValue;
 
       if (isFunction(tv)) {
-        const found_reads: NonNullable<StoreReadCallback["found_reads"]> = [];
-        const { end } = startStoreReadListen({ found_reads });
-        val = tv();
-        end();
-
+        let found_reads: StoreRead[];
+        [val, found_reads] = listenForStoreReads(tv);
         t += `lentjs:attr:${tk}="${escapeHtmlAttribute(serialize({
           callback: tv,
           found_reads,

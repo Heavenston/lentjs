@@ -1,4 +1,4 @@
-import { startStoreReadListen } from "./store";
+import { listenForStoreReads, subscribeToStoreReads } from "./store";
 import { microtaskDebounce } from "./utils";
 
 export type TaskCtx = {
@@ -12,10 +12,9 @@ export function createTask(task: (ctx: TaskCtx) => void) {
 
   const ctx: TaskCtx = {
     track: (track_cb) => {
-      const { end, unsubscribe } = startStoreReadListen({ onUpdate: debounceRun, once: true });
+      const [val, store_reads] = listenForStoreReads(() => track_cb());
+      const unsubscribe = subscribeToStoreReads(debounceRun, store_reads, { once: true });
       cleanup_functions.push(unsubscribe);
-      const val = track_cb();
-      end();
       return val;
     },
     cleanup: (cb) => {
@@ -29,9 +28,8 @@ export function createTask(task: (ctx: TaskCtx) => void) {
 export function immediateTrack<T, R>(getValue: (previous?: T) => T, fn1: (val: T) => R, fn2?: (val: T) => void): R {
   let previous_val: T | undefined;
   const run = () => {
-    const { end } = startStoreReadListen({ onUpdate: debounced, once: true });
-    const val = getValue(previous_val);
-    end();
+    const [val, store_reads] = listenForStoreReads(() => getValue(previous_val));
+    subscribeToStoreReads(debounced, store_reads, { once: true });
     previous_val = val;
     return val;
   };

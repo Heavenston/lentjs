@@ -1,8 +1,8 @@
 import type { JsxElement } from "typescript";
-import { applyNewNodeList, Component, deserialize, normalizeChildren, type JSXElement } from ".";
+import { applyNewNodeList, Component, deserialize, normalizeChildren, setAttribute, type JSXElement } from ".";
 import { constructComponent } from "./component";
 import { isClassMethod } from "./serialize";
-import { isSignalAccessor, isSignalSetter, resumeStore, signals, subscribeToStoreRead, type StoreRead, type StoreReadCallback } from "./store";
+import { isSignalAccessor, isSignalSetter, listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead, type StoreReadCallback } from "./store";
 import { fullCall, isBindableThis, isFunction, microtaskDebounce } from "./utils";
 
 function closureBind<F extends Function>(f: F, new_this: object | null): F {
@@ -108,19 +108,19 @@ function run(n: Node, ctx: RunCtx) {
         const end = n;
         const parent = n.parentNode!;
 
-        subscribeToStoreRead({
-          once: true,
-          onUpdate: microtaskDebounce(() => {
-            const previous = [];
-            let current: Node | null = start;
-            while (current?.nextSibling && current?.nextSibling !== end) {
-              previous.push(current?.nextSibling);
-              current = current?.nextSibling;
-            }
-            const new_nodes = normalizeChildren(update(previous)).flatMap(fullCall);
-            applyNewNodeList(parent, start, end, new_nodes);
-          }),
-        }, found_reads);
+        const hh = microtaskDebounce(() => {
+          const previous: Node[] = [];
+          let current: Node | null = start;
+          while (current?.nextSibling && current?.nextSibling !== end) {
+            previous.push(current?.nextSibling);
+            current = current?.nextSibling;
+          }
+
+          const [new_nodes, new_found_reads] = listenForStoreReads(() => normalizeChildren(update(previous)).flatMap(fullCall));
+          subscribeToStoreReads(hh, new_found_reads, { once: true });
+          applyNewNodeList(parent, start, end, new_nodes);
+        });
+        subscribeToStoreReads(hh, found_reads, { once: true });
         break;
       }
       default:
@@ -140,10 +140,17 @@ function run(n: Node, ctx: RunCtx) {
         }
 
         if (t.name.startsWith("lentjs:attr:")) {
-          // TODO
           const attr = t.name.replace(/^lentjs:attr:/, "");
-          const cb = deserialize(t.value) as { found_reads: NonNullable<StoreReadCallback["found_reads"]>, callback: () => any };
-          console.log(attr, cb);
+          let { callback, found_reads } = deserialize(t.value) as { found_reads: StoreRead[], callback: () => any };
+
+          callback = closureBind(callback, current_comp);
+
+          const hh = microtaskDebounce(() => {
+            const [new_value, new_found_reads] = listenForStoreReads(() => callback());
+            setAttribute(n, attr, new_value);
+            subscribeToStoreReads(hh, new_found_reads, { once: true });
+          });
+          subscribeToStoreReads(hh, found_reads, { once: true });
         }
       }
     }
