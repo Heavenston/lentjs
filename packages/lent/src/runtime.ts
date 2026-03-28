@@ -1,8 +1,7 @@
-import type { JsxElement } from "typescript";
 import { applyNewNodeList, Component, deserialize, normalizeChildren, renderClasslist, setAttribute, type ClassList, type JSXElement } from ".";
 import { constructComponent } from "./component";
 import { isClassMethod } from "./serialize";
-import { isSignalAccessor, isSignalSetter, listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead, type StoreReadCallback } from "./store";
+import { isSignalAccessor, isSignalSetter, listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "./store";
 import { fullCall, isBindableThis, isFunction, microtaskDebounce } from "./utils";
 
 function closureBind<F extends Function>(f: F, new_this: object | null): F {

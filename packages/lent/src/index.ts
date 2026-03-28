@@ -7,9 +7,9 @@ export { serialize, deserialize } from "./serialize";
 
 import { constructComponent, type Component, type ComponentFactory } from "./component";
 import { immediateTrack } from "./task";
-import { serialize, deserialize } from "./serialize";
+import { serialize } from "./serialize";
 import { fullCall, isFunction } from "./utils";
-import { listenForStoreReads, signals, stores, type StoreRead, type StoreReadCallback } from "./store";
+import { listenForStoreReads, signals, stores, type StoreRead } from "./store";
 
 const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
