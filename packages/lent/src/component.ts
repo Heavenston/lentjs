@@ -9,11 +9,15 @@ export abstract class Component<S extends object = {}, P = {}> {
 
   public static get id(): string { return this.id_ }
 
+  public static listComponents() {
+    return this.#components.values();
+  }
   public static getComponentFromId(id: string): ComponentFactory<any, any, any> | null {
     return this.#components.get(id) ?? null;
   }
 
   protected static register(id: string) {
+    id += `_${this.name}`;
     this.id_ = id;
     Component.#components.set(
       id,

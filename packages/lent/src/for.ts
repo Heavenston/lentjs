@@ -7,14 +7,14 @@ type ElementState<T> = {
   dispose: () => void,
 };
 type ForState<T> = {
-  elements: ElementState<T>[],
+  // elements: ElementState<T>[],
 };
 export type ForProps<T> = {
   each: () => T[],
   children: (idx: number, element: () => T) => JSXElement,
 };
 export class For<T> extends Component<ForState<T>, ForProps<T>> {
-  static { this.register("__lentjs_for") }
+  static { this.register("__lentjs") }
 
   protected override getInitialState(): ForState<T> {
     return {
@@ -24,7 +24,7 @@ export class For<T> extends Component<ForState<T>, ForProps<T>> {
 
   #compute(): JSXElement[] {
     const new_elements: ElementState<T>[] = [];
-    const old_elements: ElementState<T>[] = untrack(() => this.state.elements);
+    const old_elements: ElementState<T>[] = [];
     const each = this.props.each();
     for (let i = 0; i < each.length; i++) {
       const val: T = each[i]!;
@@ -46,7 +46,7 @@ export class For<T> extends Component<ForState<T>, ForProps<T>> {
     for (let i = each.length; i < old_elements.length; i++) {
       old_elements[i]!.dispose();
     }
-    this.state.elements = new_elements;
+    // this.state.elements = new_elements;
     return new_elements.map(el => el.value);
   }
 

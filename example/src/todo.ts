@@ -63,7 +63,7 @@ export default class Todo extends Component<TodoState> {
     };
   }
 
-  addTask(text: string) {
+  private addTask(text: string) {
     this.state.tasks = [...this.state.tasks, createStore({
       done: false,
       text,

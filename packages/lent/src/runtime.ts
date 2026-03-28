@@ -34,8 +34,6 @@ function run(n: Node, ctx: RunCtx) {
           }
         }
 
-        console.log(props);
-        console.log(state);
         ctx.component_stack.push({
           id: cid,
           instance: factory ? constructComponent(factory, props, state) : null,
