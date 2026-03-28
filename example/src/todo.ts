@@ -12,12 +12,15 @@ type TaskProps = {
   onDelete?: () => void,
 };
 class Task extends Component<{}, TaskProps> {
+  private c = c;
+
   static { this.register("____RANDOM_ID") }
 
   protected getInitialState(): {} { return {} }
 
   protected init(): void {
-    console.log("Task:", this.props.task());
+    console.log("Props: ", this.props);
+    console.log("Task:", this.props.task, "=", this.props.task());
   }
 
   private onChangeDone(e: Event) {
@@ -28,7 +31,7 @@ class Task extends Component<{}, TaskProps> {
 
   override render(): JSXElement {
     return h("div", {
-      class: () => [c["task"], { [c["task-completed"]]: this.props.task().done }],
+      class: () => [this.c["task"], { [this.c["task-completed"]]: this.props.task().done }],
       children: [
         h("span", {
           children: () => this.props.task().text,
@@ -62,11 +65,11 @@ export default class Todo extends Component<TodoState> {
     return {
       input_text: "",
       tasks: [
-        {
+        createStore({
           id: crypto.randomUUID(),
           done: false,
           text: "Hi!",
-        },
+        }),
       ],
     };
   }

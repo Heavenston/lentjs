@@ -1,5 +1,5 @@
 import type { JsxElement } from "typescript";
-import { applyNewNodeList, Component, deserialize, normalizeChildren, setAttribute, type JSXElement } from ".";
+import { applyNewNodeList, Component, deserialize, normalizeChildren, renderClasslist, setAttribute, type ClassList, type JSXElement } from ".";
 import { constructComponent } from "./component";
 import { isClassMethod } from "./serialize";
 import { isSignalAccessor, isSignalSetter, listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead, type StoreReadCallback } from "./store";
@@ -148,6 +148,20 @@ function run(n: Node, ctx: RunCtx) {
           const hh = microtaskDebounce(() => {
             const [new_value, new_found_reads] = listenForStoreReads(() => callback());
             setAttribute(n, attr, new_value);
+            subscribeToStoreReads(hh, new_found_reads, { once: true });
+          });
+          subscribeToStoreReads(hh, found_reads, { once: true });
+        }
+
+        if (t.name.startsWith("lentjs:class")) {
+          let { update, found_reads } = deserialize(t.value) as { found_reads: StoreRead[], update: () => ClassList };
+
+          update = closureBind(update, current_comp);
+
+          const hh = microtaskDebounce(() => {
+            const [new_value, new_found_reads] = listenForStoreReads(() => update());
+            n.className = "";
+            n.classList.add(...renderClasslist(new_value));
             subscribeToStoreReads(hh, new_found_reads, { once: true });
           });
           subscribeToStoreReads(hh, found_reads, { once: true });

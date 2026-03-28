@@ -23,6 +23,7 @@ export class For<T> extends Component<ForState<T>, ForProps<T>> {
 
   private compute(previous: JSXElement): JSXElement {
     const old_jsx_elements = Array.isArray(previous) ? previous : [previous];
+    console.log(old_jsx_elements);
 
     const new_elements: ElementState<T>[] = [];
     const old_elements: ElementState<T>[] = untrack(() => this.state.elements);
@@ -35,6 +36,7 @@ export class For<T> extends Component<ForState<T>, ForProps<T>> {
         const el = old_elements[i]!;
         el.setEl(val);
         new_elements.push(el);
+        jsx_elements.push(old_jsx_elements[i]);
       }
       else {
         const [el, setEl] = createSignal(val);

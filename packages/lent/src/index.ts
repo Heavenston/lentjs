@@ -124,7 +124,7 @@ function addChild(parent: Node, child: JSXElement) {
   }
 }
 
-function renderClasslist(list: ClassList): string[] {
+export function renderClasslist(list: ClassList): string[] {
   if (typeof list === "string") {
     return list.split(" ");
   }
@@ -301,7 +301,12 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
       if (typeof tv === "string")
         t += `class="${tv}" `;
       else if (typeof tv === "function") {
-        t += `class="${renderClasslist(tv()).join(" ")}" `;
+        const [class_list, found_reads] = listenForStoreReads(tv);
+        t += `class="${renderClasslist(class_list).join(" ")}" `;
+        t += `lentjs:class="${escapeHtmlAttribute(serialize({
+          found_reads,
+          update: tv,
+        }))}" `;
       }
       else if(tv)
         t += `class="${renderClasslist(tv).join(" ")}" `;
