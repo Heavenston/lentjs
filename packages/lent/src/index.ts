@@ -1,7 +1,9 @@
-export { createStore, type Store } from "./store";
+export { Component, type ComponentFactory } from "./component";
+export { createStore, untrack, type Store } from "./store";
 export { createTask } from "./task";
+export { For } from "./for";
 
-import { type Store, createStore } from "./store";
+import { constructComponent, type Component, type ComponentFactory } from "./component";
 import { immediateTrack } from "./task";
 
 export type JSXElement = Node | number | string | null | undefined | JSXElement[] | (() => JSXElement);
@@ -24,38 +26,6 @@ function isFunction(t: unknown): t is (...args: any) => any {
   return typeof t === "function";
 }
 
-export abstract class Component<S extends object = {}, P = {}> {
-  public static is_component_class: true = true;
-
-  #state: Store<S> | undefined;
-
-  #createInitialState(): Store<S> {
-    return createStore(this.getInitialState());
-  }
-  
-  protected get state(): Store<S> {
-    if (this.#state === undefined) {
-      this.#state = this.#createInitialState();
-    }
-    return this.#state;
-  }
-
-  constructor(public readonly props: Readonly<P>) {
-    this.init?.();
-  }
-
-  protected init?(): void;
-  protected abstract getInitialState(): S;
-  abstract render(): JSXElement;
-}
-
-export type ComponentFactory<P, C extends Component<any, P>> = (((props: P) => C) & { is_component_class?: undefined }) | { is_component_class: true, new(props: P): C }
-function constructComponent<P, C extends Component<any, P>, F extends ComponentFactory<P, C>>(factory: F, props: P): C {
-  if (factory.is_component_class)
-    return new factory(props);
-  else
-    return factory(props);
-}
 
 type NormalizedNode = string | Node;
 function normalizeChildren(child: JSXElement): (NormalizedNode | (() => NormalizedNode[]))[] {
@@ -105,6 +75,10 @@ function addChild(parent: Node, child: JSXElement) {
           if (typeof newnode === "string" && oldnode instanceof Text) {
             oldnode.textContent = newnode;
             current = oldnode;
+          }
+          else if (oldnode === newnode) {
+            // Do nothing
+            current = newnode;
           }
           else {
             const n = nodify(newnode);

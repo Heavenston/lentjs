@@ -62,3 +62,11 @@ export function startStoreReadListen(cb: StoreReadCallback, options?: { once?: b
     },
   };
 }
+
+export function untrack<T>(cb: () => T): T {
+  const old_read_callback = current_store_read_callback;
+  current_store_read_callback = null;
+  const val = cb();
+  current_store_read_callback = old_read_callback;
+  return val;
+}

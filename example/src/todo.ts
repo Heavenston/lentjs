@@ -1,4 +1,4 @@
-import { h, Component, type JSXElement, createStore } from "lent";
+import { h, Component, type JSXElement, createStore, For } from "lent";
 
 type TaskState = {
   text: string,
@@ -6,23 +6,25 @@ type TaskState = {
 };
 
 type TaskProps = {
-  task: TaskState,
+  task: () => TaskState,
 };
 class Task extends Component<{}, TaskProps> {
   protected getInitialState(): {} { return {} }
 
-  render(): JSXElement {
+  override render(): JSXElement {
     return h("div", {
+      class: () => ["task", { "task-completed": this.props.task().done }],
       children: [
         h("span", {
-          children: () => this.props.task.text,
+          children: () => this.props.task().text,
         }),
         h("input", {
-          "attr:checked": () => this.props.task.done ? "" : undefined,
+          "attr:type": "checkbox",
+          "attr:checked": () => this.props.task().done ? "" : undefined,
           "on:change": (e) => {
             const el = e.currentTarget;
             if (!(el instanceof HTMLInputElement)) return;
-            this.props.task.done = el.checked;
+            this.props.task().done = el.checked;
           },
         }),
       ],
@@ -36,7 +38,7 @@ type TodoState = {
 };
 
 export default class Todo extends Component<TodoState> {
-  protected getInitialState(): TodoState {
+  protected override getInitialState(): TodoState {
     return {
       input_text: "Example",
       tasks: [
@@ -47,13 +49,13 @@ export default class Todo extends Component<TodoState> {
   }
 
   addTask(text: string) {
-    this.state.tasks.push(createStore({
+    this.state.tasks = [...this.state.tasks, createStore({
       done: false,
       text,
-    }));
+    })];
   }
 
-  render(): JSXElement {
+  override render(): JSXElement {
     return h("div", {
       children: [
         h("form", {
@@ -80,8 +82,10 @@ export default class Todo extends Component<TodoState> {
         }),
 
         h("div", {
-          // TODO
-          // children: () => this.state.tasks.map(task => h(Task, { task })),
+          children: h(For<TaskState>, {
+            each: () => this.state.tasks,
+            children: (_idx, task) => h(Task, { task }),
+          }),
         }),
       ],
     });
