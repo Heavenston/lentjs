@@ -2,6 +2,7 @@ export { Component, type ComponentFactory } from "./component";
 export { createStore, untrack, type Store } from "./store";
 export { createTask } from "./task";
 export { For } from "./for";
+export { startRuntime } from "./runtime";
 
 import { constructComponent, type Component, type ComponentFactory } from "./component";
 import { immediateTrack } from "./task";
@@ -181,6 +182,14 @@ function setAttribute(element: HTMLElement, name: string, value: AttributeValue)
   else
     element.removeAttribute(name);
 }
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 function createHTMLElement(element: string, props: Attributes): HTMLElement {
   const el = document.createElement(element);
   for (const [k, v] of Object.entries(props)) {
@@ -293,16 +302,19 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
     else if (k.startsWith("on:")) {
       const tv = v as Attributes[`on:${string}`];
       const tk = k.replace(/^on:/, "");
-      // TODO
-      t += `--data-event-${tk}="${tv}" `;
+      if (tv !== undefined)
+        t += `lentjs:on:${tk}="${escapeHtmlAttribute(tv.toString())}" `;
     }
     else if (k.startsWith("attr:")) {
       const tv = v as Attributes[`attr:${string}`];
       const tk = k.replace(/^attr:/, "");
 
       const val = isFunction(tv) ? tv() : tv;
-      if (val !== undefined) {
-        t += `${tk}="${val}" `;
+      if (val === true) {
+        t += `${tk} `;
+      }
+      else if (val !== undefined && val !== false) {
+        t += `${tk}="${escapeHtmlAttribute(val.toString())}" `;
       }
     }
     else {

@@ -1,5 +1,4 @@
-// import App from "./app";
-// import { render } from "lent";
+import { startRuntime } from "lent";
 
-// const el = document.getElementById("app");
-// render(el!, App);
+const el = document.getElementById("app");
+startRuntime(el!);
