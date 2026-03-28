@@ -152,7 +152,17 @@ function stringifyJSXElement(el: JSXElement): string {
     return el.toString();
   }
   else if (isFunction(el)) {
-    return stringifyJSXElement(fullCall(el));
+    const found_reads: NonNullable<StoreReadCallback["found_reads"]> = [];
+    const { end } = startStoreReadListen({ found_reads });
+    const val = fullCall(el);
+    end();
+
+    const prefix = `<!--lentjs start-dynamic on ${serialize({
+      found_reads,
+      el,
+    })}-->`
+    const suffix = `<!--lentjs end-dynamic-->`
+    return `${prefix}${stringifyJSXElement(val)}${suffix}`;
   }
   else if (Array.isArray(el)) {
     return el.map(stringifyJSXElement).join("");

@@ -167,7 +167,15 @@ export function isSignalSetter(val: unknown): val is SignalSetter<never> {
 
 export function subscribeToStoreRead(cb: () => void, reads: StoreRead[]) {
   for (const read of reads) {
-    
+    if (read.kind === "store") {
+      
+    }
+    else if (read.kind === "signal") {
+      
+    }
+    else {
+      read satisfies never;
+    }
   }
 }
 
