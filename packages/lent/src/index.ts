@@ -157,7 +157,7 @@ function stringifyJSXElement(el: JSXElement): string {
     const val = fullCall(el);
     end();
 
-    const prefix = `<!--lentjs start-dynamic on ${serialize({
+    const prefix = `<!--lentjs start-dynamic ${serialize({
       found_reads,
       el,
     })}-->`
@@ -189,14 +189,14 @@ export function renderToString(jsx: { new(props: {}): Component }): string {
     ser_signals.push([id, currentValue]);
   }
   signals.clear();
-  const signals_data = `<!--lentjs state signals ${serialize(ser_signals)}-->`;
+  const signals_data = `<!--lentjs signals ${serialize(ser_signals)}-->`;
 
   const ser_stores: [string, any][] = [];
   for (const [id, { obj }] of stores.entries()) {
     ser_stores.push([id, obj]);
   }
   stores.clear();
-  const stores_data = `<!--lentjs state stores ${serialize(ser_stores)}-->`;
+  const stores_data = `<!--lentjs stores ${serialize(ser_stores)}-->`;
 
   return `${signals_data}${stores_data}${el}`;
 }
@@ -391,7 +391,7 @@ export function h(element: any, props: any = {}): JSXElement {
     if (global_h_config === "ssr") {
       const constructed = constructComponent(comp, props);
       const t = stringifyJSXElement(constructed.render());
-      return { [SSRElementMarker]: true, t: `<!--lentjs start-component ${comp.id} ${serialize({ props, state: constructed.state, })}-->${t}<!--lentjs end-component-->` };
+      return { [SSRElementMarker]: true, t: `<!--lentjs start-component ${serialize({ id: comp.id, props, state: constructed.state, })}-->${t}<!--lentjs end-component-->` };
     }
     else if (global_h_config === "dom") {
       return constructComponent(comp, props).render();

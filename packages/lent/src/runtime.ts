@@ -40,37 +40,38 @@ type RunCtx = {
 function run(n: Node, ctx: RunCtx) {
   n.childNodes.forEach(n => {
     if (n instanceof Comment) {
-      const parts = n.textContent.split(" ", 3);
+      const parts = n.textContent.split(" ", 2);
       if (parts[0] !== "lentjs") return;
-      const parts_rest = n.textContent.replace(/^([^ ]+ +){3}/, "");
+      const parts_rest = n.textContent.replace(/^([^ ]+ +){2}/, "");
 
       switch (parts[1]) {
-      case "state": {
-        const state_data = deserialize(parts_rest) as [string, any][];
-        if (parts[2] === "signals") {
-          for (const [id, val] of state_data) {
-            signals.set(id, {
-              callbacks: [],
-              currentValue: val,
-            });
-          }
+      case "signals": {
+        const signals_data = deserialize(parts_rest) as [string, any][];
+        for (const [id, val] of signals_data) {
+          signals.set(id, {
+            callbacks: [],
+            currentValue: val,
+          });
         }
-        else if (parts[2] === "stores") {
-          for (const [id, val] of state_data) {
-            resumeStore(id, val);
-          }
-        }
-      }
         break;
+      }
+      case "stores": {
+        const stores_data = deserialize(parts_rest) as [string, any][];
+        for (const [id, val] of stores_data) {
+          resumeStore(id, val);
+        }
+        break;
+      }
       case "start-component":
         const previous_comp = ctx.component_stack.at(-1)?.instance ?? null;
 
-        const cid = parts[2]!;
+        const { id: cid, props, state } = deserialize(parts_rest) as any;
+
         const factory = Component.getComponentFromId(cid);
         if (!factory) {
           console.warn(`Could not find the component with id`, cid);
         }
-        const { props, state } = deserialize(parts_rest) as any;
+
         rebindFunctions(props, previous_comp);
         rebindFunctions(state, previous_comp);
 
