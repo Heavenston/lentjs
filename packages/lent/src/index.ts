@@ -8,9 +8,9 @@ export { serialize, deserialize } from "./serialize";
 import { constructComponent, type Component, type ComponentFactory } from "./component";
 import { immediateTrack } from "./task";
 import { serialize } from "./serialize";
-import { assert, fullCall, isFunction, microtaskDebounce } from "./utils";
-import { listenForStoreReads, signals, stores, subscribeToStoreReads, type StoreRead } from "./store";
-import type { RuntimeDynamicState } from "./runtime";
+import { assert, isFunction } from "./utils";
+import { listenForStoreReads, signals, stores, type StoreRead } from "./store";
+import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type MarkerDirectiveName } from "./runtime";
 
 const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
@@ -180,7 +180,13 @@ export function render(container: HTMLElement, jsx: { new(props: {}): Component 
   addChild(container, output);
 }
 
-function stringifyJSXElement(el: JSXElement): string {
+function createDirective<K extends MarkerDirectiveName>(name: K): string;
+function createDirective<K extends DirectiveName>(name: K, arg: Directives[K]): string;
+function createDirective(name: string, arg: unknown = null): string {
+  return `<!--${DIRECTIVE_PREFIX} ${name}${arg === null ? "" : " "+serialize(arg)}-->`;
+}
+
+function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): string {
   if (isSSRElement(el)) {
     return el.t;
   }
@@ -188,16 +194,34 @@ function stringifyJSXElement(el: JSXElement): string {
     return el.toString();
   }
   else if (isFunction(el)) {
-    const [val, storeReads] = listenForStoreReads(() => fullCall(el));
-    const prefix = `<!--lentjs start-dynamic ${serialize({ storeReads, update: el } satisfies RuntimeDynamicState)}-->`
-    const suffix = `<!--lentjs end-dynamic-->`
-    return `${prefix}${stringifyJSXElement(val)}${suffix}`;
+    const [val, storeReads] = listenForStoreReads(() => el());
+    const prefix = createDirective("start-dynamic", {
+      storeReads,
+      update: el,
+    });
+    const suffix = createDirective("end-dynamic");
+    return `${prefix}${stringifyJSXElement(val, true)}${suffix}`;
   }
   else if (Array.isArray(el)) {
-    return el.map(stringifyJSXElement).join("");
+    if (!isInsideDynamic) {
+      return el.map(e => stringifyJSXElement(e, isInsideDynamic)).join("");
+    }
+
+    const t = el.map(e => {
+      const prefix = createDirective("start-array-element");
+      const suffix = createDirective("end-array-element");
+      return `${prefix}${stringifyJSXElement(e, isInsideDynamic)}${suffix}`;
+    }).join("");
+    const prefix = createDirective("start-array");
+    const suffix = createDirective("end-array");
+    return `${prefix}${t}${suffix}`;
   }
   else if (el == null) {
-    return "";
+    if (!isInsideDynamic) {
+      return "";
+    }
+
+    return createDirective("null", null);
   }
   else if (el instanceof Node) {
     throw new Error("Unsupported Node");
@@ -208,26 +232,25 @@ function stringifyJSXElement(el: JSXElement): string {
   }
 }
 
-export function renderToString(jsx: { new(props: {}): Component }): string {
+export function renderToString(jsx: ComponentFactory<{}, any, any>): string {
   signals.clear();
   stores.clear();
 
   global_h_config = "ssr";
   try {
-    const p = new jsx({});
-    const el = stringifyJSXElement(p.render());
+    const el = stringifyJSXElement(h(jsx));
 
     const ser_stores: [string, any][] = [];
     for (const [id, { obj }] of stores.entries()) {
       ser_stores.push([id, obj]);
     }
-    const stores_data = `<!--lentjs stores ${serialize(ser_stores)}-->`;
+    const stores_data = createDirective("stores", ser_stores);
 
     const ser_signals: [string, any][] = [];
     for (const [id, { currentValue }] of signals.entries()) {
       ser_signals.push([id, currentValue]);
     }
-    const signals_data = `<!--lentjs signals ${serialize(ser_signals)}-->`;
+    const signals_data = createDirective("signals", ser_signals);
 
     return `${stores_data}${signals_data}${el}`;
   }
@@ -431,7 +454,14 @@ export function h(element: any, props: any = {}): JSXElement {
     if (global_h_config === "ssr") {
       const constructed = constructComponent(comp, props);
       const t = stringifyJSXElement(constructed.render());
-      return { [SSRElementMarker]: true, t: `<!--lentjs start-component ${serialize({ id: comp.id, props, state: constructed.state, })}-->${t}<!--lentjs end-component-->` };
+      return {
+        [SSRElementMarker]: true,
+        t: `${createDirective("start-component", {
+          id: comp.id,
+          props,
+          state: constructed.state,
+        })}${t}${createDirective("end-component")}`,
+      };
     }
     else if (global_h_config === "dom") {
       return constructComponent(comp, props).render();

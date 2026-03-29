@@ -1,8 +1,8 @@
-import { Component, deserialize, renderClasslist, setAttribute, type ClassList, type JSXElement } from ".";
+import { Component, deserialize, patchElement, renderClasslist, setAttribute, type ClassList, type JSXElement, type JSXState, type JSXStateArray } from ".";
 import { constructComponent } from "./component";
 import { isClassMethod } from "./serialize";
-import { isSignalAccessor, isSignalSetter, listenForStoreReads, resumeStore, signals, stores, subscribeToStoreReads, type StoreRead } from "./store";
-import { fullCall, isBindableThis, isFunction, microtaskDebounce } from "./utils";
+import { isSignalAccessor, isSignalSetter, listenForStoreReads, resumeStore, signals, stores, subscribeToStoreReads, type Store, type StoreRead } from "./store";
+import { assert, fullCall, isBindableThis, isFunction, microtaskDebounce } from "./utils";
 
 function closureBind<F extends Function>(f: F, new_this: object | null): F {
   if (isClassMethod(f) || isBindableThis(f)) {
@@ -32,149 +32,216 @@ function rebindFunctions<O extends object>(obj: O, new_this: object | null) {
   }
 }
 
-export type RuntimeDynamicState = {
-  storeReads: StoreRead[],
-  update: (previous?: JSXElement) => JSXElement,
-};
+export const DIRECTIVE_PREFIX = "lentjs";
+export type Directives = {
+  signals: [string, any][],
+  stores: [string, any][],
 
+  "start-component": { id: string, props: object, state: Store<unknown> },
+  "end-component": null,
+
+  "start-dynamic": { storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement },
+  "end-dynamic": null,
+
+  "start-array": null,
+  "end-array": null,
+
+  "start-array-element": null,
+  "end-array-element": null,
+
+  "null": null,
+};
+export type DirectiveName = keyof Directives;
+export type MarkerDirectiveName = keyof {
+  [K in keyof Directives as Directives[K] extends null ? K : never]: Directives[K];
+};
+type DirectiveHelper<K> = K extends keyof Directives ? { name: K, data: Directives[K] } : never
+export type Directive = DirectiveHelper<DirectiveName>;
+
+type StateStackElement =
+  | { kind: "dynamic", storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement }
+  | { kind: "array", target: JSXStateArray }
+  | { kind: "array-element", target: JSXState | null }
+;
 type RunCtx = {
   component_stack: {
     id: string,
     instance: Component<any, any> | null,
   }[],
-  dynamic_stack: {
-    storeReads: StoreRead[],
-    update: (previous?: JSXElement) => JSXElement,
-  }[],
+  dynamicStateStack: StateStackElement[],
 };
-function run(n: Node, ctx: RunCtx) {
-  n.childNodes.forEach(n => {
+
+function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Comment, parent: Node, d: D) {
+  switch (d.name) {
+  case "signals": {
+    for (const [id, val] of d.data) {
+      signals.set(id, {
+        callbacks: [],
+        currentValue: val,
+      });
+    }
+    break;
+  }
+  case "stores": {
+    for (const [id, val] of d.data) {
+      resumeStore(id, val);
+    }
+    break;
+  }
+  case "start-component":
+    const previous_comp = ctx.component_stack.at(-1)?.instance ?? null;
+    const { id: cid, props, state } = d.data;
+
+    const factory = Component.getComponentFromId(cid);
+    if (!factory) {
+      console.warn(`Could not find the component with id`, cid);
+    }
+
+    rebindFunctions(props, previous_comp);
+    rebindFunctions(state, previous_comp);
+
+    ctx.component_stack.push({
+      id: cid,
+      instance: factory ? constructComponent(factory, props, state) : null,
+    });
+    break;
+  case "end-component":
+    ctx.component_stack.pop();
+    break;
+  case "start-dynamic": {
+    const current_component = ctx.component_stack.at(-1)?.instance ?? null;
+    const { storeReads, update } = d.data;
+
+    ctx.dynamicStateStack.push({
+      kind: "dynamic",
+      storeReads,
+      update,
+    });
+
+    break;
+  }
+  case "end-dynamic": {
+    const dynamic = ctx.dynamicStateStack.pop();
+    assert(dynamic?.kind === "dynamic");
+
+    console.log("dynamic", dynamic);
+
+    break;
+  }
+  case "start-array": {
+    ctx.dynamicStateStack.push({
+      kind: "array",
+      target: { kind: "array", states: [] },
+    });
+    break;
+  }
+  case "end-array": {
+    const array = ctx.dynamicStateStack.pop();
+    assert(array?.kind === "array");
+    console.log(array);
+    break;
+  }
+  case "start-array-element": {
+    ctx.dynamicStateStack.push({
+      kind: "array-element",
+      target: null,
+    });
+    break;
+  }
+  case "end-array-element": {
+    const x = ctx.dynamicStateStack.pop();
+    assert(x?.kind === "array-element");
+    assert(x.target !== null);
+    const y = ctx.dynamicStateStack.at(-1);
+    assert(y?.kind === "array");
+    y.target.states.push(x.target);
+    break;
+  }
+  case "null": {
+    const t = ctx.dynamicStateStack.at(-1);
+    assert(t?.kind === "array-element");
+    t.target = { kind: "singular", node: null };
+    break;
+  }
+  default:
+    d satisfies never;
+  }
+}
+
+function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
+  const current_comp = ctx.component_stack.at(-1)?.instance ?? null;
+  for (const t of el.attributes) {
+    if (t.name.startsWith("lentjs:on:")) {
+      const event = t.name.replace(/^lentjs:on:/, "");
+      // @ts-ignore
+      const cb: any = closureBind(deserialize(t.value), current_comp);
+      el.addEventListener(event, cb);
+    }
+
+    if (t.name.startsWith("lentjs:attr:")) {
+      const attr = t.name.replace(/^lentjs:attr:/, "");
+      let { callback, found_reads } = deserialize(t.value) as { found_reads: StoreRead[], callback: () => any };
+
+      callback = closureBind(callback, current_comp);
+
+      const hh = microtaskDebounce(() => {
+        const [new_value, new_found_reads] = listenForStoreReads(() => callback());
+        setAttribute(el, attr, new_value);
+        subscribeToStoreReads(hh, new_found_reads, { once: true });
+      });
+      subscribeToStoreReads(hh, found_reads, { once: true });
+    }
+
+    if (t.name.startsWith("lentjs:class")) {
+      let { update, found_reads } = deserialize(t.value) as { found_reads: StoreRead[], update: () => ClassList };
+
+      update = closureBind(update, current_comp);
+
+      const hh = microtaskDebounce(() => {
+        const [new_value, new_found_reads] = listenForStoreReads(() => update());
+        el.className = "";
+        el.classList.add(...renderClasslist(new_value));
+        subscribeToStoreReads(hh, new_found_reads, { once: true });
+      });
+      subscribeToStoreReads(hh, found_reads, { once: true });
+    }
+  }
+}
+
+function domVisitor(ctx: RunCtx, node: ChildNode) {
+  {
+    const current = ctx.dynamicStateStack.at(-1);
+    if (current?.kind === "array-element") {
+      current.target = { kind: "singular", node };
+    }
+  }
+
+  if (node instanceof HTMLElement)
+    handleHTMLElement(ctx, node);
+
+  node.childNodes.forEach(n => {
     if (n instanceof Comment) {
       const parts = n.textContent.split(" ", 2);
-      if (parts[0] !== "lentjs") return;
+      if (parts[0] !== DIRECTIVE_PREFIX) return;
       const parts_rest = n.textContent.replace(/^([^ ]+ +){2}/, "");
-
-      switch (parts[1]) {
-      case "signals": {
-        const signals_data = deserialize(parts_rest) as [string, any][];
-        for (const [id, val] of signals_data) {
-          signals.set(id, {
-            callbacks: [],
-            currentValue: val,
-          });
-        }
-        break;
-      }
-      case "stores": {
-        const stores_data = deserialize(parts_rest) as [string, any][];
-        for (const [id, val] of stores_data) {
-          resumeStore(id, val);
-        }
-        break;
-      }
-      case "start-component":
-        const previous_comp = ctx.component_stack.at(-1)?.instance ?? null;
-
-        const { id: cid, props, state } = deserialize(parts_rest) as any;
-
-        const factory = Component.getComponentFromId(cid);
-        if (!factory) {
-          console.warn(`Could not find the component with id`, cid);
-        }
-
-        rebindFunctions(props, previous_comp);
-        rebindFunctions(state, previous_comp);
-
-        ctx.component_stack.push({
-          id: cid,
-          instance: factory ? constructComponent(factory, props, state) : null,
-        });
-        break;
-      case "end-component":
-        ctx.component_stack.pop();
-        break;
-      case "start-dynamic": {
-        const current_component = ctx.component_stack.at(-1)?.instance ?? null;
-        let { storeReads, update } = deserialize(parts_rest) as RuntimeDynamicState;
-
-        ctx.dynamic_stack.push({
-          storeReads,
-          update: closureBind(update, current_component),
-        });
-
-        break;
-      }
-      case "end-dynamic": {
-        const { storeReads, update } = ctx.dynamic_stack.pop()!;
-        const end = n;
-        const parent = n.parentNode!;
-
-        // {
-        //   const unsubscribe = () => currentUnsubscribe();
-        //   let resultState: JSXStateArray = [];
-        //   const hh = microtaskDebounce(() => {
-        //     const [newChild, newStoreReads] = listenForStoreReads(() => update());
-        //     resultState = patchElementArray(parent, end, resultState, newChild);
-        //     currentUnsubscribe = subscribeToStoreReads(hh, newStoreReads, { once: true });
-        //   });
-        //   let currentUnsubscribe = subscribeToStoreReads(hh, storeReads, { once: true });
-        // }
-
-        break;
-      }
-      default:
-        console.warn(`Uknown runtime directive ${parts[1]}`);
-      }
+      const directive = { name: parts[1], data: parts_rest !== n.textContent ? deserialize(parts_rest) : null } as unknown as Directive;
+      handleDirective(ctx, n, node, directive);
+      return;
     }
 
     if (n instanceof HTMLElement) {
-      const current_comp = ctx.component_stack.at(-1)?.instance ?? null;
-
-      for (const t of n.attributes) {
-        if (t.name.startsWith("lentjs:on:")) {
-          const event = t.name.replace(/^lentjs:on:/, "");
-          // @ts-ignore
-          const cb: any = closureBind(deserialize(t.value), current_comp);
-          n.addEventListener(event, cb);
-        }
-
-        if (t.name.startsWith("lentjs:attr:")) {
-          const attr = t.name.replace(/^lentjs:attr:/, "");
-          let { callback, found_reads } = deserialize(t.value) as { found_reads: StoreRead[], callback: () => any };
-
-          callback = closureBind(callback, current_comp);
-
-          const hh = microtaskDebounce(() => {
-            const [new_value, new_found_reads] = listenForStoreReads(() => callback());
-            setAttribute(n, attr, new_value);
-            subscribeToStoreReads(hh, new_found_reads, { once: true });
-          });
-          subscribeToStoreReads(hh, found_reads, { once: true });
-        }
-
-        if (t.name.startsWith("lentjs:class")) {
-          let { update, found_reads } = deserialize(t.value) as { found_reads: StoreRead[], update: () => ClassList };
-
-          update = closureBind(update, current_comp);
-
-          const hh = microtaskDebounce(() => {
-            const [new_value, new_found_reads] = listenForStoreReads(() => update());
-            n.className = "";
-            n.classList.add(...renderClasslist(new_value));
-            subscribeToStoreReads(hh, new_found_reads, { once: true });
-          });
-          subscribeToStoreReads(hh, found_reads, { once: true });
-        }
-      }
     }
 
-    run(n, ctx);
+    domVisitor(ctx, n);
   });
 }
 
 export function startRuntime(rootElement: HTMLElement) {
   console.time("startRuntime");
-  run(rootElement, { component_stack: [], dynamic_stack: [] });
+  domVisitor({
+    component_stack: [],
+    dynamicStateStack: [],
+  }, rootElement);
   console.timeEnd("startRuntime");
 }
 

@@ -2,7 +2,7 @@ export class AssertionFailedError extends Error {
   public readonly cb: (() => boolean) | null;
 
   constructor(cb: (() => boolean) | null, message?: string) {
-    super(message ?? `Assertion ${cb} failed`);
+    super(message ?? `Assertion ${cb ? cb.toString()+" " : ""}failed`);
     this.cb = cb;
   }
 }
