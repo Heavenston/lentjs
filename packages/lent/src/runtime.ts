@@ -1,8 +1,8 @@
 import { Component, deserialize, patchElement, renderClasslist, setAttribute, type ClassList, type JSXElement, type JSXState, type JSXStateArray } from ".";
 import { constructComponent } from "./component";
 import { isClassMethod } from "./serialize";
-import { isSignalAccessor, isSignalSetter, listenForStoreReads, resumeStore, signals, stores, subscribeToStoreReads, type Store, type StoreRead } from "./store";
-import { assert, fullCall, isBindableThis, isFunction, microtaskDebounce } from "./utils";
+import { isSignalAccessor, isSignalSetter, listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type Store, type StoreRead } from "./store";
+import { assert, isBindableThis, isFunction, microtaskDebounce } from "./utils";
 
 function closureBind<F extends Function>(f: F, new_this: object | null): F {
   if (isClassMethod(f) || isBindableThis(f)) {
@@ -125,8 +125,18 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     assert(dynamic?.kind === "dynamic-start");
 
     let resultState = state.state;
-    const callback = dynamic.update;
-    const unsubscribe = () => {};
+    const callback = closureBind(dynamic.update,current_component);
+    const unsubscribe = () => currentUnsubscribe();
+
+    let previousResult: JSXElement | undefined;
+
+    const hh = microtaskDebounce(() => {
+      let newStoreReads: StoreRead[];
+      [previousResult, newStoreReads] = listenForStoreReads(() => callback(previousResult));
+      resultState = patchElement(parent, directiveNode, resultState, previousResult);
+      currentUnsubscribe = subscribeToStoreReads(hh, newStoreReads, { once: true });
+    });
+    let currentUnsubscribe = subscribeToStoreReads(hh, dynamic.storeReads, { once: true });
 
     if (ctx.dynamicStateStack.length > 0)
       ctx.dynamicStateStack.push({
