@@ -207,11 +207,7 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
       return el.map(e => stringifyJSXElement(e, isInsideDynamic)).join("");
     }
 
-    const t = el.map(e => {
-      const prefix = createDirective("start-array-element");
-      const suffix = createDirective("end-array-element");
-      return `${prefix}${stringifyJSXElement(e, isInsideDynamic)}${suffix}`;
-    }).join("");
+    const t = el.map(e => stringifyJSXElement(e, isInsideDynamic)).join("");
     const prefix = createDirective("start-array");
     const suffix = createDirective("end-array");
     return `${prefix}${t}${suffix}`;

@@ -46,9 +46,6 @@ export type Directives = {
   "start-array": null,
   "end-array": null,
 
-  "start-array-element": null,
-  "end-array-element": null,
-
   "null": null,
 };
 export type DirectiveName = keyof Directives;
@@ -59,9 +56,9 @@ type DirectiveHelper<K> = K extends keyof Directives ? { name: K, data: Directiv
 export type Directive = DirectiveHelper<DirectiveName>;
 
 type StateStackElement =
-  | { kind: "dynamic", storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement }
-  | { kind: "array", target: JSXStateArray }
-  | { kind: "array-element", target: JSXState | null }
+  | { kind: "dynamic-start", storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement }
+  | { kind: "array-start", target: JSXStateArray }
+  | { kind: "state", state: JSXState }
 ;
 type RunCtx = {
   component_stack: {
@@ -109,11 +106,10 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     ctx.component_stack.pop();
     break;
   case "start-dynamic": {
-    const current_component = ctx.component_stack.at(-1)?.instance ?? null;
     const { storeReads, update } = d.data;
 
     ctx.dynamicStateStack.push({
-      kind: "dynamic",
+      kind: "dynamic-start",
       storeReads,
       update,
     });
@@ -121,46 +117,50 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     break;
   }
   case "end-dynamic": {
-    const dynamic = ctx.dynamicStateStack.pop();
-    assert(dynamic?.kind === "dynamic");
+    const current_component = ctx.component_stack.at(-1)?.instance ?? null;
 
-    console.log("dynamic", dynamic);
+    const state = ctx.dynamicStateStack.pop();
+    assert(state?.kind === "state");
+    const dynamic = ctx.dynamicStateStack.pop();
+    assert(dynamic?.kind === "dynamic-start");
+
+    let resultState = state.state;
+    const callback = dynamic.update;
+    const unsubscribe = () => {};
+
+    if (ctx.dynamicStateStack.length > 0)
+      ctx.dynamicStateStack.push({
+        kind: "state",
+        state: {
+          kind: "dynamic",
+          callback,
+          resultState,
+          unsubscribe,
+        },
+      });
 
     break;
   }
   case "start-array": {
     ctx.dynamicStateStack.push({
-      kind: "array",
+      kind: "array-start",
       target: { kind: "array", states: [] },
     });
     break;
   }
   case "end-array": {
-    const array = ctx.dynamicStateStack.pop();
-    assert(array?.kind === "array");
-    console.log(array);
-    break;
-  }
-  case "start-array-element": {
-    ctx.dynamicStateStack.push({
-      kind: "array-element",
-      target: null,
-    });
-    break;
-  }
-  case "end-array-element": {
-    const x = ctx.dynamicStateStack.pop();
-    assert(x?.kind === "array-element");
-    assert(x.target !== null);
-    const y = ctx.dynamicStateStack.at(-1);
-    assert(y?.kind === "array");
-    y.target.states.push(x.target);
+    const states: JSXState[] = [];
+    while (ctx.dynamicStateStack.length > 0 && ctx.dynamicStateStack.at(-1)?.kind !== "array-start") {
+      const el = ctx.dynamicStateStack.pop();
+      assert(el?.kind === "state");
+      states.push(el.state);
+    }
+    assert(ctx.dynamicStateStack.pop()?.kind === "array-start");
+    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "array", states } })
     break;
   }
   case "null": {
-    const t = ctx.dynamicStateStack.at(-1);
-    assert(t?.kind === "array-element");
-    t.target = { kind: "singular", node: null };
+    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", node: null } })
     break;
   }
   default:
@@ -209,11 +209,8 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
 }
 
 function domVisitor(ctx: RunCtx, node: ChildNode) {
-  {
-    const current = ctx.dynamicStateStack.at(-1);
-    if (current?.kind === "array-element") {
-      current.target = { kind: "singular", node };
-    }
+  if (ctx.dynamicStateStack.length > 0) {
+    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", node } })
   }
 
   if (node instanceof HTMLElement)
@@ -229,19 +226,18 @@ function domVisitor(ctx: RunCtx, node: ChildNode) {
       return;
     }
 
-    if (n instanceof HTMLElement) {
-    }
-
     domVisitor(ctx, n);
   });
 }
 
 export function startRuntime(rootElement: HTMLElement) {
   console.time("startRuntime");
-  domVisitor({
+  const ctx: RunCtx = {
     component_stack: [],
     dynamicStateStack: [],
-  }, rootElement);
+  };
+  domVisitor(ctx, rootElement);
+  console.log(ctx);
   console.timeEnd("startRuntime");
 }
 
