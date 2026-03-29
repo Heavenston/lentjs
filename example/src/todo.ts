@@ -9,7 +9,7 @@ type TaskState = {
 
 type TaskProps = {
   task: () => TaskState,
-  onDelete?: () => void,
+  onDelete: (id: string) => void,
 };
 class Task extends Component<{}, TaskProps> {
   private c = c;
@@ -44,7 +44,8 @@ class Task extends Component<{}, TaskProps> {
         }),
         h("button", {
           "on:click": () => {
-            this.props.onDelete?.();
+            console.log(this.props);
+            this.props.onDelete(this.props.task().id);
           },
           children: "delete",
         }),
@@ -91,10 +92,7 @@ export default class Todo extends Component<TodoState> {
   private taskRender(_idx: number, task: () => TaskState) {
     return h(Task, {
       task,
-      onDelete: () => {
-        console.log("delete :(");
-        this.deleteTask(task().id);
-      },
+      onDelete: this.deleteTask,
     });
   }
 

@@ -1,5 +1,5 @@
 import { Component } from "./component";
-import { createSignal, untrack, type JSXElement, type JSXElementSingular } from ".";
+import { createSignal, untrack, type JSXElement } from ".";
 import type { SignalSetter } from "./store";
 
 type ElementState<T> = {
@@ -10,7 +10,7 @@ type ForState<T> = {
 };
 export type ForProps<T> = {
   each: () => T[],
-  children: (idx: number, element: () => T) => JSXElementSingular,
+  children: (idx: number, element: () => T) => JSXElement,
 };
 export class For<T> extends Component<ForState<T>, ForProps<T>> {
   static { this.register("__lentjs") }

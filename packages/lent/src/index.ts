@@ -8,8 +8,8 @@ export { serialize, deserialize } from "./serialize";
 import { constructComponent, type Component, type ComponentFactory } from "./component";
 import { immediateTrack } from "./task";
 import { serialize } from "./serialize";
-import { assert, isFunction } from "./utils";
-import { listenForStoreReads, signals, stores, type StoreRead } from "./store";
+import { assert, isFunction, microtaskDebounce } from "./utils";
+import { listenForStoreReads, signals, stores, subscribeToStoreReads, type StoreRead } from "./store";
 import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type MarkerDirectiveName } from "./runtime";
 
 const SSRElementMarker = Symbol("ssr-element-marker");
@@ -58,8 +58,9 @@ function getFirstAnchorElement(state: JSXState): ChildNode | "no-node" | "dynami
 }
 
 export function patchElementSingular(parent: Node, nextSibling: ChildNode | null, previousState: JSXStateSingular | null, child: JSXElementSingular): JSXStateSingular {
+  console.log({parent,nextSibling,previousState,child});
   assert(nextSibling === null || nextSibling.parentNode === parent);
-  assert(previousState === null || previousState.node === null || previousState.node.nextSibling === nextSibling);
+  assert(previousState === null || previousState.node === null || previousState.node.parentNode === parent);
   assert(!isSSRElement(child), "Unexpected ssr element during rendering");
 
   if (child == null) {
@@ -105,13 +106,35 @@ export function patchElement(parent: Node, nextSibling: ChildNode | null, previo
   assert(() => nextSibling === null || nextSibling.parentNode === parent);
   assert(!isSSRElement(child));
 
-  if (isFunction(child)) {
-    throw new Error("todo");
+  if (previousState?.kind === "dynamic") {
+    if (previousState.callback !== child) {
+      previousState.unsubscribe();
+      return patchElement(parent, nextSibling, previousState.resultState, child);
+    }
+    else {
+      // Nothing to do, same callback
+      return previousState;
+    }
   }
 
-  if (previousState?.kind === "dynamic") {
-    previousState.unsubscribe();
-    return patchElement(parent, nextSibling, previousState.resultState, child);
+  if (isFunction(child)) {
+    let [newChild, storeReads] = listenForStoreReads(() => child());
+    let resultState = patchElement(parent, nextSibling, previousState, newChild);
+
+    const hh = microtaskDebounce(() => {
+      [newChild, storeReads] = listenForStoreReads(() => child(newChild));
+      resultState = patchElement(parent, nextSibling, resultState, newChild);
+      
+      currentUnsubscribe = subscribeToStoreReads(hh, storeReads, { once: true });
+    });
+    let currentUnsubscribe = subscribeToStoreReads(hh, storeReads, { once: true });
+
+    return {
+      kind: "dynamic",
+      callback: child,
+      resultState,
+      unsubscribe: () => currentUnsubscribe(),
+    };
   }
   
   if (Array.isArray(child)) {
@@ -133,7 +156,7 @@ export function patchElement(parent: Node, nextSibling: ChildNode | null, previo
       const temporaryAnchor = new Comment("anchor");
       parent.insertBefore(temporaryAnchor, currentAnchor);
 
-      const outState = patchElement(parent, null!/*TODO*/, previousState.states[i]!, child[i]);
+      const outState = patchElement(parent, currentAnchor, previousState.states[i] ?? null, child[i]);
       newState.states.push(outState);
 
       const possibleNewAnchor = getFirstAnchorElement(outState);
