@@ -10,6 +10,7 @@ import { immediateTrack } from "./task";
 import { serialize } from "./serialize";
 import { assert, fullCall, isFunction, microtaskDebounce } from "./utils";
 import { listenForStoreReads, signals, stores, subscribeToStoreReads, type StoreRead } from "./store";
+import type { RuntimeDynamicState } from "./runtime";
 
 const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
@@ -41,9 +42,9 @@ function addChild(parent: Node, child: JSXElement) {
   patchElement(parent, null, [], child);
 }
 
-type JSXStateSingular = { node: ChildNode | null };
-type JSXStateArray = JSXStateSingular[];
-type JSXState = JSXStateArray | { resultState: JSXStateArray, callback: unknown, unsubscribe: () => void };
+export type JSXStateSingular = { node: ChildNode | null };
+export type JSXStateArray = JSXStateSingular[];
+export type JSXState = JSXStateArray | { resultState: JSXStateArray, callback: unknown, unsubscribe: () => void };
 
 export function patchElementSingular(parent: Node, nextSibling: ChildNode | null, previousState: JSXStateSingular, child: JSXElementSingular): JSXStateSingular {
   assert(nextSibling === null || nextSibling.parentNode === parent);
@@ -156,8 +157,8 @@ function stringifyJSXElement(el: JSXElement): string {
     return el.toString();
   }
   else if (isFunction(el)) {
-    const [val, found_reads] = listenForStoreReads(() => fullCall(el));
-    const prefix = `<!--lentjs start-dynamic ${serialize({ found_reads, el })}-->`
+    const [val, storeReads] = listenForStoreReads(() => fullCall(el));
+    const prefix = `<!--lentjs start-dynamic ${serialize({ storeReads, update: el } satisfies RuntimeDynamicState)}-->`
     const suffix = `<!--lentjs end-dynamic-->`
     return `${prefix}${stringifyJSXElement(val)}${suffix}`;
   }
@@ -185,19 +186,19 @@ export function renderToString(jsx: { new(props: {}): Component }): string {
     const p = new jsx({});
     const el = stringifyJSXElement(p.render());
 
-    const ser_signals: [string, any][] = [];
-    for (const [id, { currentValue }] of signals.entries()) {
-      ser_signals.push([id, currentValue]);
-    }
-    const signals_data = `<!--lentjs signals ${serialize(ser_signals)}-->`;
-
     const ser_stores: [string, any][] = [];
     for (const [id, { obj }] of stores.entries()) {
       ser_stores.push([id, obj]);
     }
     const stores_data = `<!--lentjs stores ${serialize(ser_stores)}-->`;
 
-    return `${signals_data}${stores_data}${el}`;
+    const ser_signals: [string, any][] = [];
+    for (const [id, { currentValue }] of signals.entries()) {
+      ser_signals.push([id, currentValue]);
+    }
+    const signals_data = `<!--lentjs signals ${serialize(ser_signals)}-->`;
+
+    return `${stores_data}${signals_data}${el}`;
   }
   catch(e) {
     throw e;

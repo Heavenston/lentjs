@@ -1,7 +1,7 @@
-import { Component, deserialize, renderClasslist, setAttribute, type ClassList, type JSXElement } from ".";
+import { Component, deserialize, patchElement, patchElementArray, renderClasslist, setAttribute, type ClassList, type JSXElement, type JSXElementArray, type JSXState, type JSXStateArray } from ".";
 import { constructComponent } from "./component";
 import { isClassMethod } from "./serialize";
-import { isSignalAccessor, isSignalSetter, listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "./store";
+import { isSignalAccessor, isSignalSetter, listenForStoreReads, resumeStore, signals, stores, subscribeToStoreReads, type StoreRead } from "./store";
 import { fullCall, isBindableThis, isFunction, microtaskDebounce } from "./utils";
 
 function closureBind<F extends Function>(f: F, new_this: object | null): F {
@@ -32,16 +32,19 @@ function rebindFunctions<O extends object>(obj: O, new_this: object | null) {
   }
 }
 
+export type RuntimeDynamicState = {
+  storeReads: StoreRead[],
+  update: (previous?: JSXElementArray) => JSXElementArray,
+};
+
 type RunCtx = {
   component_stack: {
     id: string,
     instance: Component<any, any> | null,
   }[],
   dynamic_stack: {
-    found_reads: StoreRead[],
-    update: (previous?: JSXElement) => JSXElement,
-
-    start: ChildNode,
+    storeReads: StoreRead[],
+    update: (previous?: JSXElementArray) => JSXElementArray,
   }[],
 };
 function run(n: Node, ctx: RunCtx) {
@@ -92,34 +95,31 @@ function run(n: Node, ctx: RunCtx) {
         break;
       case "start-dynamic": {
         const current_component = ctx.component_stack.at(-1)?.instance ?? null;
-        let { found_reads, el } = deserialize(parts_rest) as { found_reads: StoreRead[], el: (previous?: JSXElement) => JSXElement };
+        let { storeReads, update } = deserialize(parts_rest) as RuntimeDynamicState;
 
         ctx.dynamic_stack.push({
-          found_reads,
-          start: n,
-          update: closureBind(el, current_component),
+          storeReads,
+          update: closureBind(update, current_component),
         });
 
         break;
       }
       case "end-dynamic": {
-        const { found_reads, start, update } = ctx.dynamic_stack.pop()!;
+        const { storeReads, update } = ctx.dynamic_stack.pop()!;
         const end = n;
         const parent = n.parentNode!;
 
-        const hh = microtaskDebounce(() => {
-          const previous: Node[] = [];
-          let current: Node | null = start;
-          while (current?.nextSibling && current?.nextSibling !== end) {
-            previous.push(current?.nextSibling);
-            current = current?.nextSibling;
-          }
+        // {
+        //   const unsubscribe = () => currentUnsubscribe();
+        //   let resultState: JSXStateArray = [];
+        //   const hh = microtaskDebounce(() => {
+        //     const [newChild, newStoreReads] = listenForStoreReads(() => update());
+        //     resultState = patchElementArray(parent, end, resultState, newChild);
+        //     currentUnsubscribe = subscribeToStoreReads(hh, newStoreReads, { once: true });
+        //   });
+        //   let currentUnsubscribe = subscribeToStoreReads(hh, storeReads, { once: true });
+        // }
 
-          const [new_nodes, new_found_reads] = listenForStoreReads(() => normalizeChildren(update(previous)).flatMap(fullCall));
-          subscribeToStoreReads(hh, new_found_reads, { once: true });
-          applyNewNodeList(parent, start, end, new_nodes);
-        });
-        subscribeToStoreReads(hh, found_reads, { once: true });
         break;
       }
       default:

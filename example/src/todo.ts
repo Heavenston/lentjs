@@ -19,8 +19,8 @@ class Task extends Component<{}, TaskProps> {
   protected getInitialState(): {} { return {} }
 
   protected init(): void {
-    console.log("Props: ", this.props);
-    console.log("Task:", this.props.task, "=", this.props.task());
+    console.log("Task Props:", this.props);
+    console.log("Task Task:", this.props.task, "=", this.props.task());
   }
 
   private onChangeDone(e: Event) {

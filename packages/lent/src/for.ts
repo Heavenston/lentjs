@@ -1,5 +1,5 @@
 import { Component } from "./component";
-import { createSignal, untrack, type JSXElement } from ".";
+import { createSignal, untrack, type JSXElement, type JSXElementArray, type JSXElementSingular } from ".";
 import type { SignalSetter } from "./store";
 
 type ElementState<T> = {
@@ -10,10 +10,14 @@ type ForState<T> = {
 };
 export type ForProps<T> = {
   each: () => T[],
-  children: (idx: number, element: () => T) => JSXElement,
+  children: (idx: number, element: () => T) => JSXElementSingular,
 };
 export class For<T> extends Component<ForState<T>, ForProps<T>> {
   static { this.register("__lentjs") }
+
+  protected override init(): void {
+    console.debug("For state:", this.state.elements);
+  }
 
   protected override getInitialState(): ForState<T> {
     return {
@@ -21,13 +25,13 @@ export class For<T> extends Component<ForState<T>, ForProps<T>> {
     };
   }
 
-  private compute(previous: JSXElement): JSXElement {
+  private compute(previous: JSXElementArray): JSXElementArray {
     const old_jsx_elements = Array.isArray(previous) ? previous : [previous];
     console.log(old_jsx_elements);
 
     const new_elements: ElementState<T>[] = [];
     const old_elements: ElementState<T>[] = untrack(() => this.state.elements);
-    const jsx_elements: JSXElement[] = [];
+    const jsx_elements: JSXElementSingular[] = [];
 
     const each = this.props.each();
     for (let i = 0; i < each.length; i++) {
