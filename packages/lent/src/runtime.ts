@@ -1,4 +1,4 @@
-import { applyNewNodeList, Component, deserialize, normalizeChildren, renderClasslist, setAttribute, type ClassList, type JSXElement } from ".";
+import { Component, deserialize, renderClasslist, setAttribute, type ClassList, type JSXElement } from ".";
 import { constructComponent } from "./component";
 import { isClassMethod } from "./serialize";
 import { isSignalAccessor, isSignalSetter, listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "./store";

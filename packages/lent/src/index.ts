@@ -8,12 +8,14 @@ export { serialize, deserialize } from "./serialize";
 import { constructComponent, type Component, type ComponentFactory } from "./component";
 import { immediateTrack } from "./task";
 import { serialize } from "./serialize";
-import { fullCall, isFunction } from "./utils";
-import { listenForStoreReads, signals, stores, type StoreRead } from "./store";
+import { assert, fullCall, isFunction, microtaskDebounce } from "./utils";
+import { listenForStoreReads, signals, stores, subscribeToStoreReads, type StoreRead } from "./store";
 
 const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
-export type JSXElement = Node | number | string | null | undefined | JSXElement[] | ((previous?: JSXElement) => JSXElement) | SSRElement;
+export type JSXElementSingular = SSRElement | ChildNode | number | string | null | undefined;
+export type JSXElementArray = JSXElementSingular[] | JSXElementSingular;
+export type JSXElement = JSXElementArray | ((previous?: JSXElementArray) => JSXElementArray);
 export type PropertyValue = string | number | (() => PropertyValue);
 export type ClassList = string | Partial<Record<string, boolean>> | ClassList[];
 
@@ -35,92 +37,96 @@ function isSSRElement(t: unknown): t is SSRElement {
   return typeof t === "object" && t !== null && SSRElementMarker in t && t[SSRElementMarker] === true;
 }
 
-type NormalizedNode = string | Node | SSRElement;
-export function normalizeChildren(child: JSXElement): (NormalizedNode | ((previous?: JSXElement) => NormalizedNode[]))[] {
-  if (child == null) return [];
-  if (Array.isArray(child)) {
-    return child.flatMap(normalizeChildren);
-  }
-  if (typeof child === "string" || typeof child === "number") {
-    return [child.toString()];
-  }
-  if (isFunction(child)) {
-    return [(previous) => normalizeChildren(child(previous)).flatMap(fullCall)];
-  }
-  return [child];
+function addChild(parent: Node, child: JSXElement) {
+  patchElement(parent, null, [], child);
 }
 
-const nodify = (n: NormalizedNode): Node => {
-  if (isSSRElement(n)) {
-    const doc = new DOMParser().parseFromString(n.t, "text/html");
-    if (doc.childNodes.length !== 1)
-      throw new Error("Invalid number of element in ssr element");
-    return doc.firstChild!;
+type JSXStateSingular = { node: ChildNode | null };
+type JSXStateArray = JSXStateSingular[];
+type JSXState = JSXStateArray | { resultState: JSXStateArray, callback: unknown, unsubscribe: () => void };
+
+export function patchElementSingular(parent: Node, nextSibling: ChildNode | null, previousState: JSXStateSingular, child: JSXElementSingular): JSXStateSingular {
+  assert(nextSibling === null || nextSibling.parentNode === parent);
+  assert(previousState.node === null || previousState.node.nextSibling === nextSibling);
+  assert(!isSSRElement(child), "Unexpected ssr element during rendering");
+
+  if (child == null) {
+    if (previousState.node !== null)
+      parent.removeChild(previousState.node);
+    return { node: null };
   }
-  else if (typeof n === "string") {
-    return document.createTextNode(n);
+
+  if (previousState.node === null) {
+    const childAsNode = typeof child === "string" || typeof child === "number" ? document.createTextNode(child.toString()) : child;
+    parent.insertBefore(childAsNode, nextSibling);
+    return { node: childAsNode };
+  }
+  else if (previousState.node instanceof Text && (typeof child === "string" || typeof child === "number")) {
+    previousState.node.textContent = child.toString();
+    return { node: previousState.node };
   }
   else {
-    return n;
-  }
-};
-
-export function applyNewNodeList(parent: Node, start: ChildNode, end: ChildNode, new_nodes: NormalizedNode[]) {
-  const parentNodes = [...parent.childNodes];
-
-  const s = parentNodes.indexOf(start);
-  const e = parentNodes.indexOf(end);
-  let current: Node = start;
-  for (let i = 0; i < new_nodes.length; i++) {
-    const oldnode = s+i+1 < e ? parentNodes[s + i + 1] : null;
-    const newnode = new_nodes[i]!;
-
-    if (typeof newnode === "string" && oldnode instanceof Text) {
-      oldnode.textContent = newnode;
-      current = oldnode;
-    }
-    else if (oldnode === newnode) {
-      // Do nothing
-      current = newnode;
-    }
-    else {
-      const n = nodify(newnode);
-      if (oldnode) {
-        parent.replaceChild(n, oldnode);
-      }
-      else {
-        parent.insertBefore(n, current.nextSibling);
-      }
-      current = n;
-    }
-  }
-  for (let i = new_nodes.length+s+1; i < e; i++) {
-    parent.removeChild(parentNodes[i]!);
+    const childAsNode = typeof child === "string" || typeof child === "number" ? document.createTextNode(child.toString()) : child;
+    parent.replaceChild(previousState.node, childAsNode);
+    return { node: childAsNode };
   }
 }
 
-function addChild(parent: Node, child: JSXElement) {
-  if (typeof document === "undefined")
-    throw new Error("Called add_child not from a browser");
+export function patchElementArray(parent: Node, nextSibling: ChildNode | null, previousState: JSXStateArray, child: JSXElementArray): JSXStateArray {
+  assert(() => nextSibling === null || nextSibling.parentNode === parent);
+  assert(!isSSRElement(child));
+  
+  child = Array.isArray(child) ? child : [child];
 
-  const normalizedChildren = normalizeChildren(child);
-  for (const child of normalizedChildren) {
-    if (isFunction(child)) {
-      const start_comment = new Comment("lentjs start");
-      const end_comment = new Comment("lentjs end");
+  const newState: JSXStateArray = [];
+  let currentAnchor = nextSibling;
+  for (let i = Math.max(previousState.length, child.length)-1; i >= 0; i--) {
+    newState[i] = patchElementSingular(parent, currentAnchor, previousState[i] ?? { node: null }, child[i]);
+    currentAnchor = newState[i]?.node ?? currentAnchor;
+  }
+  while (newState.at(-1)?.node === null)
+    newState.pop();
+  return newState;
+}
 
-      immediateTrack(child, nodes => {
-        parent.appendChild(start_comment);
-        for (const subchild of nodes)
-          parent.appendChild(nodify(subchild));
-        parent.appendChild(end_comment);
-      }, (new_nodes) => {
-        applyNewNodeList(parent, start_comment, end_comment, new_nodes);
-      });
+export function patchElement(parent: Node, nextSibling: ChildNode | null, previousState: JSXState, child: JSXElement): JSXState {
+  assert(() => nextSibling === null || nextSibling.parentNode === parent);
+  assert(!isSSRElement(child));
+
+  if (isFunction(child)) {
+    let previousResultState: JSXStateArray;
+    if (!Array.isArray(previousState)) {
+      // Nothing changed
+      if (previousState.callback === child) return previousState;
+      previousState.unsubscribe();
+      previousResultState = previousState.resultState;
     }
     else {
-      parent.appendChild(nodify(child));
+      previousResultState = previousState;
     }
+    
+    const [newChild, storeReads] = listenForStoreReads(() => child());
+
+    let resultState = patchElementArray(parent, nextSibling, previousResultState, newChild);
+    const hh = microtaskDebounce(() => {
+      const [newChild, newStoreReads] = listenForStoreReads(() => child());
+      resultState = patchElementArray(parent, nextSibling, resultState, newChild);
+      unsubscribe = subscribeToStoreReads(hh, newStoreReads, { once: true });
+    });
+    let unsubscribe = subscribeToStoreReads(hh, storeReads, { once: true });
+
+    return {
+      callback: child,
+      resultState,
+      unsubscribe: () => unsubscribe(),
+    };
+  }
+  else if (!Array.isArray(previousState)) {
+    previousState.unsubscribe();
+    return patchElementArray(parent, nextSibling, previousState.resultState, child);
+  }
+  else {
+    return patchElementArray(parent, nextSibling, previousState, child);
   }
 }
 

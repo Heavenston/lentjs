@@ -1,3 +1,20 @@
+export class AssertionFailedError extends Error {
+  public readonly cb: (() => boolean) | null;
+
+  constructor(cb: (() => boolean) | null, message?: string) {
+    super(message ?? `Assertion ${cb} failed`);
+    this.cb = cb;
+  }
+}
+
+export function assert(value: boolean, message?: string): asserts value;
+export function assert(value: () => boolean, message?: string): void;
+export function assert(value: boolean | (() => boolean), message?: string) {
+  const success = isFunction(value) ? value() : value;
+  if (!success) {
+    throw new AssertionFailedError(isFunction(value) ? value : null, message);
+  }
+}
 
 export function microtaskDebounce(cb: () => void): () => void {
   let queued = false;
