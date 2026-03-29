@@ -15,8 +15,7 @@ import type { RuntimeDynamicState } from "./runtime";
 const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
 export type JSXElementSingular = SSRElement | ChildNode | number | string | null | undefined;
-export type JSXElementArray = JSXElementSingular[] | JSXElementSingular;
-export type JSXElement = JSXElementArray | ((previous?: JSXElementArray) => JSXElementArray);
+export type JSXElement = JSXElementSingular | JSXElement[] | ((previous?: JSXElement) => JSXElement);
 export type PropertyValue = string | number | (() => PropertyValue);
 export type ClassList = string | Partial<Record<string, boolean>> | ClassList[];
 
@@ -39,95 +38,127 @@ function isSSRElement(t: unknown): t is SSRElement {
 }
 
 function addChild(parent: Node, child: JSXElement) {
-  patchElement(parent, null, [], child);
+  patchElement(parent, null, null, child);
 }
 
-export type JSXStateSingular = { node: ChildNode | null };
-export type JSXStateArray = JSXStateSingular[];
-export type JSXState = JSXStateArray | { resultState: JSXStateArray, callback: unknown, unsubscribe: () => void };
+export type JSXStateSingular = { kind: "singular", node: ChildNode | null };
+export type JSXStateDynamic = { kind: "dynamic", resultState: JSXState, callback: unknown, unsubscribe: () => void };
+export type JSXStateArray = { kind: "array", states: JSXState[] }
+export type JSXState = JSXStateSingular | JSXStateArray | JSXStateDynamic;
 
-export function patchElementSingular(parent: Node, nextSibling: ChildNode | null, previousState: JSXStateSingular, child: JSXElementSingular): JSXStateSingular {
+function getFirstAnchorElement(state: JSXState): ChildNode | "no-node" | "dynamic" {
+  switch (state.kind) {
+  case "singular":
+    return state.node ?? "no-node";
+  case "array":
+    return state.states.length > 0 ? getFirstAnchorElement(state.states[0]!) : "dynamic";
+  case "dynamic":
+    return "dynamic";
+  }
+}
+
+export function patchElementSingular(parent: Node, nextSibling: ChildNode | null, previousState: JSXStateSingular | null, child: JSXElementSingular): JSXStateSingular {
   assert(nextSibling === null || nextSibling.parentNode === parent);
-  assert(previousState.node === null || previousState.node.nextSibling === nextSibling);
+  assert(previousState === null || previousState.node === null || previousState.node.nextSibling === nextSibling);
   assert(!isSSRElement(child), "Unexpected ssr element during rendering");
 
   if (child == null) {
-    if (previousState.node !== null)
+    if (previousState?.node != null)
       parent.removeChild(previousState.node);
-    return { node: null };
+    return { kind: "singular", node: null };
   }
 
-  if (previousState.node === null) {
+  if (previousState?.node == null) {
     const childAsNode = typeof child === "string" || typeof child === "number" ? document.createTextNode(child.toString()) : child;
     parent.insertBefore(childAsNode, nextSibling);
-    return { node: childAsNode };
+    return { kind: "singular", node: childAsNode };
   }
   else if (previousState.node instanceof Text && (typeof child === "string" || typeof child === "number")) {
     previousState.node.textContent = child.toString();
-    return { node: previousState.node };
+    return { kind: "singular", node: previousState.node };
   }
   else {
     const childAsNode = typeof child === "string" || typeof child === "number" ? document.createTextNode(child.toString()) : child;
     parent.replaceChild(previousState.node, childAsNode);
-    return { node: childAsNode };
+    return { kind: "singular", node: childAsNode };
   }
 }
 
-export function patchElementArray(parent: Node, nextSibling: ChildNode | null, previousState: JSXStateArray, child: JSXElementArray): JSXStateArray {
-  assert(() => nextSibling === null || nextSibling.parentNode === parent);
-  assert(!isSSRElement(child));
+// export function patchElementArray(parent: Node, nextSibling: ChildNode | null, previousState: JSXStateArray, child: JSXElementArray): JSXStateArray {
+//   assert(() => nextSibling === null || nextSibling.parentNode === parent);
+//   assert(!isSSRElement(child));
   
-  child = Array.isArray(child) ? child : [child];
+//   child = Array.isArray(child) ? child : [child];
 
-  const newState: JSXStateArray = [];
-  let currentAnchor = nextSibling;
-  for (let i = Math.max(previousState.length, child.length)-1; i >= 0; i--) {
-    newState[i] = patchElementSingular(parent, currentAnchor, previousState[i] ?? { node: null }, child[i]);
-    currentAnchor = newState[i]?.node ?? currentAnchor;
-  }
-  while (newState.at(-1)?.node === null)
-    newState.pop();
-  return newState;
-}
+//   const newState: JSXStateArray = [];
+//   let currentAnchor = nextSibling;
+//   for (let i = Math.max(previousState.length, child.length)-1; i >= 0; i--) {
+//     newState[i] = patchElementSingular(parent, currentAnchor, previousState[i] ?? { node: null }, child[i]);
+//     currentAnchor = newState[i]?.node ?? currentAnchor;
+//   }
+//   while (newState.at(-1)?.node === null)
+//     newState.pop();
+//   return newState;
+// }
 
-export function patchElement(parent: Node, nextSibling: ChildNode | null, previousState: JSXState, child: JSXElement): JSXState {
+export function patchElement(parent: Node, nextSibling: ChildNode | null, previousState: JSXState | null, child: JSXElement): JSXState {
   assert(() => nextSibling === null || nextSibling.parentNode === parent);
   assert(!isSSRElement(child));
 
   if (isFunction(child)) {
-    let previousResultState: JSXStateArray;
-    if (!Array.isArray(previousState)) {
-      // Nothing changed
-      if (previousState.callback === child) return previousState;
-      previousState.unsubscribe();
-      previousResultState = previousState.resultState;
-    }
-    else {
-      previousResultState = previousState;
-    }
-    
-    const [newChild, storeReads] = listenForStoreReads(() => child());
-
-    let resultState = patchElementArray(parent, nextSibling, previousResultState, newChild);
-    const hh = microtaskDebounce(() => {
-      const [newChild, newStoreReads] = listenForStoreReads(() => child());
-      resultState = patchElementArray(parent, nextSibling, resultState, newChild);
-      unsubscribe = subscribeToStoreReads(hh, newStoreReads, { once: true });
-    });
-    let unsubscribe = subscribeToStoreReads(hh, storeReads, { once: true });
-
-    return {
-      callback: child,
-      resultState,
-      unsubscribe: () => unsubscribe(),
-    };
+    throw new Error("todo");
   }
-  else if (!Array.isArray(previousState)) {
+
+  if (previousState?.kind === "dynamic") {
     previousState.unsubscribe();
-    return patchElementArray(parent, nextSibling, previousState.resultState, child);
+    return patchElement(parent, nextSibling, previousState.resultState, child);
+  }
+  
+  if (Array.isArray(child)) {
+    if (previousState?.kind !== "array") {
+      previousState = {
+        kind: "array",
+        states: previousState === null ? [] : [previousState],
+      };
+    }
+
+    // let currentAnchor = nextSibling;
+    const newState: JSXStateArray = {
+      kind: "array",
+      states: [],
+    };
+
+    let currentAnchor = nextSibling;
+    for (let i = Math.max(previousState.states.length, child.length)-1; i >= 0; i--) {
+      const temporaryAnchor = new Comment("anchor");
+      parent.insertBefore(temporaryAnchor, currentAnchor);
+
+      const outState = patchElement(parent, null!/*TODO*/, previousState.states[i]!, child[i]);
+      newState.states.push(outState);
+
+      const possibleNewAnchor = getFirstAnchorElement(outState);
+      switch (possibleNewAnchor) {
+      case "dynamic":
+        currentAnchor = temporaryAnchor;
+        break;
+      default:
+        currentAnchor = possibleNewAnchor;
+      case "no-node":
+        parent.removeChild(temporaryAnchor);
+      }
+    }
+
+    return newState;
   }
   else {
-    return patchElementArray(parent, nextSibling, previousState, child);
+    child satisfies JSXElementSingular;
+
+    if (previousState === null || previousState.kind === "singular") {
+      return patchElementSingular(parent, nextSibling, previousState, child);
+    }
+    else {
+      throw new Error("todo");
+    }
   }
 }
 

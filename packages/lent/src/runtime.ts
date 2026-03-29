@@ -1,4 +1,4 @@
-import { Component, deserialize, patchElement, patchElementArray, renderClasslist, setAttribute, type ClassList, type JSXElement, type JSXElementArray, type JSXState, type JSXStateArray } from ".";
+import { Component, deserialize, renderClasslist, setAttribute, type ClassList, type JSXElement } from ".";
 import { constructComponent } from "./component";
 import { isClassMethod } from "./serialize";
 import { isSignalAccessor, isSignalSetter, listenForStoreReads, resumeStore, signals, stores, subscribeToStoreReads, type StoreRead } from "./store";
@@ -34,7 +34,7 @@ function rebindFunctions<O extends object>(obj: O, new_this: object | null) {
 
 export type RuntimeDynamicState = {
   storeReads: StoreRead[],
-  update: (previous?: JSXElementArray) => JSXElementArray,
+  update: (previous?: JSXElement) => JSXElement,
 };
 
 type RunCtx = {
@@ -44,7 +44,7 @@ type RunCtx = {
   }[],
   dynamic_stack: {
     storeReads: StoreRead[],
-    update: (previous?: JSXElementArray) => JSXElementArray,
+    update: (previous?: JSXElement) => JSXElement,
   }[],
 };
 function run(n: Node, ctx: RunCtx) {

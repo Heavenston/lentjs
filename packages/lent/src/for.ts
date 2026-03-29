@@ -1,5 +1,5 @@
 import { Component } from "./component";
-import { createSignal, untrack, type JSXElement, type JSXElementArray, type JSXElementSingular } from ".";
+import { createSignal, untrack, type JSXElement, type JSXElementSingular } from ".";
 import type { SignalSetter } from "./store";
 
 type ElementState<T> = {
@@ -25,13 +25,13 @@ export class For<T> extends Component<ForState<T>, ForProps<T>> {
     };
   }
 
-  private compute(previous: JSXElementArray): JSXElementArray {
+  private compute(previous: JSXElement): JSXElement {
     const old_jsx_elements = Array.isArray(previous) ? previous : [previous];
     console.log(old_jsx_elements);
 
     const new_elements: ElementState<T>[] = [];
     const old_elements: ElementState<T>[] = untrack(() => this.state.elements);
-    const jsx_elements: JSXElementSingular[] = [];
+    const jsx_elements: JSXElement[] = [];
 
     const each = this.props.each();
     for (let i = 0; i < each.length; i++) {
