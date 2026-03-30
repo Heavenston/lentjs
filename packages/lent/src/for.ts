@@ -15,10 +15,6 @@ export type ForProps<T> = {
 export class For<T> extends Component<ForState<T>, ForProps<T>> {
   static { this.register("__lentjs") }
 
-  protected override init(): void {
-    console.debug("For state:", this.state.elements);
-  }
-
   protected override getInitialState(): ForState<T> {
     return {
       elements: [],
@@ -27,7 +23,6 @@ export class For<T> extends Component<ForState<T>, ForProps<T>> {
 
   private compute(previous: JSXElement): JSXElement {
     const old_jsx_elements = Array.isArray(previous) ? previous : [previous];
-    console.log(old_jsx_elements);
 
     const new_elements: ElementState<T>[] = [];
     const old_elements: ElementState<T>[] = untrack(() => this.state.elements);

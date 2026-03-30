@@ -85,13 +85,14 @@ export default class Todo extends Component<TodoState> {
   }
 
   private deleteTask(id: string) {
+    console.log("tasks:", this.state.tasks);
     this.state.tasks = this.state.tasks.filter(t => t.id !== id);
   }
 
   private taskRender(_idx: number, task: () => TaskState) {
     return h(Task, {
       task,
-      onDelete: this.deleteTask,
+      onDelete: bind(this.deleteTask, this),
     });
   }
 
@@ -128,7 +129,7 @@ export default class Todo extends Component<TodoState> {
         h("div", {
           children: h(For<TaskState>, {
             each: closure(self => self.state.tasks, this),
-            children: this.taskRender,
+            children: bind(this.taskRender, this),
           }),
         }),
       ],

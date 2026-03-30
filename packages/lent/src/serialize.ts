@@ -64,10 +64,6 @@ function getComponentFunctions(): NonNullable<typeof component_functions> {
 }
 
 const devalueReducers: Record<string, (value: any) => any> = {
-  componentFunction: (f: unknown) => {
-    if (!isFunction(f)) return;
-    return getComponentFunctions().function_to_name.get(f);
-  },
   signalAccessor: (f: unknown) => {
     if (isSignalAccessor(f)) {
       return f.signalId;
@@ -95,6 +91,10 @@ const devalueReducers: Record<string, (value: any) => any> = {
   },
 };
 const extendedDevalueReducers: Record<string, (value: any) => any> = {
+  componentFunction: (f: unknown) => {
+    if (!isFunction(f)) return;
+    return getComponentFunctions().function_to_name.get(f);
+  },
   ...devalueReducers,
   function: (f: unknown) => {
     if (isFunction(f)) {
@@ -136,10 +136,12 @@ const devalueRevivers: Record<string, (value: any) => any> = {
     return eval(code);
   },
   store: (id) => {
-    const store = storeFromId(id);
-    if (store === null)
-      throw new Error(`No store with id ${id}`);
-    return store;
+    return createLazyProxy(() => {
+      const store = storeFromId(id);
+      if (store === null)
+        throw new Error(`No store with id ${id}`);
+      return store;
+    });
   },
 };
 
