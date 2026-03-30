@@ -3,7 +3,7 @@ export { createStore, untrack, type Store, createSignal } from "./store";
 export { createTask } from "./task";
 export { For } from "./for";
 export { startRuntime } from "./runtime";
-export { serialize, deserialize } from "./serialize";
+export { serialize, deserialize, closure } from "./serialize";
 
 import { constructComponent, type Component, type ComponentFactory } from "./component";
 import { immediateTrack } from "./task";
@@ -58,7 +58,6 @@ function getFirstAnchorElement(state: JSXState): ChildNode | "no-node" | "dynami
 }
 
 export function patchElementSingular(parent: Node, nextSibling: ChildNode | null, previousState: JSXStateSingular | null, child: JSXElementSingular): JSXStateSingular {
-  console.log({parent,nextSibling,previousState,child});
   assert(nextSibling === null || nextSibling.parentNode === parent);
   assert(previousState === null || previousState.node === null || previousState.node.parentNode === parent);
   assert(!isSSRElement(child), "Unexpected ssr element during rendering");
@@ -218,6 +217,9 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
   }
   else if (isFunction(el)) {
     const [val, storeReads] = listenForStoreReads(() => el());
+    if (storeReads.length <= 0) {
+      return stringifyJSXElement(val, false);
+    }
     const prefix = createDirective("start-dynamic", {
       storeReads,
       update: el,
@@ -383,10 +385,12 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
       else if (typeof tv === "function") {
         const [class_list, found_reads] = listenForStoreReads(tv);
         t += `class="${renderClasslist(class_list).join(" ")}" `;
-        t += `lentjs:class="${escapeHtmlAttribute(serialize({
-          found_reads,
-          update: tv,
-        }))}" `;
+        if (found_reads.length > 0) {
+          t += `lentjs:class="${escapeHtmlAttribute(serialize({
+            found_reads,
+            update: tv,
+          }))}" `;
+        }
       }
       else if(tv)
         t += `class="${renderClasslist(tv).join(" ")}" `;
@@ -424,10 +428,12 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
       if (isFunction(tv)) {
         let found_reads: StoreRead[];
         [val, found_reads] = listenForStoreReads(tv);
-        t += `lentjs:attr:${tk}="${escapeHtmlAttribute(serialize({
-          callback: tv,
-          found_reads,
-        }))}" `;
+        if (found_reads.length > 0) {
+          t += `lentjs:attr:${tk}="${escapeHtmlAttribute(serialize({
+            callback: tv,
+            found_reads,
+          }))}" `;
+        }
       }
       else {
         val = tv;
@@ -476,7 +482,8 @@ export function h(element: any, props: any = {}): JSXElement {
       return {
         [SSRElementMarker]: true,
         t: `${createDirective("start-component", {
-          id: comp.id,
+          factoryId: comp.id,
+          componentId: constructed.id,
           props,
           state: constructed.state,
         })}${t}${createDirective("end-component")}`,

@@ -1,4 +1,4 @@
-import { h, Component, type JSXElement, createTask } from "lent";
+import { h, Component, type JSXElement, createTask, closure } from "lent";
 
 type CounterButtonState = {
   count: number,
@@ -16,11 +16,11 @@ class CounterButton extends Component<CounterButtonState, CounterButtonProps> {
     };
   }
 
-  protected init(): void {
-    createTask(({ track }) => {
-      const val = this.state.count;
-      this.state.count = track(() => this.clamp(val));
-    });
+  protected override init(): void {
+    // createTask(({ track }) => {
+    //   const val = this.state.count;
+    //   this.state.count = track(() => this.clamp(val));
+    // });
   }
 
   clamp(val: number) {
@@ -38,23 +38,23 @@ class CounterButton extends Component<CounterButtonState, CounterButtonProps> {
     return h("div", {
       children: [
         h("div", {
-          children: ["Count: ", () => this.state.count],
+          children: ["Count: ", closure(state => state.count, this.state)],
         }),
         h("button", {
-          children: ["Increment to ", () => this.state.count + 1],
-          "attr:disabled": () => this.state.count >= this.props.max(),
-          "on:click": () => {
-            console.log(`Increment ${this.state.count} -> ${this.state.count+1}`);
-            this.state.count = this.clamp(this.state.count+1);
-          },
+          children: ["Increment to ", closure(state => state.count + 1, this.state)],
+          "attr:disabled": closure(self => self.state.count >= self.props.max(), this),
+          "on:click": closure(self => {
+            console.log(`Increment ${self.state.count} -> ${self.state.count+1}`);
+            self.state.count = self.clamp(self.state.count+1);
+          }, this),
         }),
         h("button", {
-          children: ["Decrement to ", () => this.clamp(this.state.count-1)],
-          "attr:disabled": () => this.state.count <= this.props.min(),
-          "on:click": () => {
-            console.log(`Decrement ${this.state.count} -> ${this.state.count-1}`);
-            this.state.count = this.clamp(this.state.count-1);
-          },
+          children: ["Decrement to ", closure(self => self.clamp(self.state.count-1), this)],
+          "attr:disabled": closure(self => self.state.count <= self.props.min(), this),
+          "on:click": closure(self => {
+            console.log(`Decrement ${self.state.count} -> ${self.state.count-1}`);
+            self.state.count = self.clamp(self.state.count-1);
+          }, this),
         }),
       ],
     });
@@ -86,13 +86,13 @@ export default class Counter extends Component<CounterState> {
               "attr:type": "number",
               "attr:value": this.state.min,
               "attr:max": this.state.max,
-              "on:change": e => {
+              "on:change": closure((self, e) => {
                 if (!(e instanceof Event)) return;
                 const el = e.currentTarget;
                 if (!(el instanceof HTMLInputElement)) return;
                 console.log(`Min Changed: ${el.valueAsNumber}`);
-                this.state.min = el.valueAsNumber;
-              }
+                self.state.min = el.valueAsNumber;
+              }, this),
             }),
           ],
         }),
@@ -103,19 +103,19 @@ export default class Counter extends Component<CounterState> {
               "attr:type": "number",
               "attr:value": this.state.max,
               "attr:min": this.state.min,
-              "on:change": e => {
+              "on:change": closure((self, e) => {
                 if (!(e instanceof Event)) return;
                 const el = e.currentTarget;
                 if (!(el instanceof HTMLInputElement)) return;
                 console.log(`Changed: ${el.valueAsNumber}`);
-                this.state.max = el.valueAsNumber;
-              }
+                self.state.max = el.valueAsNumber;
+              }, this)
             }),
           ],
         }),
         h(CounterButton, {
-          min: () => this.state.min,
-          max: () => this.state.max,
+          min: closure(self => self.state.min, this),
+          max: closure(self => self.state.max, this),
         }),
       ],
     });

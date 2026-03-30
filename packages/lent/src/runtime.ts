@@ -1,35 +1,28 @@
 import { Component, deserialize, patchElement, renderClasslist, setAttribute, type ClassList, type JSXElement, type JSXState, type JSXStateArray } from ".";
 import { constructComponent } from "./component";
-import { isClassMethod } from "./serialize";
-import { isSignalAccessor, isSignalSetter, listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type Store, type StoreRead } from "./store";
-import { assert, isBindableThis, isFunction, microtaskDebounce } from "./utils";
+import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type Store, type StoreRead } from "./store";
+import { assert, microtaskDebounce } from "./utils";
 
 function closureBind<F extends Function>(f: F, new_this: object | null): F {
-  if (isClassMethod(f) || isBindableThis(f)) {
-    return f.bind(new_this);
-  }
-  else {
-    // console.warn("Rebinding closure: ", f.toString());
-    try {
-      return new Function("return " + f.toString()).call(new_this);
-    }
-    catch(e) {
-      console.error("Error rebinding:", e);
-      // @ts-ignore
-      return () => { throw new Error("Error rebinding this function") };
-    }
-  }
-}
+  return f;
 
-function rebindFunctions<O extends object>(obj: O, new_this: object | null) {
-  for (const [k, v] of Object.entries(obj) as [keyof O, O[keyof O]][]) {
-    let new_val: any = v;
-    if (isSignalAccessor(v) || isSignalSetter(v)) continue;
-    if (isFunction(v)) {
-      new_val = closureBind(v, new_this);
-    }
-    obj[k] = new_val;
-  }
+  // if (isFunction(f) && isClosure(f)) {
+  //   return f;
+  // }
+  // if (isClassMethod(f) || isBindableThis(f)) {
+  //   return f.bind(new_this);
+  // }
+  // else {
+  //   // console.warn("Rebinding closure: ", f.toString());
+  //   try {
+  //     return new Function("return " + f.toString()).call(new_this);
+  //   }
+  //   catch(e) {
+  //     console.error("Error rebinding:", e);
+  //     // @ts-ignore
+  //     return () => { throw new Error("Error rebinding this function") };
+  //   }
+  // }
 }
 
 export const DIRECTIVE_PREFIX = "lentjs";
@@ -37,7 +30,7 @@ export type Directives = {
   signals: [string, any][],
   stores: [string, any][],
 
-  "start-component": { id: string, props: object, state: Store<unknown> },
+  "start-component": { factoryId: string, componentId: string, props: object, state: Store<unknown> },
   "end-component": null,
 
   "start-dynamic": { storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement },
@@ -62,7 +55,8 @@ type StateStackElement =
 ;
 type RunCtx = {
   component_stack: {
-    id: string,
+    factoryId: string,
+    componentId: string,
     instance: Component<any, any> | null,
   }[],
   dynamicStateStack: StateStackElement[],
@@ -87,19 +81,17 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
   }
   case "start-component":
     const previous_comp = ctx.component_stack.at(-1)?.instance ?? null;
-    const { id: cid, props, state } = d.data;
+    const { factoryId, componentId, props, state } = d.data;
 
-    const factory = Component.getComponentFromId(cid);
+    const factory = Component.getFactoryFromId(factoryId);
     if (!factory) {
-      console.warn(`Could not find the component with id`, cid);
+      console.warn(`Could not find the component factory with id`, factoryId);
     }
 
-    rebindFunctions(props, previous_comp);
-    rebindFunctions(state, previous_comp);
-
     ctx.component_stack.push({
-      id: cid,
-      instance: factory ? constructComponent(factory, props, state) : null,
+      factoryId,
+      componentId,
+      instance: factory ? constructComponent(factory, props, componentId, state) : null,
     });
     break;
   case "end-component":

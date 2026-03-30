@@ -2,8 +2,34 @@ import * as devalue from "devalue";
 import { Component } from ".";
 import { isFunction } from "./utils";
 import { getStoreId, isSignalAccessor, isSignalSetter, isStore, signalAccessorFromId, signalSetterFromId, storeFromId } from "./store";
+import { createLazyProxy } from "./lazy-proxy";
 
 const isClassMethodSymbol = Symbol("is-class-method-symbol");
+
+const isClosureSymbol = Symbol("closure");
+export type Closure<F extends () => any> = F & {
+  [isClosureSymbol]: true,
+  og_function: () => unknown,
+  values: unknown[],
+};
+export function closure<A extends any[], B extends any[], R>(og_fn: (...args: [...A, ...B]) => R, ...values: A): Closure<(...args: B) => R> {
+  // This is just for helping development, making the function always run
+  // without any of its captured variables
+  // const fn = (new Function(`return ${og_fn}`))();
+  const fn = og_fn;
+
+  const nfn: Closure<(...args: B) => R> = (...args: B): R => {
+    return fn(...values, ...args);
+  };
+  nfn[isClosureSymbol] = true;
+  nfn.og_function = og_fn;
+  nfn.values = values;
+  return nfn
+}
+
+export function isClosure<F extends () => any>(value: F): value is Closure<F> {
+  return isClosureSymbol in value && value[isClosureSymbol] === true;
+}
 
 let component_functions: {
   done_components: Set<any>,
@@ -54,7 +80,20 @@ export function serialize(value: unknown): string {
       }
     },
     closure: (f: unknown) => {
-      if (isFunction(f)) return f.toString();
+      if (isFunction(f) && isClosure(f)) {
+        return {
+          code: f.og_function.toString(),
+          values: f.values,
+        };
+      }
+    },
+    function: (f: unknown) => {
+      if (isFunction(f)) {
+        throw new Error(`Cannot stringify function ${f}`);
+      }
+    },
+    component: (f: unknown) => {
+      if (f instanceof Component) return f.id;
     },
     store: (f: unknown) => {
       if (isStore(f)) return getStoreId(f);
@@ -73,8 +112,16 @@ export function deserialize(text: string): unknown {
     signalSetter: (id: string) => {
       return signalSetterFromId(id);
     },
-    closure: f => {
-      return (new Function(`return ${f}`))();
+    closure: ({ code, values }: { code: string, values: Array<unknown> }) => {
+      const fn = (new Function(`return ${code}`))();
+      return (...args: unknown[]) => fn(...values, ...args);
+    },
+    component: (id: string) => {
+      return createLazyProxy(() => {
+        const instance = Component.getInstanceFromId(id);
+        if (instance === null) throw new Error(`No component instance with id ${id}`);
+        return instance;
+      });
     },
     store: (id) => {
       const store = storeFromId(id);

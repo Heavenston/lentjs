@@ -1,4 +1,4 @@
-import { h, Component, type JSXElement, createStore, For } from "lent";
+import { h, Component, type JSXElement, createStore, For, closure } from "lent";
 import c from "./todo.module.scss";
 
 type TaskState = {
@@ -12,13 +12,11 @@ type TaskProps = {
   onDelete: (id: string) => void,
 };
 class Task extends Component<{}, TaskProps> {
-  private c = c;
-
   static { this.register("____RANDOM_ID") }
 
   protected getInitialState(): {} { return {} }
 
-  protected init(): void {
+  protected override init(): void {
     console.log("Task Props:", this.props);
     console.log("Task Task:", this.props.task, "=", this.props.task());
   }
@@ -31,22 +29,22 @@ class Task extends Component<{}, TaskProps> {
 
   override render(): JSXElement {
     return h("div", {
-      class: () => [this.c["task"], { [this.c["task-completed"]]: this.props.task().done }],
+      class: closure((c, self) => [c["task"], { [c["task-completed"]]: self.props.task().done }], c, this),
       children: [
         h("span", {
-          children: () => this.props.task().text,
+          children: closure(self => self.props.task().text, this),
         }),
         h("input", {
-          "checked": () => this.props.task().done,
+          "checked": closure(self => self.props.task().done, this),
 
           "attr:type": "checkbox",
           "on:change": this.onChangeDone,
         }),
         h("button", {
-          "on:click": () => {
-            console.log(this.props);
-            this.props.onDelete(this.props.task().id);
-          },
+          "on:click": closure(self => {
+            console.log(self.props);
+            self.props.onDelete(self.props.task().id);
+          }, this),
           children: "delete",
         }),
       ],
@@ -100,35 +98,35 @@ export default class Todo extends Component<TodoState> {
     return h("div", {
       children: [
         h("form", {
-          "on:submit": (e) => {
+          "on:submit": closure((self, e) => {
             e.preventDefault();
             const el = e.currentTarget;
             if (!(el instanceof HTMLFormElement)) return;
-            const trimmed = this.state.input_text.trim();
+            const trimmed = self.state.input_text.trim();
             if (!trimmed) return;
-            this.addTask(trimmed);
-            this.state.input_text = "";
-          },
+            self.addTask(trimmed);
+            self.state.input_text = "";
+          }, this),
           children: [
             h("input", {
-              "value": () => this.state.input_text,
-              "on:input": e => {
-                console.log("change", this);
+              "value": closure(self => self.state.input_text, this),
+              "on:input": closure((self, e) => {
+                console.log("change", self);
                 const el = e.currentTarget;
                 if (!(el instanceof HTMLInputElement)) return;
-                this.state.input_text = el.value;
-              },
+                self.state.input_text = el.value;
+              }, this),
             }),
             h("button", {
               children: "Create Task",
-              "attr:disabled": () => !this.state.input_text.trim(),
+              "attr:disabled": closure(self => !self.state.input_text.trim(), this),
             }),
           ],
         }),
 
         h("div", {
           children: h(For<TaskState>, {
-            each: () => this.state.tasks,
+            each: closure(self => self.state.tasks, this),
             children: this.taskRender,
           }),
         }),

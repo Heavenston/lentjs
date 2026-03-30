@@ -1,5 +1,5 @@
 import { Component } from "./component";
-import { createSignal, untrack, type JSXElement } from ".";
+import { closure, createSignal, untrack, type JSXElement } from ".";
 import type { SignalSetter } from "./store";
 
 type ElementState<T> = {
@@ -58,6 +58,6 @@ export class For<T> extends Component<ForState<T>, ForProps<T>> {
   }
 
   override render(): JSXElement {
-    return previous => this.compute(previous);
+    return closure((self, previous) => self.compute(previous), this);
   }
 }
