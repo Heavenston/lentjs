@@ -9,7 +9,7 @@ import { constructComponent, type Component, type ComponentFactory } from "./com
 import { immediateTrack } from "./task";
 import { serialize } from "./serialize";
 import { isFunction } from "./utils";
-import { listenForStoreReads, signals, stores, subscribeToStoreReads, type StoreRead } from "./store";
+import { listenForStoreReads, signals, stores, type StoreRead } from "./store";
 import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type MarkerDirectiveName } from "./runtime";
 import { patchElement } from "./patchElement";
 
@@ -32,6 +32,8 @@ export type Attributes = {
   [key in `on:${string}`]?: EventHandler<Event>
 } & {
   [key in `attr:${string}`]?: AttributeValue | (() => AttributeValue)
+} & {
+  [key in `prop:${string}`]?: () => any
 };
 
 export function isSSRElement(t: unknown): t is SSRElement {
@@ -222,6 +224,21 @@ function createHTMLElement(element: string, props: Attributes): HTMLElement {
         setAttribute(el, tk, tv);
       }
     }
+    else if (k.startsWith("prop:")) {
+      const tv = v as Attributes[`prop:${string}`];
+      const tk = k.replace(/^prop:/, "");
+
+      if (isFunction(tv)) {
+        immediateTrack(tv, (value) => {
+          // @ts-ignore
+          el[tk] = value;
+        });
+      }
+      else {
+        // @ts-ignore
+        el[tk] = value;
+      }
+    }
     else {
       throw new Error(`Unsupported attribute ${k}`);
     }
@@ -303,6 +320,33 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
       else if (val !== undefined && val !== false) {
         t += `${tk}="${escapeHtmlAttribute(val.toString())}" `;
       }
+    }
+    else if (k.startsWith("prop:")) {
+      const tv = v as Attributes[`prop:${string}`];
+      const tk = k.replace(/^prop:/, "");
+
+      let val: AttributeValue;
+
+      if (isFunction(tv)) {
+        let found_reads: StoreRead[];
+        [val, found_reads] = listenForStoreReads(tv);
+        if (found_reads.length > 0) {
+          t += `lentjs:prop:${tk}="${escapeHtmlAttribute(serialize({
+            callback: tv,
+            found_reads,
+          }))}" `;
+        }
+      }
+      else {
+        val = tv;
+      }
+
+      // if (val === true) {
+      //   t += `${tk} `;
+      // }
+      // else if (val !== undefined && val !== false) {
+      //   t += `${tk}="${escapeHtmlAttribute(val.toString())}" `;
+      // }
     }
     else {
       throw new Error(`Unsupported attribute ${k}`);

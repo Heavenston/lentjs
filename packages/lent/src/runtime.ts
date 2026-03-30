@@ -185,6 +185,19 @@ function handleHTMLElement(el: HTMLElement) {
       });
       subscribeToStoreReads(hh, found_reads, { once: true });
     }
+
+    if (t.name.startsWith("lentjs:prop")) {
+      const prop = t.name.replace(/^lentjs:prop:/, "");
+      let { callback, found_reads } = deserialize(t.value) as { found_reads: StoreRead[], callback: () => any };
+
+      const hh = microtaskDebounce(() => {
+        const [new_value, new_found_reads] = listenForStoreReads(() => callback());
+        // @ts-ignore
+        el[prop] = new_value;
+        subscribeToStoreReads(hh, new_found_reads, { once: true });
+      });
+      subscribeToStoreReads(hh, found_reads, { once: true });
+    }
   }
 }
 

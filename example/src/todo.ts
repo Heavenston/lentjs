@@ -105,7 +105,8 @@ export default class Todo extends Component<TodoState> {
           }, this),
           children: [
             h("input", {
-              "value": closure(self => self.state.input_text, this),
+              "prop:value": closure(self => self.state.input_text, this),
+              "attr:value": this.state.input_text,
               "on:input": closure((self, e) => {
                 console.log("change", self);
                 const el = e.currentTarget;
