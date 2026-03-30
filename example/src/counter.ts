@@ -1,4 +1,4 @@
-import { h, Component, type JSXElement, createTask, closure } from "lent";
+import { h, Component, type JSXElement, closure } from "lent";
 
 type CounterButtonState = {
   count: number,
@@ -40,8 +40,11 @@ class CounterButton extends Component<CounterButtonState, CounterButtonProps> {
         h("div", {
           children: ["Count: ", closure(state => state.count, this.state)],
         }),
+        h("div", {
+          children: ["Digits: ", closure(state => new Array(state.count).fill(null).map((_val, idx) => `${idx} `), this.state)],
+        }),
         h("button", {
-          children: ["Increment to ", closure(state => state.count + 1, this.state)],
+          children: ["Increment to ", closure(self => self.state.count+1, this)],
           "attr:disabled": closure(self => self.state.count >= self.props.max(), this),
           "on:click": closure(self => {
             console.log(`Increment ${self.state.count} -> ${self.state.count+1}`);
@@ -49,7 +52,7 @@ class CounterButton extends Component<CounterButtonState, CounterButtonProps> {
           }, this),
         }),
         h("button", {
-          children: ["Decrement to ", closure(self => self.clamp(self.state.count-1), this)],
+          children: ["Decrement to ", closure(self => self.state.count-1, this)],
           "attr:disabled": closure(self => self.state.count <= self.props.min(), this),
           "on:click": closure(self => {
             console.log(`Decrement ${self.state.count} -> ${self.state.count-1}`);

@@ -38,49 +38,58 @@ function isSSRElement(t: unknown): t is SSRElement {
 }
 
 function addChild(parent: Node, child: JSXElement) {
-  patchElement(parent, null, null, child);
+  patchElement(parent, null, child);
 }
 
-export type JSXStateSingular = { kind: "singular", node: ChildNode | null };
-export type JSXStateDynamic = { kind: "dynamic", resultState: JSXState, callback: unknown, unsubscribe: () => void };
-export type JSXStateArray = { kind: "array", states: JSXState[] }
+export type JSXStateCommon = { endAnchor: ChildNode | null };
+export type JSXStateSingular = JSXStateCommon & { kind: "singular", node: ChildNode | null };
+export type JSXStateDynamic = JSXStateCommon & { kind: "dynamic", resultState: JSXState, callback: unknown, unsubscribe: () => void };
+export type JSXStateArray = JSXStateCommon & { kind: "array", states: JSXState[] }
 export type JSXState = JSXStateSingular | JSXStateArray | JSXStateDynamic;
 
 function getFirstAnchorElement(state: JSXState): ChildNode | "no-node" | "dynamic" {
   switch (state.kind) {
   case "singular":
-    return state.node ?? "no-node";
+    return state.node ?? state.endAnchor ?? "no-node";
   case "array":
-    return state.states.length > 0 ? getFirstAnchorElement(state.states[0]!) : "dynamic";
+    for (const s of state.states) {
+      const potentialAnchor = getFirstAnchorElement(s);
+      if (potentialAnchor === "dynamic") return "dynamic";
+      if (potentialAnchor === "no-node") continue;
+      return potentialAnchor;
+    }
+    return state.endAnchor ?? "no-node";
   case "dynamic":
     return "dynamic";
   }
 }
 
-export function patchElementSingular(parent: Node, nextSibling: ChildNode | null, previousState: JSXStateSingular | null, child: JSXElementSingular): JSXStateSingular {
-  assert(nextSibling === null || nextSibling.parentNode === parent);
-  assert(previousState === null || previousState.node === null || previousState.node.parentNode === parent);
+export function patchElementSingular(parent: Node, previousState: JSXStateSingular | null, child: JSXElementSingular): JSXStateSingular {
+  const endAnchor = previousState?.endAnchor ?? null;
+
+  assert(endAnchor === null || endAnchor.parentNode === parent, "Invalid end anchor");
+  assert(previousState === null || previousState.node === null || previousState.node.parentNode === parent, "Invalid node");
   assert(!isSSRElement(child), "Unexpected ssr element during rendering");
 
   if (child == null) {
     if (previousState?.node != null)
       parent.removeChild(previousState.node);
-    return { kind: "singular", node: null };
+    return { kind: "singular", endAnchor, node: null };
   }
 
   if (previousState?.node == null) {
     const childAsNode = typeof child === "string" || typeof child === "number" ? document.createTextNode(child.toString()) : child;
-    parent.insertBefore(childAsNode, nextSibling);
-    return { kind: "singular", node: childAsNode };
+    parent.insertBefore(childAsNode, endAnchor);
+    return { kind: "singular", endAnchor, node: childAsNode };
   }
   else if (previousState.node instanceof Text && (typeof child === "string" || typeof child === "number")) {
     previousState.node.textContent = child.toString();
-    return { kind: "singular", node: previousState.node };
+    return { kind: "singular", endAnchor, node: previousState.node };
   }
   else {
     const childAsNode = typeof child === "string" || typeof child === "number" ? document.createTextNode(child.toString()) : child;
     parent.replaceChild(previousState.node, childAsNode);
-    return { kind: "singular", node: childAsNode };
+    return { kind: "singular", endAnchor, node: childAsNode };
   }
 }
 
@@ -101,14 +110,16 @@ export function patchElementSingular(parent: Node, nextSibling: ChildNode | null
 //   return newState;
 // }
 
-export function patchElement(parent: Node, nextSibling: ChildNode | null, previousState: JSXState | null, child: JSXElement): JSXState {
-  assert(() => nextSibling === null || nextSibling.parentNode === parent);
+export function patchElement(parent: Node, previousState: JSXState | null, child: JSXElement): JSXState {
+  const endAnchor = previousState?.endAnchor ?? null;
+
+  assert(endAnchor === null || endAnchor.parentNode === parent);
   assert(!isSSRElement(child));
 
   if (previousState?.kind === "dynamic") {
     if (previousState.callback !== child) {
       previousState.unsubscribe();
-      return patchElement(parent, nextSibling, previousState.resultState, child);
+      return patchElement(parent, previousState.resultState, child);
     }
     else {
       // Nothing to do, same callback
@@ -118,11 +129,11 @@ export function patchElement(parent: Node, nextSibling: ChildNode | null, previo
 
   if (isFunction(child)) {
     let [newChild, storeReads] = listenForStoreReads(() => child());
-    let resultState = patchElement(parent, nextSibling, previousState, newChild);
+    let resultState = patchElement(parent, previousState, newChild);
 
     const hh = microtaskDebounce(() => {
       [newChild, storeReads] = listenForStoreReads(() => child(newChild));
-      resultState = patchElement(parent, nextSibling, resultState, newChild);
+      resultState = patchElement(parent, resultState, newChild);
       
       currentUnsubscribe = subscribeToStoreReads(hh, storeReads, { once: true });
     });
@@ -133,6 +144,8 @@ export function patchElement(parent: Node, nextSibling: ChildNode | null, previo
       callback: child,
       resultState,
       unsubscribe: () => currentUnsubscribe(),
+
+      endAnchor,
     };
   }
   
@@ -141,6 +154,7 @@ export function patchElement(parent: Node, nextSibling: ChildNode | null, previo
       previousState = {
         kind: "array",
         states: previousState === null ? [] : [previousState],
+        endAnchor,
       };
     }
 
@@ -148,14 +162,16 @@ export function patchElement(parent: Node, nextSibling: ChildNode | null, previo
     const newState: JSXStateArray = {
       kind: "array",
       states: [],
+      endAnchor,
     };
 
-    let currentAnchor = nextSibling;
+    let currentAnchor = endAnchor;
     for (let i = Math.max(previousState.states.length, child.length)-1; i >= 0; i--) {
       const temporaryAnchor = new Comment("anchor");
       parent.insertBefore(temporaryAnchor, currentAnchor);
 
-      const outState = patchElement(parent, currentAnchor, previousState.states[i] ?? null, child[i]);
+      const elState: JSXState = previousState.states[i] ? { ...previousState.states[i]!, endAnchor: currentAnchor } : { kind: "singular", endAnchor: currentAnchor, node: null };
+      const outState = patchElement(parent, elState, child[i]);
       newState.states.push(outState);
 
       const possibleNewAnchor = getFirstAnchorElement(outState);
@@ -169,14 +185,14 @@ export function patchElement(parent: Node, nextSibling: ChildNode | null, previo
         parent.removeChild(temporaryAnchor);
       }
     }
-
+    newState.states.reverse();
     return newState;
   }
   else {
     child satisfies JSXElementSingular;
 
     if (previousState === null || previousState.kind === "singular") {
-      return patchElementSingular(parent, nextSibling, previousState, child);
+      return patchElementSingular(parent, previousState, child);
     }
     else {
       throw new Error("todo");
@@ -232,7 +248,7 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
       return el.map(e => stringifyJSXElement(e, isInsideDynamic)).join("");
     }
 
-    const t = el.map(e => stringifyJSXElement(e, isInsideDynamic)).join("");
+    const t = el.map(e => stringifyJSXElement(e, isInsideDynamic)).join(createDirective("array-element-separator"));
     const prefix = createDirective("start-array");
     const suffix = createDirective("end-array");
     return `${prefix}${t}${suffix}`;

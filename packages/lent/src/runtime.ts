@@ -38,6 +38,7 @@ export type Directives = {
 
   "start-array": null,
   "end-array": null,
+  "array-element-separator": null,
 
   "null": null,
 };
@@ -50,7 +51,7 @@ export type Directive = DirectiveHelper<DirectiveName>;
 
 type StateStackElement =
   | { kind: "dynamic-start", storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement }
-  | { kind: "array-start", target: JSXStateArray }
+  | { kind: "array-start" }
   | { kind: "state", state: JSXState }
 ;
 type RunCtx = {
@@ -80,7 +81,6 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     break;
   }
   case "start-component":
-    const previous_comp = ctx.component_stack.at(-1)?.instance ?? null;
     const { factoryId, componentId, props, state } = d.data;
 
     const factory = Component.getFactoryFromId(factoryId);
@@ -125,7 +125,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     const hh = microtaskDebounce(() => {
       let newStoreReads: StoreRead[];
       [previousResult, newStoreReads] = listenForStoreReads(() => callback(previousResult));
-      resultState = patchElement(parent, directiveNode, resultState, previousResult);
+      resultState = patchElement(parent, resultState, previousResult);
       currentUnsubscribe = subscribeToStoreReads(hh, newStoreReads, { once: true });
     });
     let currentUnsubscribe = subscribeToStoreReads(hh, dynamic.storeReads, { once: true });
@@ -138,6 +138,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
           callback,
           resultState,
           unsubscribe,
+          endAnchor: directiveNode,
         },
       });
 
@@ -146,7 +147,6 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
   case "start-array": {
     ctx.dynamicStateStack.push({
       kind: "array-start",
-      target: { kind: "array", states: [] },
     });
     break;
   }
@@ -157,12 +157,20 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
       assert(el?.kind === "state");
       states.push(el.state);
     }
+    states.reverse();
+
     assert(ctx.dynamicStateStack.pop()?.kind === "array-start");
-    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "array", states } })
+    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "array", endAnchor: directiveNode, states } })
     break;
   }
+  // Dummy directive, does nothing
+  case "array-element-separator":
+    const last = ctx.dynamicStateStack.at(-1);
+    assert(last?.kind === "state");
+    last.state.endAnchor = directiveNode;
+    break;
   case "null": {
-    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", node: null } })
+    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", endAnchor: directiveNode, node: null } })
     break;
   }
   default:
@@ -212,7 +220,7 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
 
 function domVisitor(ctx: RunCtx, node: ChildNode) {
   if (ctx.dynamicStateStack.length > 0) {
-    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", node } })
+    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", endAnchor: null, node } })
   }
 
   if (node instanceof HTMLElement)
