@@ -17,11 +17,6 @@ class Task extends Component<{}, TaskProps> {
 
   protected getInitialState(): {} { return {} }
 
-  protected override init(): void {
-    console.log("Task Props:", this.props);
-    console.log("Task Task:", this.props.task, "=", this.props.task());
-  }
-
   private onChangeDone(e: Event) {
     const el = e.currentTarget;
     if (!(el instanceof HTMLInputElement)) return;
@@ -85,7 +80,6 @@ export default class Todo extends Component<TodoState> {
   }
 
   private deleteTask(id: string) {
-    console.log("tasks:", this.state.tasks);
     this.state.tasks = this.state.tasks.filter(t => t.id !== id);
   }
 
