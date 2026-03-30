@@ -18,14 +18,18 @@ export function closure<A extends any[], B extends any[], R>(og_fn: (...args: [.
 }
 
 export function bind<A extends any[], B extends any[], T, R>(og_fn: (this: T, ...args: [...A, ...B]) => R, thisarg: T, ...values: A): Closure<(...args: B) => R> {
-  const nfn: Closure<(...args: B) => R> = (...args: B): R => {
-    return og_fn.call(thisarg, ...values, ...args);
-  };
+  // Created inside an object so that its 'name' is the same of the og_fn
+  // FIXME: Any other way?
+  const nfn: Closure<(...args: B) => R> = {
+    [og_fn.name](...args: B): R {
+      return og_fn.call(thisarg, ...values, ...args);
+    },
+  }[og_fn.name] as any;
   nfn[isClosureSymbol] = true;
   nfn.og_function = og_fn;
   nfn.thisarg = thisarg;
   nfn.values = values;
-  return nfn
+  return nfn;
 }
 
 export function isClosure<F extends () => any>(value: F): value is Closure<F> {
@@ -80,6 +84,7 @@ const devalueReducers: Record<string, (value: any) => any> = {
         code: devalue.stringify(f.og_function, extendedDevalueReducers),
         thisarg: f.thisarg,
         values: f.values,
+        name: f.name,
       };
     }
   },
@@ -121,9 +126,13 @@ const devalueRevivers: Record<string, (value: any) => any> = {
   signalSetter: (id: string) => {
     return signalSetterFromId(id);
   },
-  closure: ({ code, thisarg, values }: { code: string, thisarg: unknown, values: Array<unknown> }) => {
+  closure: ({ name, code, thisarg, values }: { name: string, code: string, thisarg: unknown, values: Array<unknown> }) => {
     const fn = deserialize(code) as Function;
-    return (...args: unknown[]) => fn.call(thisarg, ...values, ...args);
+    // Created inside an object so that we can chose its 'name'
+    // FIXME: Any other way?
+    return {
+      [name](...args: unknown[]) { return fn.call(thisarg, ...values, ...args) },
+    }[name];
   },
   component: (id: string) => {
     return createLazyProxy(() => {
