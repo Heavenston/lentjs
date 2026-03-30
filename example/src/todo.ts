@@ -1,4 +1,4 @@
-import { h, Component, type JSXElement, createStore, For, closure } from "lent";
+import { h, Component, type JSXElement, createStore, closure, RefFor } from "lent";
 import c from "./todo.module.scss";
 import { bind } from "lent/src/serialize";
 
@@ -8,7 +8,7 @@ type TaskData = {
 };
 
 type TaskProps = {
-  task: () => TaskData,
+  task: TaskData,
   onDelete: (id: string) => void,
 };
 type TaskState = {
@@ -34,7 +34,7 @@ class Task extends Component<TaskState, TaskProps> {
       class: closure((c, self) => [c["task"], { [c["task-completed"]]: self.state.done }], c, this),
       children: [
         h("span", {
-          children: closure(self => self.props.task().text, this),
+          children: closure(self => self.props.task.text, this),
         }),
         h("input", {
           "checked": closure(self => self.state.done, this),
@@ -45,7 +45,7 @@ class Task extends Component<TaskState, TaskProps> {
         h("button", {
           "on:click": closure(self => {
             console.log(self.props);
-            self.props.onDelete(self.props.task().id);
+            self.props.onDelete(self.props.task.id);
           }, this),
           children: "delete",
         }),
@@ -89,7 +89,7 @@ export default class Todo extends Component<TodoState> {
     this.state.tasks = this.state.tasks.filter(t => t.id !== id);
   }
 
-  private taskRender(_idx: number, task: () => TaskData) {
+  private taskRender(task: TaskData) {
     return h(Task, {
       task,
       onDelete: bind(this.deleteTask, this),
@@ -128,8 +128,9 @@ export default class Todo extends Component<TodoState> {
 
         h("div", {
           class: ["tasks-container"],
-          children: h(For<TaskData>, {
+          children: h(RefFor<TaskData>, {
             each: closure(self => self.state.tasks, this),
+            key: closure(task => task.id),
             children: bind(this.taskRender, this),
           }),
         }),

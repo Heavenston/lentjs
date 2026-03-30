@@ -2,6 +2,7 @@ export { Component, type ComponentFactory } from "./component";
 export { createStore, untrack, type Store, createSignal } from "./store";
 export { createTask } from "./task";
 export { For } from "./for";
+export { RefFor } from "./ref-for";
 export { startRuntime } from "./runtime";
 export { serialize, deserialize, closure, bind } from "./serialize";
 

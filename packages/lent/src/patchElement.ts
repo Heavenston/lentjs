@@ -49,7 +49,12 @@ export function patchElementSingular(parent: Node, previousState: JSXStateSingul
   }
   else {
     const childAsNode = typeof child === "string" || typeof child === "number" ? document.createTextNode(child.toString()) : child;
-    parent.replaceChild(previousState.node, childAsNode);
+    if (previousState?.node === childAsNode) {
+      // Do nothing
+    }
+    else {
+      parent.replaceChild(childAsNode, previousState.node);
+    }
     return { kind: "singular", endAnchor, node: childAsNode };
   }
 }
