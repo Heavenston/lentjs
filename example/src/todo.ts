@@ -108,7 +108,6 @@ export default class Todo extends Component<TodoState> {
               "prop:value": closure(self => self.state.input_text, this),
               "attr:value": this.state.input_text,
               "on:input": closure((self, e) => {
-                console.log("change", self);
                 const el = e.currentTarget;
                 if (!(el instanceof HTMLInputElement)) return;
                 self.state.input_text = el.value;
