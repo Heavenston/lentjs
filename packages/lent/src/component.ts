@@ -4,11 +4,7 @@ import { assert } from "./utils";
 
 export abstract class Component<S extends object = {}, P = {}> {
   static #components: Map<string, ComponentFactory<any, any, any>> = new Map;
-  static #componentInstances: Map<string, WeakRef<Component<any, any>>> = new Map;
-
-  static #componentFinalizationRegistry = new FinalizationRegistry((id: string) => {
-    Component.#componentInstances.delete(id);
-  });
+  static #componentInstances: Map<string, Component<any, any>> = new Map;
 
   public static is_component_class: true = true;
   private static id_: string;
@@ -22,7 +18,7 @@ export abstract class Component<S extends object = {}, P = {}> {
     return this.#components.get(id) ?? null;
   }
   public static getInstanceFromId(id: string): Component<any, any> | null {
-    return this.#componentInstances.get(id)?.deref() ?? null;
+    return this.#componentInstances.get(id) ?? null;
   }
 
   protected static register(id: string) {
@@ -57,8 +53,8 @@ export abstract class Component<S extends object = {}, P = {}> {
   constructor(props: P, id?: string, state?: S) {
     this.id_ = id ?? crypto.randomUUID();
     assert(!Component.#componentInstances.has(this.id_));
-    Component.#componentInstances.set(this.id_, new WeakRef(this));
-    Component.#componentFinalizationRegistry.register(this, this.id_);
+    // FIXME: This leaks the component forever
+    Component.#componentInstances.set(this.id_, this);
 
     const this_class = this.constructor as { id?: string, name?: string };
     if (this_class.id === undefined) {

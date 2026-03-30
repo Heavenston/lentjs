@@ -10,19 +10,20 @@ const isClosureSymbol = Symbol("closure");
 export type Closure<F extends () => any> = F & {
   [isClosureSymbol]: true,
   og_function: () => unknown,
+  thisarg?: unknown,
   values: unknown[],
 };
 export function closure<A extends any[], B extends any[], R>(og_fn: (...args: [...A, ...B]) => R, ...values: A): Closure<(...args: B) => R> {
-  // This is just for helping development, making the function always run
-  // without any of its captured variables
-  // const fn = (new Function(`return ${og_fn}`))();
-  const fn = og_fn;
+  return bind(og_fn, null, ...values);
+}
 
+export function bind<A extends any[], B extends any[], T, R>(og_fn: (this: T, ...args: [...A, ...B]) => R, thisarg: T, ...values: A): Closure<(...args: B) => R> {
   const nfn: Closure<(...args: B) => R> = (...args: B): R => {
-    return fn(...values, ...args);
+    return og_fn.call(thisarg, ...values, ...args);
   };
   nfn[isClosureSymbol] = true;
   nfn.og_function = og_fn;
+  nfn.thisarg = thisarg;
   nfn.values = values;
   return nfn
 }
@@ -62,74 +63,92 @@ function getComponentFunctions(): NonNullable<typeof component_functions> {
   return component_functions;
 }
 
+const devalueReducers: Record<string, (value: any) => any> = {
+  componentFunction: (f: unknown) => {
+    if (!isFunction(f)) return;
+    return getComponentFunctions().function_to_name.get(f);
+  },
+  signalAccessor: (f: unknown) => {
+    if (isSignalAccessor(f)) {
+      return f.signalId;
+    }
+  },
+  signalSetter: (f: unknown) => {
+    if (isSignalSetter(f)) {
+      return f.signalId;
+    }
+  },
+  closure: (f: unknown) => {
+    if (isFunction(f) && isClosure(f)) {
+      return {
+        code: devalue.stringify(f.og_function, extendedDevalueReducers),
+        thisarg: f.thisarg,
+        values: f.values,
+      };
+    }
+  },
+  component: (f: unknown) => {
+    if (f instanceof Component) return f.id;
+  },
+  store: (f: unknown) => {
+    if (isStore(f)) return getStoreId(f);
+  },
+};
+const extendedDevalueReducers: Record<string, (value: any) => any> = {
+  ...devalueReducers,
+  function: (f: unknown) => {
+    if (isFunction(f)) {
+      return f.toString();
+    }
+  },
+};
+const limitedDevalueReducers: Record<string, (value: any) => any> = {
+  ...devalueReducers,
+  function: (f: unknown) => {
+    if (isFunction(f)) {
+      throw new Error(`Cannot stringify function ${f}`);
+    }
+  },
+};
+
+const devalueRevivers: Record<string, (value: any) => any> = {
+  componentFunction: f => {
+    return getComponentFunctions().name_to_function.get(`${f[0]} ${f[1]}`);
+  },
+  signalAccessor: (id: string) => {
+    return signalAccessorFromId(id);
+  },
+  signalSetter: (id: string) => {
+    return signalSetterFromId(id);
+  },
+  closure: ({ code, thisarg, values }: { code: string, thisarg: unknown, values: Array<unknown> }) => {
+    const fn = deserialize(code) as Function;
+    return (...args: unknown[]) => fn.call(thisarg, ...values, ...args);
+  },
+  component: (id: string) => {
+    return createLazyProxy(() => {
+      const instance = Component.getInstanceFromId(id);
+      if (instance === null) throw new Error(`No component instance with id ${id}`);
+      return instance;
+    });
+  },
+  function: (code: string) => {
+    return eval(code);
+  },
+  store: (id) => {
+    const store = storeFromId(id);
+    if (store === null)
+      throw new Error(`No store with id ${id}`);
+    return store;
+  },
+};
+
 export function serialize(value: unknown): string {
-  const cf = getComponentFunctions();
-  return devalue.stringify(value, {
-    componentFunction: (f: unknown) => {
-      if (!isFunction(f)) return;
-      return cf.function_to_name.get(f);
-    },
-    signalAccessor: (f: unknown) => {
-      if (isSignalAccessor(f)) {
-        return f.signalId;
-      }
-    },
-    signalSetter: (f: unknown) => {
-      if (isSignalSetter(f)) {
-        return f.signalId;
-      }
-    },
-    closure: (f: unknown) => {
-      if (isFunction(f) && isClosure(f)) {
-        return {
-          code: f.og_function.toString(),
-          values: f.values,
-        };
-      }
-    },
-    function: (f: unknown) => {
-      if (isFunction(f)) {
-        throw new Error(`Cannot stringify function ${f}`);
-      }
-    },
-    component: (f: unknown) => {
-      if (f instanceof Component) return f.id;
-    },
-    store: (f: unknown) => {
-      if (isStore(f)) return getStoreId(f);
-    },
-  });
+  return devalue.stringify(value, limitedDevalueReducers);
 }
 
 export function deserialize(text: string): unknown {
-  return devalue.parse(text, {
-    componentFunction: f => {
-      return getComponentFunctions().name_to_function.get(`${f[0]} ${f[1]}`);
-    },
-    signalAccessor: (id: string) => {
-      return signalAccessorFromId(id);
-    },
-    signalSetter: (id: string) => {
-      return signalSetterFromId(id);
-    },
-    closure: ({ code, values }: { code: string, values: Array<unknown> }) => {
-      const fn = (new Function(`return ${code}`))();
-      return (...args: unknown[]) => fn(...values, ...args);
-    },
-    component: (id: string) => {
-      return createLazyProxy(() => {
-        const instance = Component.getInstanceFromId(id);
-        if (instance === null) throw new Error(`No component instance with id ${id}`);
-        return instance;
-      });
-    },
-    store: (id) => {
-      const store = storeFromId(id);
-      if (store === null)
-        throw new Error(`No store with id ${id}`);
-      return store;
-    },
-  });
+  return devalue.parse(text, devalueRevivers);
 }
 
 export function isClassMethod(val: unknown): boolean {

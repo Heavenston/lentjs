@@ -1,5 +1,6 @@
 import { h, Component, type JSXElement, createStore, For, closure } from "lent";
 import c from "./todo.module.scss";
+import { bind } from "lent/src/serialize";
 
 type TaskState = {
   id: string,
@@ -38,7 +39,7 @@ class Task extends Component<{}, TaskProps> {
           "checked": closure(self => self.props.task().done, this),
 
           "attr:type": "checkbox",
-          "on:change": this.onChangeDone,
+          "on:change": bind(this.onChangeDone, this),
         }),
         h("button", {
           "on:click": closure(self => {
