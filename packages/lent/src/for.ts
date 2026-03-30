@@ -1,6 +1,7 @@
 import { Component } from "./component";
-import { closure, createSignal, untrack, type JSXElement } from ".";
+import { createSignal, untrack, type JSXElement } from ".";
 import type { SignalSetter } from "./store";
+import { bind } from "./serialize";
 
 type ElementState<T> = {
   setEl: SignalSetter<T>,
@@ -31,10 +32,10 @@ export class For<T> extends Component<ForState<T>, ForProps<T>> {
     const each = this.props.each();
     for (let i = 0; i < each.length; i++) {
       const val: T = each[i]!;
-      if (i < old_elements.length) {
-        const el = old_elements[i]!;
-        el.setEl(val);
-        new_elements.push(el);
+      const oldel = old_elements[i];
+      if (oldel) {
+        oldel.setEl(val);
+        new_elements.push(oldel);
         jsx_elements.push(old_jsx_elements[i]);
       }
       else {
@@ -53,6 +54,6 @@ export class For<T> extends Component<ForState<T>, ForProps<T>> {
   }
 
   override render(): JSXElement {
-    return closure((self, previous) => self.compute(previous), this);
+    return bind(this.compute, this);
   }
 }

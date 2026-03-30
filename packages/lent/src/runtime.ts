@@ -97,7 +97,18 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     const callback = dynamic.update;
     const unsubscribe = () => currentUnsubscribe();
 
-    let previousResult: JSXElement | undefined;
+    function convertStateToJSXElement(state: JSXState): JSXElement {
+      switch (state.kind) {
+      case "singular":
+        return state.node;
+      case "array":
+        return state.states.map(convertStateToJSXElement);
+      case "dynamic":
+        return state.callback as JSXElement;
+      }
+    }
+
+    let previousResult: JSXElement = convertStateToJSXElement(state.state);
 
     const hh = microtaskDebounce(() => {
       let newStoreReads: StoreRead[];

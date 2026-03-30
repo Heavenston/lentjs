@@ -3,7 +3,7 @@ export { createStore, untrack, type Store, createSignal } from "./store";
 export { createTask } from "./task";
 export { For } from "./for";
 export { startRuntime } from "./runtime";
-export { serialize, deserialize, closure } from "./serialize";
+export { serialize, deserialize, closure, bind } from "./serialize";
 
 import { constructComponent, type Component, type ComponentFactory } from "./component";
 import { immediateTrack } from "./task";
