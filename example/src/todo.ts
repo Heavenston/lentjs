@@ -2,36 +2,42 @@ import { h, Component, type JSXElement, createStore, For, closure } from "lent";
 import c from "./todo.module.scss";
 import { bind } from "lent/src/serialize";
 
-type TaskState = {
+type TaskData = {
   id: string,
   text: string,
-  done: boolean,
 };
 
 type TaskProps = {
-  task: () => TaskState,
+  task: () => TaskData,
   onDelete: (id: string) => void,
 };
-class Task extends Component<{}, TaskProps> {
+type TaskState = {
+  done: boolean,
+};
+class Task extends Component<TaskState, TaskProps> {
   static { this.register("____RANDOM_ID") }
 
-  protected getInitialState(): {} { return {} }
+  protected getInitialState(): TaskState {
+    return {
+      done: false,
+    };
+  }
 
   private onChangeDone(e: Event) {
     const el = e.currentTarget;
     if (!(el instanceof HTMLInputElement)) return;
-    this.props.task().done = el.checked;
+    this.state.done = el.checked;
   }
 
   override render(): JSXElement {
     return h("div", {
-      class: closure((c, self) => [c["task"], { [c["task-completed"]]: self.props.task().done }], c, this),
+      class: closure((c, self) => [c["task"], { [c["task-completed"]]: self.state.done }], c, this),
       children: [
         h("span", {
           children: closure(self => self.props.task().text, this),
         }),
         h("input", {
-          "checked": closure(self => self.props.task().done, this),
+          "checked": closure(self => self.state.done, this),
 
           "attr:type": "checkbox",
           "on:change": bind(this.onChangeDone, this),
@@ -50,7 +56,7 @@ class Task extends Component<{}, TaskProps> {
 
 type TodoState = {
   input_text: string,
-  tasks: TaskState[],
+  tasks: TaskData[],
 };
 
 export default class Todo extends Component<TodoState> {
@@ -83,7 +89,7 @@ export default class Todo extends Component<TodoState> {
     this.state.tasks = this.state.tasks.filter(t => t.id !== id);
   }
 
-  private taskRender(_idx: number, task: () => TaskState) {
+  private taskRender(_idx: number, task: () => TaskData) {
     return h(Task, {
       task,
       onDelete: bind(this.deleteTask, this),
@@ -122,7 +128,7 @@ export default class Todo extends Component<TodoState> {
 
         h("div", {
           class: ["tasks-container"],
-          children: h(For<TaskState>, {
+          children: h(For<TaskData>, {
             each: closure(self => self.state.tasks, this),
             children: bind(this.taskRender, this),
           }),
