@@ -204,9 +204,8 @@ export function subscribeToStoreReads(cb: () => void, reads: StoreRead[], option
 }
 
 export function listenForStoreReads<T>(cb: () => T): [T, StoreRead[]] {
-  if (current_store_read_listener !== null)
-    throw new Error("Recursive listenForStoreReads not supported");
   const found_reads: StoreRead[] = [];
+  const previousListener = current_store_read_listener;
   current_store_read_listener = { found_reads };
   try {
     const val = cb();
@@ -216,7 +215,7 @@ export function listenForStoreReads<T>(cb: () => T): [T, StoreRead[]] {
     throw e;
   }
   finally {
-    current_store_read_listener = null;
+    current_store_read_listener = previousListener;
   }
 }
 
