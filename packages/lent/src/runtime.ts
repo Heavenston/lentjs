@@ -1,5 +1,6 @@
-import { Component, deserialize, patchElement, renderClasslist, setAttribute, type ClassList, type JSXElement, type JSXState, type JSXStateArray } from ".";
+import { Component, deserialize, renderClasslist, setAttribute, type ClassList, type JSXElement } from ".";
 import { constructComponent } from "./component";
+import { patchElement, type JSXState } from "./patchElement";
 import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type Store, type StoreRead } from "./store";
 import { assert, microtaskDebounce } from "./utils";
 
