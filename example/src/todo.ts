@@ -127,6 +127,7 @@ export default class Todo extends Component<TodoState> {
         }),
 
         h("div", {
+          class: ["tasks-container"],
           children: h(For<TaskState>, {
             each: closure(self => self.state.tasks, this),
             children: bind(this.taskRender, this),

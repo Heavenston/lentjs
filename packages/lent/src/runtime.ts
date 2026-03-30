@@ -1,30 +1,8 @@
-import { Component, deserialize, renderClasslist, setAttribute, type ClassList, type JSXElement } from ".";
+import { Component, deserialize, renderClasslist, setAttribute, type ClassList, type EventHandler, type JSXElement } from ".";
 import { constructComponent } from "./component";
 import { patchElement, type JSXState } from "./patchElement";
 import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type Store, type StoreRead } from "./store";
 import { assert, microtaskDebounce } from "./utils";
-
-function closureBind<F extends Function>(f: F, new_this: object | null): F {
-  return f;
-
-  // if (isFunction(f) && isClosure(f)) {
-  //   return f;
-  // }
-  // if (isClassMethod(f) || isBindableThis(f)) {
-  //   return f.bind(new_this);
-  // }
-  // else {
-  //   // console.warn("Rebinding closure: ", f.toString());
-  //   try {
-  //     return new Function("return " + f.toString()).call(new_this);
-  //   }
-  //   catch(e) {
-  //     console.error("Error rebinding:", e);
-  //     // @ts-ignore
-  //     return () => { throw new Error("Error rebinding this function") };
-  //   }
-  // }
-}
 
 export const DIRECTIVE_PREFIX = "lentjs";
 export type Directives = {
@@ -110,15 +88,13 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     break;
   }
   case "end-dynamic": {
-    const current_component = ctx.component_stack.at(-1)?.instance ?? null;
-
     const state = ctx.dynamicStateStack.pop();
     assert(state?.kind === "state");
     const dynamic = ctx.dynamicStateStack.pop();
     assert(dynamic?.kind === "dynamic-start");
 
     let resultState = state.state;
-    const callback = closureBind(dynamic.update,current_component);
+    const callback = dynamic.update;
     const unsubscribe = () => currentUnsubscribe();
 
     let previousResult: JSXElement | undefined;
@@ -179,21 +155,16 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
   }
 }
 
-function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
-  const current_comp = ctx.component_stack.at(-1)?.instance ?? null;
+function handleHTMLElement(el: HTMLElement) {
   for (const t of el.attributes) {
     if (t.name.startsWith("lentjs:on:")) {
       const event = t.name.replace(/^lentjs:on:/, "");
-      // @ts-ignore
-      const cb: any = closureBind(deserialize(t.value), current_comp);
-      el.addEventListener(event, cb);
+      el.addEventListener(event, deserialize(t.value) as EventHandler<Event>);
     }
 
     if (t.name.startsWith("lentjs:attr:")) {
       const attr = t.name.replace(/^lentjs:attr:/, "");
       let { callback, found_reads } = deserialize(t.value) as { found_reads: StoreRead[], callback: () => any };
-
-      callback = closureBind(callback, current_comp);
 
       const hh = microtaskDebounce(() => {
         const [new_value, new_found_reads] = listenForStoreReads(() => callback());
@@ -205,8 +176,6 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
 
     if (t.name.startsWith("lentjs:class")) {
       let { update, found_reads } = deserialize(t.value) as { found_reads: StoreRead[], update: () => ClassList };
-
-      update = closureBind(update, current_comp);
 
       const hh = microtaskDebounce(() => {
         const [new_value, new_found_reads] = listenForStoreReads(() => update());
@@ -220,12 +189,8 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
 }
 
 function domVisitor(ctx: RunCtx, node: ChildNode) {
-  if (ctx.dynamicStateStack.length > 0) {
-    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", endAnchor: null, node } })
-  }
-
   if (node instanceof HTMLElement)
-    handleHTMLElement(ctx, node);
+    handleHTMLElement(node);
 
   node.childNodes.forEach(n => {
     if (n instanceof Comment) {
@@ -237,7 +202,11 @@ function domVisitor(ctx: RunCtx, node: ChildNode) {
       return;
     }
 
-    domVisitor(ctx, n);
+    if (ctx.dynamicStateStack.length > 0) {
+      ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", endAnchor: null, node: n } })
+    }
+
+    domVisitor({ component_stack: [], dynamicStateStack: [] }, n);
   });
 }
 
