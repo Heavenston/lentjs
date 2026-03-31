@@ -100,12 +100,11 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
     const suffix = createDirective("end-array");
     return `${prefix}${t}${suffix}`;
   }
-  else if (el == null) {
-    if (!isInsideDynamic) {
-      return "";
-    }
-
-    return createDirective("null", null);
+  else if (el === null) {
+    return isInsideDynamic ? createDirective("null", null) : "";
+  }
+  else if (el === undefined) {
+    return isInsideDynamic ? createDirective("undefined", null) : "";
   }
   else if (el instanceof Node) {
     throw new Error("Unsupported Node");
