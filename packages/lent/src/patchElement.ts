@@ -59,6 +59,48 @@ export function patchElementSingular(parent: Node, previousState: JSXStateSingul
   }
 }
 
+export function patchElementArray(parent: Node, previousState: JSXStateSingular | JSXStateArray | null, child: JSXElement[]): JSXStateArray {
+  const endAnchor = previousState?.endAnchor ?? null;
+
+  if (previousState?.kind !== "array") {
+    previousState = {
+      kind: "array",
+      states: previousState === null ? [] : [previousState],
+      endAnchor,
+    };
+  }
+
+  // let currentAnchor = nextSibling;
+  const newState: JSXStateArray = {
+    kind: "array",
+    states: [],
+    endAnchor,
+  };
+
+  let currentAnchor = endAnchor;
+  for (let i = Math.max(previousState.states.length, child.length)-1; i >= 0; i--) {
+    const temporaryAnchor = new Comment("anchor");
+    parent.insertBefore(temporaryAnchor, currentAnchor);
+
+    const elState: JSXState = previousState.states[i] ? { ...previousState.states[i]!, endAnchor: currentAnchor } : { kind: "singular", endAnchor: currentAnchor, node: null };
+    const outState = patchElement(parent, elState, child[i]);
+    newState.states.push(outState);
+
+    const possibleNewAnchor = getFirstAnchorElement(outState);
+    switch (possibleNewAnchor) {
+    case "dynamic":
+      currentAnchor = temporaryAnchor;
+      break;
+    default:
+      currentAnchor = possibleNewAnchor;
+    case "no-node":
+      parent.removeChild(temporaryAnchor);
+    }
+  }
+  newState.states.reverse();
+  return newState;
+}
+
 export function patchElement(parent: Node, previousState: JSXState | null, child: JSXElement): JSXState {
   const endAnchor = previousState?.endAnchor ?? null;
 
@@ -99,43 +141,7 @@ export function patchElement(parent: Node, previousState: JSXState | null, child
   }
   
   if (Array.isArray(child)) {
-    if (previousState?.kind !== "array") {
-      previousState = {
-        kind: "array",
-        states: previousState === null ? [] : [previousState],
-        endAnchor,
-      };
-    }
-
-    // let currentAnchor = nextSibling;
-    const newState: JSXStateArray = {
-      kind: "array",
-      states: [],
-      endAnchor,
-    };
-
-    let currentAnchor = endAnchor;
-    for (let i = Math.max(previousState.states.length, child.length)-1; i >= 0; i--) {
-      const temporaryAnchor = new Comment("anchor");
-      parent.insertBefore(temporaryAnchor, currentAnchor);
-
-      const elState: JSXState = previousState.states[i] ? { ...previousState.states[i]!, endAnchor: currentAnchor } : { kind: "singular", endAnchor: currentAnchor, node: null };
-      const outState = patchElement(parent, elState, child[i]);
-      newState.states.push(outState);
-
-      const possibleNewAnchor = getFirstAnchorElement(outState);
-      switch (possibleNewAnchor) {
-      case "dynamic":
-        currentAnchor = temporaryAnchor;
-        break;
-      default:
-        currentAnchor = possibleNewAnchor;
-      case "no-node":
-        parent.removeChild(temporaryAnchor);
-      }
-    }
-    newState.states.reverse();
-    return newState;
+    return patchElementArray(parent, previousState, child);
   }
   else {
     child satisfies JSXElementSingular;
