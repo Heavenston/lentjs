@@ -17,7 +17,9 @@ import { patchElement } from "./patchElement";
 const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
 export type JSXElementSingular = SSRElement | ChildNode | number | string | null | undefined;
-export type JSXElement = JSXElementSingular | JSXElement[] | ((previous?: JSXElement) => JSXElement);
+export type JSXElementArray = JSXElement[];
+export type JSXElementDynamic = (previous?: JSXElement) => JSXElement;
+export type JSXElement = JSXElementSingular | JSXElementArray | JSXElementDynamic;
 export type PropertyValue = string | number | (() => PropertyValue);
 export type ClassList = string | Partial<Record<string, boolean>> | ClassList[];
 
