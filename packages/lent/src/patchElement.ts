@@ -24,7 +24,7 @@ function getFirstAnchorElement(state: JSXState): ChildNode | null {
   }
 }
 
-export function patchElementSingular(parent: Node, anchorElement: ChildNode | null, previousState: JSXStateSingular | null, child: JSXElementSingular): JSXStateSingular {
+function patchElementSingular(parent: Node, anchorElement: ChildNode | null, previousState: JSXStateSingular | null, child: JSXElementSingular): JSXStateSingular {
   assert(anchorElement === null || anchorElement.parentNode === parent, "Invalid end anchor");
   assert(previousState === null || previousState.node === null || previousState.node.parentNode === parent, "Invalid node");
   assert(!isSSRElement(child), "Unexpected ssr element during rendering");
@@ -58,7 +58,7 @@ export function patchElementSingular(parent: Node, anchorElement: ChildNode | nu
   }
 }
 
-export function patchElementArray(parent: Node, anchorElement: ChildNode | null, previousState: JSXStateSingular | JSXStateArray | null, child: JSXElement[]): JSXStateArray {
+function patchElementArray(parent: Node, anchorElement: ChildNode | null, previousState: JSXStateSingular | JSXStateArray | null, child: JSXElement[]): JSXStateArray {
   if (previousState?.kind !== "array") {
     previousState = {
       kind: "array",

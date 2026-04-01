@@ -10,7 +10,7 @@ import { constructComponent, type Component, type ComponentFactory } from "./com
 import { immediateTrack } from "./task";
 import { serialize } from "./serialize";
 import { isFunction } from "./utils";
-import { listenForStoreReads, signals, stores, type StoreRead } from "./store";
+import { listenForStoreReads, signals, stores, untrack, type StoreRead } from "./store";
 import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type MarkerDirectiveName } from "./runtime";
 import { patchElement } from "./patchElement";
 import { escapeHtml } from "./escape-html";

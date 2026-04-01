@@ -1,6 +1,6 @@
 import * as devalue from "devalue";
 import { Component } from ".";
-import { isFunction } from "./utils";
+import { assert, isFunction } from "./utils";
 import { getStoreId, isSignalAccessor, isSignalSetter, isStore, signalAccessorFromId, signalSetterFromId, storeFromId } from "./store";
 import { createLazyProxy } from "./lazy-proxy";
 
@@ -36,6 +36,25 @@ export function isClosure<F extends () => any>(value: F): value is Closure<F> {
   return isClosureSymbol in value && value[isClosureSymbol] === true;
 }
 
+const registry = new Map<string, unknown>;
+const registryIdSymbol = Symbol("registry-id");
+export function register<V extends object>(value: V, id: string): V {
+  assert(!registry.has(id), "Duplicate registry id");
+  assert(!(registryIdSymbol in value), "Value already registered");
+  registry.set(id, value);
+  Object.defineProperty(value, registryIdSymbol, {
+    writable: false,
+    value: id,
+  });
+  return value;
+}
+
+export function getValueRegistryId(value: unknown): string | null {
+  if (typeof value === "object" && value !== null && registryIdSymbol in value)
+    return value[registryIdSymbol] as string;
+  return null;
+}
+
 let component_functions: {
   done_components: Set<any>,
   function_to_name: Map<any, [string, string]>,
@@ -68,6 +87,7 @@ function getComponentFunctions(): NonNullable<typeof component_functions> {
 }
 
 const devalueReducers: Record<string, (value: any) => any> = {
+  registered: (val: unknown) => getValueRegistryId(val) ?? undefined,
   signalAccessor: (f: unknown) => {
     if (isSignalAccessor(f)) {
       return f.signalId;
@@ -117,6 +137,10 @@ const limitedDevalueReducers: Record<string, (value: any) => any> = {
 };
 
 const devalueRevivers: Record<string, (value: any) => any> = {
+  registered: (id: string) => {
+    assert(registry.has(id), `No values in registry with id '${id}'`);
+    return registry.get(id);
+  },
   componentFunction: f => {
     return getComponentFunctions().name_to_function.get(`${f[0]} ${f[1]}`);
   },
