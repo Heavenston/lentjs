@@ -1,6 +1,7 @@
 import { h, type ComponentFn, register } from "lent";
 import Counter from "./counter";
 import Todo from "./todo";
+import List from "./list";
 
 const Complex: ComponentFn<{}> = register((props) => {
   return [
@@ -22,6 +23,8 @@ const App: ComponentFn<{}> = () => {
     }),
     h("hr"),
     h(Complex),
+    h("hr"),
+    h(List),
   ];
 };
 export default App;
