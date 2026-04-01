@@ -1,16 +1,14 @@
-export { Component, type ComponentFactory } from "./component";
 export { createStore, untrack, type Store, createSignal } from "./store";
 export { createTask } from "./task";
 export { For } from "./for";
 export { RefFor } from "./ref-for";
 export { startRuntime } from "./runtime";
-export { serialize, deserialize, closure, bind } from "./serialize";
+export { serialize, deserialize, closure, bind, register } from "./serialize";
 
-import { constructComponent, type Component, type ComponentFactory } from "./component";
 import { immediateTrack } from "./task";
-import { serialize } from "./serialize";
+import { closure, serialize } from "./serialize";
 import { isFunction } from "./utils";
-import { listenForStoreReads, signals, stores, untrack, type StoreRead } from "./store";
+import { listenForStoreReads, signals, stores, type StoreRead } from "./store";
 import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type MarkerDirectiveName } from "./runtime";
 import { patchElement } from "./patchElement";
 import { escapeHtml } from "./escape-html";
@@ -24,6 +22,8 @@ export type JSXElementDynamic = (previous?: JSXElement) => JSXElement;
 export type JSXElement = JSXElementSingular | JSXElementArray | JSXElementDynamic;
 export type PropertyValue = string | number | (() => PropertyValue);
 export type ClassList = string | Partial<Record<string, boolean>> | ClassList[];
+
+export type ComponentFn<P> = (props: P) => JSXElement;
 
 export type EventHandler<E> = (event: E) => unknown;
 
@@ -62,13 +62,6 @@ export function renderClasslist(list: ClassList): string[] {
   return Object.entries(list)
     .filter(([k, v]) => typeof k === "string" && v)
     .map(([k, _]) => k);
-}
-
-export function render(container: HTMLElement, jsx: { new(props: {}): Component }) {
-  global_h_config = "dom";
-  const p = new jsx({});
-  const output = p.render();
-  addChild(container, output);
 }
 
 function createDirective<K extends MarkerDirectiveName>(name: K): string;
@@ -121,14 +114,12 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
   }
 }
 
-export function renderToString(jsx: ComponentFactory<{}, any, any>): string {
+export function renderToString(el: JSXElement): string {
   signals.clear();
   stores.clear();
 
   global_h_config = "ssr";
   try {
-    const el = stringifyJSXElement(h(jsx));
-
     const ser_stores: [string, any][] = [];
     for (const [id, { obj }] of stores.entries()) {
       ser_stores.push([id, obj]);
@@ -350,9 +341,13 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
 
 let global_h_config: "ssr" | "dom" = "dom";
 
+function hComponent<P>(component: ComponentFn<P>, props: P): JSXElement {
+  throw closure(component, props);
+}
+
 export function h(element: string, props?: Attributes): JSXElement;
-export function h(element: ComponentFactory<{}, any, any>): JSXElement;
-export function h<P>(element: ComponentFactory<P, any, any>, props: P): JSXElement;
+export function h(element: ComponentFn<{}>): JSXElement;
+export function h<P>(element: ComponentFn<P>, props: P): JSXElement;
 export function h(element: any, props: any = {}): JSXElement {
   if (typeof element === "string") {
     if (global_h_config === "ssr") {
@@ -365,27 +360,7 @@ export function h(element: any, props: any = {}): JSXElement {
       throw new Error("Invalid global_h_config value");
     }
   }
-  // is a component factory
   else {
-    const comp: ComponentFactory<{}, any, any> = element;
-    if (global_h_config === "ssr") {
-      const constructed = constructComponent(comp, props);
-      const t = stringifyJSXElement(constructed.render());
-      return {
-        [SSRElementMarker]: true,
-        t: `${createDirective("start-component", {
-          factoryId: comp.id,
-          componentId: constructed.id,
-          props,
-          state: constructed.state,
-        })}${t}${createDirective("end-component")}`,
-      };
-    }
-    else if (global_h_config === "dom") {
-      return constructComponent(comp, props).render();
-    }
-    else {
-      throw new Error("Invalid global_h_config value");
-    }
+    return hComponent(element, props);
   }
 }

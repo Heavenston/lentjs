@@ -1,16 +1,12 @@
-import { Component, deserialize, renderClasslist, setAttribute, type ClassList, type EventHandler, type JSXElement } from ".";
-import { constructComponent } from "./component";
+import { deserialize, renderClasslist, setAttribute, type ClassList, type EventHandler, type JSXElement } from ".";
 import { patchElement, type JSXState } from "./patchElement";
-import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type Store, type StoreRead } from "./store";
+import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "./store";
 import { assert, microtaskDebounce } from "./utils";
 
 export const DIRECTIVE_PREFIX = "lentjs";
 export type Directives = {
   signals: [string, any][],
   stores: [string, any][],
-
-  "start-component": { factoryId: string, componentId: string, props: object, state: Store<unknown> },
-  "end-component": null,
 
   "start-dynamic": { storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement },
   "end-dynamic": null,
@@ -35,11 +31,6 @@ type StateStackElement =
   | { kind: "state", state: JSXState }
 ;
 type RunCtx = {
-  component_stack: {
-    factoryId: string,
-    componentId: string,
-    instance: Component<any, any> | null,
-  }[],
   dynamicStateStack: StateStackElement[],
 };
 
@@ -60,23 +51,6 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     }
     break;
   }
-  case "start-component":
-    const { factoryId, componentId, props, state } = d.data;
-
-    const factory = Component.getFactoryFromId(factoryId);
-    if (!factory) {
-      console.warn(`Could not find the component factory with id`, factoryId);
-    }
-
-    ctx.component_stack.push({
-      factoryId,
-      componentId,
-      instance: factory ? constructComponent(factory, props, componentId, state) : null,
-    });
-    break;
-  case "end-component":
-    ctx.component_stack.pop();
-    break;
   case "start-dynamic": {
     const { storeReads, update } = d.data;
 
@@ -221,14 +195,13 @@ function domVisitor(ctx: RunCtx, node: ChildNode) {
       ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", element: n, node: n } })
     }
 
-    domVisitor({ component_stack: [], dynamicStateStack: [] }, n);
+    domVisitor({ dynamicStateStack: [] }, n);
   });
 }
 
 export function startRuntime(rootElement: HTMLElement) {
   console.time("startRuntime");
   const ctx: RunCtx = {
-    component_stack: [],
     dynamicStateStack: [],
   };
   domVisitor(ctx, rootElement);

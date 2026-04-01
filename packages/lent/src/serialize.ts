@@ -1,5 +1,4 @@
 import * as devalue from "devalue";
-import { Component } from ".";
 import { assert, isFunction } from "./utils";
 import { getStoreId, isSignalAccessor, isSignalSetter, isStore, signalAccessorFromId, signalSetterFromId, storeFromId } from "./store";
 import { createLazyProxy } from "./lazy-proxy";
@@ -55,37 +54,6 @@ export function getValueRegistryId(value: unknown): string | null {
   return null;
 }
 
-let component_functions: {
-  done_components: Set<any>,
-  function_to_name: Map<any, [string, string]>,
-  name_to_function: Map<`${string} ${string}`, any>,
-} | null = null;
-function getComponentFunctions(): NonNullable<typeof component_functions> {
-  if (!component_functions)
-    component_functions = {
-      done_components: new Set,
-      function_to_name: new Map,
-      name_to_function: new Map,
-    };
-
-  for (const comp of Component.listComponents()) {
-    if (component_functions.done_components.has(comp)) continue;
-    component_functions.done_components.add(comp);
-
-    const methods = Object.getOwnPropertyNames(comp.prototype);
-    for (const method of methods) {
-      if (isFunction(comp.prototype[method])) {
-        // @ts-ignore
-        comp.prototype[method][isClassMethodSymbol] = true;
-        component_functions.function_to_name.set(comp.prototype[method], [comp.id, method]);
-        component_functions.name_to_function.set(`${comp.id} ${method}`, comp.prototype[method]);
-      }
-    }
-  }
-  
-  return component_functions;
-}
-
 const devalueReducers: Record<string, (value: any) => any> = {
   registered: (val: unknown) => getValueRegistryId(val) ?? undefined,
   signalAccessor: (f: unknown) => {
@@ -108,18 +76,11 @@ const devalueReducers: Record<string, (value: any) => any> = {
       };
     }
   },
-  component: (f: unknown) => {
-    if (f instanceof Component) return f.id;
-  },
   store: (f: unknown) => {
     if (isStore(f)) return getStoreId(f);
   },
 };
 const extendedDevalueReducers: Record<string, (value: any) => any> = {
-  componentFunction: (f: unknown) => {
-    if (!isFunction(f)) return;
-    return getComponentFunctions().function_to_name.get(f);
-  },
   ...devalueReducers,
   function: (f: unknown) => {
     if (isFunction(f)) {
@@ -141,9 +102,6 @@ const devalueRevivers: Record<string, (value: any) => any> = {
     assert(registry.has(id), `No values in registry with id '${id}'`);
     return registry.get(id);
   },
-  componentFunction: f => {
-    return getComponentFunctions().name_to_function.get(`${f[0]} ${f[1]}`);
-  },
   signalAccessor: (id: string) => {
     return signalAccessorFromId(id);
   },
@@ -157,13 +115,6 @@ const devalueRevivers: Record<string, (value: any) => any> = {
     return {
       [name](...args: unknown[]) { return fn.call(thisarg, ...values, ...args) },
     }[name];
-  },
-  component: (id: string) => {
-    return createLazyProxy(() => {
-      const instance = Component.getInstanceFromId(id);
-      if (instance === null) throw new Error(`No component instance with id ${id}`);
-      return instance;
-    });
   },
   function: (code: string) => {
     return eval(code);

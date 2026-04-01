@@ -1,6 +1,5 @@
-import { h, Component, type JSXElement, createStore, closure, RefFor } from "lent";
+import { h, type ComponentFn, createStore, closure, RefFor, createSignal, register } from "lent";
 import c from "./todo.module.scss";
-import { bind } from "lent/src/serialize";
 
 type TaskData = {
   id: string,
@@ -11,130 +10,97 @@ type TaskProps = {
   task: TaskData,
   onDelete: (id: string) => void,
 };
-type TaskState = {
-  done: boolean,
-};
-class Task extends Component<TaskState, TaskProps> {
-  static { this.register("____RANDOM_ID") }
+const Task: ComponentFn<TaskProps> = register((props) => {
+  const [done, setDone] = createSignal(false);
 
-  protected getInitialState(): TaskState {
-    return {
-      done: false,
-    };
-  }
+  return h("div", {
+    class: closure((c, done) => [c["task"], { [c["task-completed"]]: done() }], c, done),
+    children: [
+      h("span", {
+        children: closure(task => task.text, props.task),
+      }),
+      h("input", {
+        "checked": done,
 
-  private onChangeDone(e: Event) {
-    const el = e.currentTarget;
-    if (!(el instanceof HTMLInputElement)) return;
-    this.state.done = el.checked;
-  }
-
-  override render(): JSXElement {
-    return h("div", {
-      class: closure((c, self) => [c["task"], { [c["task-completed"]]: self.state.done }], c, this),
-      children: [
-        h("span", {
-          children: closure(self => self.props.task.text, this),
-        }),
-        h("input", {
-          "checked": closure(self => self.state.done, this),
-
-          "attr:type": "checkbox",
-          "on:change": bind(this.onChangeDone, this),
-        }),
-        h("button", {
-          "on:click": closure(self => {
-            console.log(self.props);
-            self.props.onDelete(self.props.task.id);
-          }, this),
-          children: "delete",
-        }),
-      ],
-    });
-  }
-}
+        "attr:type": "checkbox",
+        "on:change": closure((setDone, e) => {
+          const el = e.currentTarget;
+          if (!(el instanceof HTMLInputElement)) return;
+          setDone(el.checked);
+        }, setDone),
+      }),
+      h("button", {
+        "on:click": closure((onDelete, task) => {
+          onDelete(task.id);
+        }, props.onDelete, props.task),
+        children: "delete",
+      }),
+    ],
+  });
+}, "____RANDOM_ID");
 
 type TodoState = {
   input_text: string,
   tasks: TaskData[],
 };
+const taskRender = register((state: TodoState, task: TaskData) => {
+  return h(Task, {
+    task,
+    onDelete: closure((state, task) => {
+      state.tasks = state.tasks.filter(p => p.id !== task.id);
+    }, state, task),
+  });
+}, "____RANDOM_ID");
+const Todo: ComponentFn<{}> = register(() => {
+  const state = createStore<TodoState>({
+    input_text: "Hi",
+    tasks: [
+      createStore({ id: crypto.randomUUID(), text: "Say Hello" }),
+      createStore({ id: crypto.randomUUID(), text: "Say Bye" }),
+    ],
+  });
 
-export default class Todo extends Component<TodoState> {
-  static { this.register("____RANDOM_ID") }
-
-  protected override getInitialState(): TodoState {
-    return {
-      input_text: "",
-      tasks: [
-        createStore({
-          id: crypto.randomUUID(),
-          done: false,
-          text: "Hi!",
-        }),
-      ],
-    };
-  }
-
-  private addTask(text: string): string {
-    const id = crypto.randomUUID();
-    this.state.tasks = [...this.state.tasks, createStore({
-      id,
-      done: false,
-      text,
-    })];
-    return id;
-  }
-
-  private deleteTask(id: string) {
-    this.state.tasks = this.state.tasks.filter(t => t.id !== id);
-  }
-
-  private taskRender(task: TaskData) {
-    return h(Task, {
-      task,
-      onDelete: bind(this.deleteTask, this),
-    });
-  }
-
-  override render(): JSXElement {
-    return h("div", {
-      children: [
-        h("form", {
-          "on:submit": closure((self, e) => {
-            e.preventDefault();
-            const el = e.currentTarget;
-            if (!(el instanceof HTMLFormElement)) return;
-            const trimmed = self.state.input_text.trim();
-            if (!trimmed) return;
-            self.addTask(trimmed);
-            self.state.input_text = "";
-          }, this),
-          children: [
-            h("input", {
-              "prop:value": closure(self => self.state.input_text, this),
-              "attr:value": this.state.input_text,
-              "on:input": closure((self, e) => {
-                const el = e.currentTarget;
-                if (!(el instanceof HTMLInputElement)) return;
-                self.state.input_text = el.value;
-              }, this),
-            }),
-            h("button", {
-              children: "Create Task",
-              "attr:disabled": closure(self => !self.state.input_text.trim(), this),
-            }),
-          ],
-        }),
-
-        h("div", {
-          class: ["tasks-container"],
-          children: h(RefFor<TaskData>, {
-            each: closure(self => self.state.tasks, this),
-            key: closure(task => task.id),
-            children: bind(this.taskRender, this),
+  return h("div", {
+    children: [
+      h("form", {
+        "on:submit": closure((state, e) => {
+          e.preventDefault();
+          const el = e.currentTarget;
+          if (!(el instanceof HTMLFormElement)) return;
+          const trimmed = state.input_text.trim();
+          if (!trimmed) return;
+          state.tasks = [...state.tasks, {
+            id: crypto.randomUUID(),
+            text: trimmed,
+          }];
+          state.input_text = "";
+        }, state),
+        children: [
+          h("input", {
+            "prop:value": closure(state => state.input_text, state),
+            "attr:value": state.input_text,
+            "on:input": closure((state, e) => {
+              const el = e.currentTarget;
+              if (!(el instanceof HTMLInputElement)) return;
+              state.input_text = el.value;
+            }, state),
           }),
+          h("button", {
+            children: "Create Task",
+            "attr:disabled": closure(state => !state.input_text.trim(), state),
+          }),
+        ],
+      }),
+
+      h("div", {
+        class: ["tasks-container"],
+        children: h(RefFor<TaskData>, {
+          each: closure(state => state.tasks, state),
+          key: closure(task => task.id),
+          children: closure(taskRender, state),
         }),
-      ],
-    });
-  }
-}
+      }),
+    ],
+  });
+}, "____RANDOM_ID");
+export default Todo;
