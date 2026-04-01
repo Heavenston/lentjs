@@ -30,7 +30,7 @@ type DirectiveHelper<K> = K extends keyof Directives ? { name: K, data: Directiv
 export type Directive = DirectiveHelper<DirectiveName>;
 
 type StateStackElement =
-  | { kind: "dynamic-start", storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement }
+  | { kind: "dynamic-start", startDirective: Comment, storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement }
   | { kind: "array-start" }
   | { kind: "state", state: JSXState }
 ;
@@ -82,6 +82,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
 
     ctx.dynamicStateStack.push({
       kind: "dynamic-start",
+      startDirective: directiveNode,
       storeReads,
       update,
     });
@@ -103,7 +104,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
 
     const hh = microtaskDebounce(() => {
       const [previousResult, newStoreReads] = listenForStoreReads(() => callback(resultState.element));
-      resultState = patchElement(parent, resultState, previousResult);
+      resultState = patchElement(parent, directiveNode, resultState, previousResult);
       currentUnsubscribe = subscribeToStoreReads(hh, newStoreReads, { once: true });
     });
     let currentUnsubscribe = subscribeToStoreReads(hh, dynamic.storeReads, { once: true });
@@ -113,9 +114,10 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
         kind: "state",
         state: {
           kind: "dynamic",
+          startAnchor: dynamic.startDirective,
+          endAnchor: directiveNode,
           element: callback,
           unsubscribe,
-          endAnchor: directiveNode,
         },
       });
 
@@ -137,21 +139,17 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     states.reverse();
 
     assert(ctx.dynamicStateStack.pop()?.kind === "array-start");
-    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "array", element: states.map(s => s.element), endAnchor: directiveNode, states } })
+    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "array", element: states.map(s => s.element), states } })
     break;
   }
-  // Dummy directive, does nothing
-  case "array-element-separator":
-    const last = ctx.dynamicStateStack.at(-1);
-    assert(last?.kind === "state");
-    last.state.endAnchor = directiveNode;
-    break;
+  // Dummy directive, does nothing (makes sure text nodes are broken up)
+  case "array-element-separator": break;
   case "null": {
-    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", element: null, endAnchor: directiveNode, node: null } })
+    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", element: null, node: null } })
     break;
   }
   case "undefined": {
-    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", element: undefined, endAnchor: directiveNode, node: null } })
+    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", element: undefined, node: null } })
     break;
   }
   default:
@@ -220,7 +218,7 @@ function domVisitor(ctx: RunCtx, node: ChildNode) {
     }
 
     if (ctx.dynamicStateStack.length > 0) {
-      ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", element: n, endAnchor: null, node: n } })
+      ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", element: n, node: n } })
     }
 
     domVisitor({ component_stack: [], dynamicStateStack: [] }, n);

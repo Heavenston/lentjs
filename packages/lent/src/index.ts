@@ -44,7 +44,7 @@ export function isSSRElement(t: unknown): t is SSRElement {
 }
 
 function addChild(parent: Node, child: JSXElement) {
-  patchElement(parent, null, child);
+  patchElement(parent, null, null, child);
 }
 
 export function renderClasslist(list: ClassList): string[] {
