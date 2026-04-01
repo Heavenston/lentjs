@@ -38,11 +38,10 @@ export function isClosure<F extends () => any>(value: F): value is Closure<F> {
 const registry = new Map<string, unknown>;
 const registryIdSymbol = Symbol("registry-id");
 export function register<V extends object>(value: V, id: string): V {
+  if (registryIdSymbol in value) { return value; }
   if (registry.has(id)) {
-    if (registry.get(id) === value) return value;
     console.warn("Duplicate registry id", id);
   }
-  assert(!(registryIdSymbol in value), "Value already registered");
   registry.set(id, value);
   Object.defineProperty(value, registryIdSymbol, {
     writable: false,

@@ -6,12 +6,15 @@ export { startRuntime } from "./runtime";
 export { serialize, deserialize, closure, bind, register } from "./serialize";
 
 import { immediateTrack } from "./task";
-import { closure, serialize } from "./serialize";
+import { closure, register, serialize } from "./serialize";
 import { isFunction } from "./utils";
-import { listenForStoreReads, signals, stores, type StoreRead } from "./store";
+import { listenForStoreReads, signals, stores, untrack, type StoreRead } from "./store";
 import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type MarkerDirectiveName } from "./runtime";
 import { patchElement } from "./patchElement";
 import { escapeHtml } from "./escape-html";
+
+register(untrack, "__lentjs_untrack");
+register(h, "__lentjs_h");
 
 const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
@@ -344,7 +347,7 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
 let global_h_config: "ssr" | "dom" = "dom";
 
 function hComponent<P>(component: ComponentFn<P>, props: P): JSXElement {
-  return closure(component, props);
+  return closure((untrack, props) => untrack(() => component(props)), untrack, props);
 }
 
 export function h(element: string, props?: Attributes): JSXElement;
