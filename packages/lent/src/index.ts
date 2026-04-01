@@ -120,6 +120,8 @@ export function renderToString(el: JSXElement): string {
 
   global_h_config = "ssr";
   try {
+    const t = stringifyJSXElement(el);
+
     const ser_stores: [string, any][] = [];
     for (const [id, { obj }] of stores.entries()) {
       ser_stores.push([id, obj]);
@@ -132,7 +134,7 @@ export function renderToString(el: JSXElement): string {
     }
     const signals_data = createDirective("signals", ser_signals);
 
-    return `${stores_data}${signals_data}${el}`;
+    return `${stores_data}${signals_data}${t}`;
   }
   catch(e) {
     throw e;
@@ -342,7 +344,7 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
 let global_h_config: "ssr" | "dom" = "dom";
 
 function hComponent<P>(component: ComponentFn<P>, props: P): JSXElement {
-  throw closure(component, props);
+  return closure(component, props);
 }
 
 export function h(element: string, props?: Attributes): JSXElement;
