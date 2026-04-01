@@ -112,7 +112,7 @@ const signalAccessorSymbol = Symbol("signal-accessor");
 const signalSetterSymbol = Symbol("signal-setter");
 export type SignalData = { signalId: string };
 export type SignalAccessor<V> = (() => V) & { [signalAccessorSymbol]: true } & SignalData;
-export type SignalSetter<V> = ((new_val: V) => void) & { [signalSetterSymbol]: true } & SignalData;
+export type SignalSetter<V> = ((new_val: V) => void) & { [signalSetterSymbol]: true, update: (cb: (old_val: V) => V) => void } & SignalData;
 
 export function createSignal<V>(initialValue: V): [SignalAccessor<V>, SignalSetter<V>] {
   const id = newId();
@@ -162,6 +162,12 @@ export function signalSetterFromId(id: string): SignalSetter<unknown> {
   };
   setter[signalSetterSymbol] = true;
   setter.signalId = id;
+  setter.update = (updater: (old_val: unknown) => unknown) => {
+    const state = signals.get(id);
+    if (!state) throw new Error(`No signal found with id ${id}`);
+
+    setter(updater(state.currentValue));
+  };
   return setter;
 }
 

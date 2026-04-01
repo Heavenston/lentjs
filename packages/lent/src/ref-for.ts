@@ -1,5 +1,5 @@
 import { createSignal, untrack, type JSXElement } from ".";
-import type { SignalSetter } from "./store";
+import type { SignalAccessor, SignalSetter } from "./store";
 import { closure, register } from "./serialize";
 
 type ElementState = {
@@ -12,7 +12,7 @@ type ForState = {
 export type RefForProps<T> = {
   each: () => T[],
   key: (value: T) => unknown,
-  children: (element: T, idx: () => number) => JSXElement,
+  children: (element: T, idx: SignalAccessor<number>) => JSXElement,
 };
 const forMapper = register(<T>(props: RefForProps<T>, state: ForState, previous: JSXElement) => {
   const previousState = state.currentState;
