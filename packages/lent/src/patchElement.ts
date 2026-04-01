@@ -4,7 +4,7 @@ import { assert, isFunction, microtaskDebounce } from "./utils";
 
 export type JSXStateCommon = { kind: string, element: JSXElement };
 export type JSXStateSingular = JSXStateCommon & { kind: "singular", element: JSXElementSingular, node: ChildNode | null };
-export type JSXStateDynamic = JSXStateCommon & { kind: "dynamic", startAnchor: ChildNode, endAnchor: ChildNode, element: JSXElementDynamic, unsubscribe: () => JSXState };
+export type JSXStateDynamic = JSXStateCommon & { kind: "dynamic", startAnchor: ChildNode | null, endAnchor: ChildNode | null, element: JSXElementDynamic, unsubscribe: () => JSXState };
 export type JSXStateArray = JSXStateCommon & { kind: "array", element: JSXElementArray, states: JSXState[] }
 export type JSXState = JSXStateSingular | JSXStateArray | JSXStateDynamic;
 
@@ -55,6 +55,50 @@ function patchElementSingular(parent: Node, anchorElement: ChildNode | null, pre
       parent.replaceChild(childAsNode, previousState.node);
     }
     return { kind: "singular", element: child, node: childAsNode };
+  }
+}
+
+function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, previousState: JSXStateSingular | JSXStateArray | null, child: JSXElementDynamic): JSXStateDynamic {
+  let [newChild, storeReads] = listenForStoreReads(() => child());
+
+  if (storeReads.length === 0) {
+    const resultState = patchElement(parent, anchorElement, previousState, newChild);
+    return {
+      kind: "dynamic",
+      startAnchor: null,
+      endAnchor: null,
+      element: child,
+      unsubscribe: () => resultState,
+    };
+  }
+  else {
+    const dynamicStartAnchor = new Comment("lentjs start-dynamic-anchor");
+    const dynamicEndAnchor = new Comment("lentjs end-dynamic-anchor");
+    parent.insertBefore(dynamicEndAnchor, anchorElement);
+    parent.insertBefore(dynamicStartAnchor, anchorElement);
+
+    let lastResultState = patchElement(parent, dynamicEndAnchor, previousState, newChild);
+
+    const hh = microtaskDebounce(() => {
+      [newChild, storeReads] = listenForStoreReads(() => child(newChild));
+      lastResultState = patchElement(parent, dynamicEndAnchor, lastResultState, newChild);
+    
+      currentUnsubscribe = subscribeToStoreReads(hh, storeReads, { once: true });
+    });
+    let currentUnsubscribe = subscribeToStoreReads(hh, storeReads, { once: true });
+
+    return {
+      kind: "dynamic",
+      startAnchor: dynamicStartAnchor,
+      endAnchor: dynamicEndAnchor,
+      element: child,
+      unsubscribe: () => {
+        currentUnsubscribe();
+        dynamicStartAnchor.remove();
+        dynamicEndAnchor.remove();
+        return lastResultState;
+      },
+    };
   }
 }
 
@@ -198,34 +242,7 @@ export function patchElement(parent: Node, anchorElement: ChildNode | null, prev
   }
 
   if (isFunction(child)) {
-    const dynamicStartAnchor = new Comment("lentjs start-anchor");
-    const dynamicEndAnchor = new Comment("lentjs end-anchor");
-    parent.insertBefore(dynamicEndAnchor, anchorElement);
-    parent.insertBefore(dynamicStartAnchor, anchorElement);
-
-    let [newChild, storeReads] = listenForStoreReads(() => child());
-    let lastResultState = patchElement(parent, dynamicEndAnchor, previousState, newChild);
-
-    const hh = microtaskDebounce(() => {
-      [newChild, storeReads] = listenForStoreReads(() => child(newChild));
-      lastResultState = patchElement(parent, dynamicEndAnchor, lastResultState, newChild);
-      
-      currentUnsubscribe = subscribeToStoreReads(hh, storeReads, { once: true });
-    });
-    let currentUnsubscribe = subscribeToStoreReads(hh, storeReads, { once: true });
-
-    return {
-      kind: "dynamic",
-      startAnchor: dynamicStartAnchor,
-      endAnchor: dynamicEndAnchor,
-      element: child,
-      unsubscribe: () => {
-        currentUnsubscribe();
-        dynamicStartAnchor.remove();
-        dynamicEndAnchor.remove();
-        return lastResultState;
-      },
-    };
+    return patchElementDynamic(parent, anchorElement, previousState, child);
   }
   
   if (Array.isArray(child)) {

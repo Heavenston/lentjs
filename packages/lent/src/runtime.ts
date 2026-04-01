@@ -31,12 +31,14 @@ type StateStackElement =
   | { kind: "state", state: JSXState }
 ;
 type RunCtx = {
+  nodesToRemove: ChildNode[],
   dynamicStateStack: StateStackElement[],
 };
 
 function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Comment, parent: Node, d: D) {
   switch (d.name) {
   case "signals": {
+    ctx.nodesToRemove.push(directiveNode);
     for (const [id, val] of d.data) {
       signals.set(id, {
         callbacks: [],
@@ -46,12 +48,15 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     break;
   }
   case "stores": {
+    ctx.nodesToRemove.push(directiveNode);
     for (const [id, val] of d.data) {
       resumeStore(id, val);
     }
     break;
   }
   case "start-dynamic": {
+    directiveNode.textContent = "lentjs start-dynamic";
+
     const { storeReads, update } = d.data;
 
     ctx.dynamicStateStack.push({
@@ -64,6 +69,8 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     break;
   }
   case "end-dynamic": {
+    directiveNode.textContent = "lentjs end-dynamic";
+
     const state = ctx.dynamicStateStack.pop();
     assert(state?.kind === "state");
     const dynamic = ctx.dynamicStateStack.pop();
@@ -98,12 +105,14 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     break;
   }
   case "start-array": {
+    ctx.nodesToRemove.push(directiveNode);
     ctx.dynamicStateStack.push({
       kind: "array-start",
     });
     break;
   }
   case "end-array": {
+    ctx.nodesToRemove.push(directiveNode);
     const states: JSXState[] = [];
     while (ctx.dynamicStateStack.length > 0 && ctx.dynamicStateStack.at(-1)?.kind !== "array-start") {
       const el = ctx.dynamicStateStack.pop();
@@ -117,12 +126,16 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     break;
   }
   // Dummy directive, does nothing (makes sure text nodes are broken up)
-  case "array-element-separator": break;
+  case "array-element-separator":
+    ctx.nodesToRemove.push(directiveNode);
+    break;
   case "null": {
+    ctx.nodesToRemove.push(directiveNode);
     ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", element: null, node: null } })
     break;
   }
   case "undefined": {
+    ctx.nodesToRemove.push(directiveNode);
     ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", element: undefined, node: null } })
     break;
   }
@@ -195,16 +208,19 @@ function domVisitor(ctx: RunCtx, node: ChildNode) {
       ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", element: n, node: n } })
     }
 
-    domVisitor({ dynamicStateStack: [] }, n);
+    domVisitor({ nodesToRemove: ctx.nodesToRemove, dynamicStateStack: [] }, n);
   });
 }
 
 export function startRuntime(rootElement: HTMLElement) {
   console.time("startRuntime");
   const ctx: RunCtx = {
+    nodesToRemove: [],
     dynamicStateStack: [],
   };
   domVisitor(ctx, rootElement);
+  for (const n of ctx.nodesToRemove)
+    n.remove();
   console.log(ctx);
   console.timeEnd("startRuntime");
 }
