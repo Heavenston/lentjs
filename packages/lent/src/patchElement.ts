@@ -1,4 +1,4 @@
-import { isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular } from ".";
+import { isJSXElementString, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular } from ".";
 import { listenForStoreReads, subscribeToStoreReads } from "./store";
 import { assert, isFunction, microtaskDebounce } from "./utils";
 
@@ -36,18 +36,18 @@ export function patchElementSingular(parent: Node, anchorElement: ChildNode | nu
   }
 
   if (previousState?.node == null) {
-    const childAsNode = typeof child === "string" || typeof child === "number" ? document.createTextNode(child.toString()) : child;
+    const childAsNode = isJSXElementString(child) ? document.createTextNode(child.toString()) : child;
     parent.insertBefore(childAsNode, anchorElement);
     return { kind: "singular", element: child, node: childAsNode };
   }
-  else if (previousState.node instanceof Text && (typeof child === "string" || typeof child === "number")) {
+  else if (previousState.node instanceof Text && isJSXElementString(child)) {
     const newText = child.toString();
     if (previousState.node.textContent !== newText)
       previousState.node.textContent = newText;
     return { kind: "singular", element: child, node: previousState.node };
   }
   else {
-    const childAsNode = typeof child === "string" || typeof child === "number" ? document.createTextNode(child.toString()) : child;
+    const childAsNode = isJSXElementString(child) ? document.createTextNode(child.toString()) : child;
     if (previousState?.node === childAsNode) {
       // Do nothing
     }
@@ -84,15 +84,12 @@ export function patchElementArray(parent: Node, anchorElement: ChildNode | null,
   return newState;
 }
 
-// export function patchElementArrayNew(parent: Node, previousState: JSXStateSingular | JSXStateArray | null, child: JSXElement[]): JSXStateArray {
-//   const endAnchor = previousState?.endAnchor ?? null;
-
+// export function patchElementArrayNew(parent: Node, anchorElement: ChildNode | null, previousState: JSXStateSingular | JSXStateArray | null, child: JSXElement[]): JSXStateArray {
 //   if (previousState?.kind !== "array") {
 //     previousState = {
 //       kind: "array",
 //       element: child,
 //       states: previousState === null ? [] : [previousState],
-//       endAnchor,
 //     };
 //   }
 
@@ -107,12 +104,17 @@ export function patchElementArray(parent: Node, anchorElement: ChildNode | null,
 //       ? child[val]
 //       : val;
 //   }
-//   function compare(a: JSXElement, b: JSXElement) {
+//   function compareAnchor(a: number | ChildNode | null, b: number | ChildNode | null): boolean {
+//     if (typeof a === "number" && typeof b === "number")
+//       return a === b;
+//     return compareEl(anchorToJSXElement(a), anchorToJSXElement(b));
+//   }
+//   function compareEl(a: JSXElement, b: JSXElement) {
 //     if (a === b)
 //       return true;
 //     if (typeof a === "string" || typeof a === "number") {
 //       if (b instanceof Text)
-//         return b.textContent === a.toString();
+//         return true;
 //       else
 //         return false;
 //     }
@@ -126,10 +128,12 @@ export function patchElementArray(parent: Node, anchorElement: ChildNode | null,
 //   }
 
 //   const size = Math.max(previousState.states.length, child.length);
+//   let currentRemoveAnchor: ChildNode | null = null;
 //   let currentInsertAnchor: number | null = null;
 //   for (let index = size-1; index >= 0; index--) {
 //     if (index < previousState.states.length) {
-//       operations.push({ kind: "remove", element: previousState.states[index]!.element, anchor: previousState.states[index]!.endAnchor })
+//       operations.push({ kind: "remove", element: previousState.states[index]!.element, anchor: currentRemoveAnchor })
+//       currentRemoveAnchor = getFirstAnchorElement(previousState.states[index]!);
 //     }
 //     if (index < child.length) {
 //       operations.push({ kind: "add", element: index, anchor: currentInsertAnchor })
@@ -137,30 +141,26 @@ export function patchElementArray(parent: Node, anchorElement: ChildNode | null,
 //     }
 //   }
 
-//   console.log("step1:",{previousState, child, operations});
-
 //   for (let i = 0; i < operations.length; i++) {
 //     const op1 = operations[i]!;
 //     for (let j = i+1; j < operations.length; j++) {
 //       const op2 = operations[j]!;
-//       if (op1.kind === "add" && op2.anchor === op1.anchor) {
+//       if (op1.kind === "add" && compareAnchor(op2.anchor, op1.anchor)) {
 //         op2.anchor = op1.element;
 //       }
-//       else if (op1.kind === "remove" && anchorToJSXElement(op2.anchor) === op1.element) {
+//       else if (op1.kind === "remove" && compareEl(anchorToJSXElement(op2.anchor), op1.element)) {
 //         op2.anchor = op1.anchor;
 //       }
 //     }
 //   }
 
-//   console.log("step2:",operations);
-
 //   for (let i = 0; i < operations.length; i++) {
 //     const op1 = operations[i]!;
 //     for (let j = i+1; j < operations.length; j++) {
 //       const op2 = operations[j]!;
-//       if (op1.kind === "remove" && op2.kind === "add" && op1.anchor === op2.anchor && compare(op1.element, child[op2.element])) {
+//       if (op1.kind === "remove" && op2.kind === "add" && op1.anchor === op2.anchor && compareEl(op1.element, child[op2.element])) {
 //         for (let k = i+1; k < j; k++) {
-//           if (operations[k]!.anchor === op1.anchor) {
+//           if (compareAnchor(operations[k]!.anchor, op1.anchor)) {
 //             operations[k]!.anchor = op2.element;
 //           }
 //         }
@@ -169,6 +169,16 @@ export function patchElementArray(parent: Node, anchorElement: ChildNode | null,
 //         i--;
 //         break;
 //       }
+//     }
+//   }
+
+//   const childToNode = new Map<number, ChildNode>;
+//   for (const op of operations) {
+//     switch (op.kind) {
+//     case "add":
+//       break;
+//     case "remove":
+//       break;
 //     }
 //   }
 
@@ -190,6 +200,8 @@ export function patchElement(parent: Node, anchorElement: ChildNode | null, prev
   if (isFunction(child)) {
     const dynamicStartAnchor = new Comment("lentjs start-anchor");
     const dynamicEndAnchor = new Comment("lentjs end-anchor");
+    parent.insertBefore(dynamicEndAnchor, anchorElement);
+    parent.insertBefore(dynamicStartAnchor, anchorElement);
 
     let [newChild, storeReads] = listenForStoreReads(() => child());
     let lastResultState = patchElement(parent, dynamicEndAnchor, previousState, newChild);

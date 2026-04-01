@@ -13,10 +13,12 @@ import { isFunction } from "./utils";
 import { listenForStoreReads, signals, stores, type StoreRead } from "./store";
 import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type MarkerDirectiveName } from "./runtime";
 import { patchElement } from "./patchElement";
+import { escapeHtml } from "./escape-html";
 
 const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
-export type JSXElementSingular = SSRElement | ChildNode | number | string | null | undefined;
+export type JSXElementString = number | string;
+export type JSXElementSingular = SSRElement | ChildNode | JSXElementString | null | undefined;
 export type JSXElementArray = JSXElement[];
 export type JSXElementDynamic = (previous?: JSXElement) => JSXElement;
 export type JSXElement = JSXElementSingular | JSXElementArray | JSXElementDynamic;
@@ -41,6 +43,10 @@ export type Attributes = {
 
 export function isSSRElement(t: unknown): t is SSRElement {
   return typeof t === "object" && t !== null && SSRElementMarker in t && t[SSRElementMarker] === true;
+}
+
+export function isJSXElementString(t: unknown): t is JSXElementString {
+  return typeof t === "string" || typeof t === "number";
 }
 
 function addChild(parent: Node, child: JSXElement) {
@@ -75,8 +81,8 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
   if (isSSRElement(el)) {
     return el.t;
   }
-  else if (typeof el === "string" || typeof el === "number") {
-    return el.toString();
+  else if (isJSXElementString(el)) {
+    return escapeHtml(el.toString());
   }
   else if (isFunction(el)) {
     const [val, storeReads] = listenForStoreReads(() => el());
@@ -151,14 +157,7 @@ export function setAttribute(element: HTMLElement, name: string, value: Attribut
   else
     element.removeAttribute(name);
 }
-function escapeHtmlAttribute(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
+
 function createHTMLElement(element: string, props: Attributes): HTMLElement {
   const el = document.createElement(element);
   for (const [k, v] of Object.entries(props)) {
@@ -263,7 +262,7 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
         const [class_list, found_reads] = listenForStoreReads(tv);
         t += `class="${renderClasslist(class_list).join(" ")}" `;
         if (found_reads.length > 0) {
-          t += `lentjs:class="${escapeHtmlAttribute(serialize({
+          t += `lentjs:class="${escapeHtml(serialize({
             found_reads,
             update: tv,
           }))}" `;
@@ -294,7 +293,7 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
       const tv = v as Attributes[`on:${string}`];
       const tk = k.replace(/^on:/, "");
       if (tv !== undefined)
-        t += `lentjs:on:${tk}="${escapeHtmlAttribute(serialize(tv))}" `;
+        t += `lentjs:on:${tk}="${escapeHtml(serialize(tv))}" `;
     }
     else if (k.startsWith("attr:")) {
       const tv = v as Attributes[`attr:${string}`];
@@ -306,7 +305,7 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
         let found_reads: StoreRead[];
         [val, found_reads] = listenForStoreReads(tv);
         if (found_reads.length > 0) {
-          t += `lentjs:attr:${tk}="${escapeHtmlAttribute(serialize({
+          t += `lentjs:attr:${tk}="${escapeHtml(serialize({
             callback: tv,
             found_reads,
           }))}" `;
@@ -320,35 +319,24 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
         t += `${tk} `;
       }
       else if (val !== undefined && val !== false) {
-        t += `${tk}="${escapeHtmlAttribute(val.toString())}" `;
+        t += `${tk}="${escapeHtml(val.toString())}" `;
       }
     }
     else if (k.startsWith("prop:")) {
       const tv = v as Attributes[`prop:${string}`];
       const tk = k.replace(/^prop:/, "");
 
-      let val: AttributeValue;
-
       if (isFunction(tv)) {
-        let found_reads: StoreRead[];
-        [val, found_reads] = listenForStoreReads(tv);
+        const [_val, found_reads] = listenForStoreReads(tv);
         if (found_reads.length > 0) {
-          t += `lentjs:prop:${tk}="${escapeHtmlAttribute(serialize({
+          t += `lentjs:prop:${tk}="${escapeHtml(serialize({
             callback: tv,
             found_reads,
           }))}" `;
         }
       }
-      else {
-        val = tv;
-      }
 
-      // if (val === true) {
-      //   t += `${tk} `;
-      // }
-      // else if (val !== undefined && val !== false) {
-      //   t += `${tk}="${escapeHtmlAttribute(val.toString())}" `;
-      // }
+      // FIXME: prop: cannot be SSRd, or can it?
     }
     else {
       throw new Error(`Unsupported attribute ${k}`);

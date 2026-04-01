@@ -37,15 +37,15 @@ class CounterButton extends Component<CounterButtonState, CounterButtonProps> {
   render(): JSXElement {
     return h("div", {
       children: [
-        // h("div", {
-        //   children: ["Count: ", closure(state => state.count, this.state)],
-        // }),
+        h("div", {
+          children: ["Count: ", closure(state => state.count, this.state)],
+        }),
         h("div", {
           children: ["Digits: ", closure(state => new Array(state.count).fill(null).map((_val, idx) => `${idx} `), this.state)],
         }),
         h("button", {
-          // children: ["Increment to ", closure(self => self.state.count+1, this)],
-          children: ["Increment"],
+          children: ["Increment to ", closure(self => self.state.count+1, this)],
+          // children: ["Increment"],
           "attr:disabled": closure(self => self.state.count >= self.props.max(), this),
           "on:click": closure(self => {
             console.log(`Increment ${self.state.count} -> ${self.state.count+1}`);
@@ -53,8 +53,8 @@ class CounterButton extends Component<CounterButtonState, CounterButtonProps> {
           }, this),
         }),
         h("button", {
-          // children: ["Decrement to ", closure(self => self.state.count-1, this)],
-          children: ["Decrement"],
+          children: ["Decrement to ", closure(self => self.state.count-1, this)],
+          // children: ["Decrement"],
           "attr:disabled": closure(self => self.state.count <= self.props.min(), this),
           "on:click": closure(self => {
             console.log(`Decrement ${self.state.count} -> ${self.state.count-1}`);

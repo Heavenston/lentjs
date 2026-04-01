@@ -38,12 +38,12 @@ export default class App extends Component<AppState> {
       h("div", {
         children: h(Counter),
       }),
-      // h("hr"),
-      // h("div", {
-      //   children: h(Todo),
-      // }),
-      // h("hr"),
-      // h(Complex),
+      h("hr"),
+      h("div", {
+        children: h(Todo),
+      }),
+      h("hr"),
+      h(Complex),
     ];
   }
 }
