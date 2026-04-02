@@ -10,7 +10,6 @@ register(createElement, "____RANDOM_ID");
 type Element = { id: string };
 const elementRender = register((setElements: SignalSetter<Element[]>, element: Element, idx: SignalAccessor<number>) => {
   const i = crypto.randomUUID().split("-")[0];
-  console.log(`RUNNING FOR ${element.id}`);
 
   return h("div", {
     "attr:id": `el-${element.id}`,
@@ -91,10 +90,7 @@ const List: ComponentFn<{}> = register(() => {
       children: ["List: ", closure(g => g().map(p => p.id).join(", "), elements)],
     }),
     h(RefFor<Element>, {
-      each: closure(getEls => {
-        console.log(getEls());
-        return getEls();
-      }, elements),
+      each: elements,
       key: closure(el => el.id),
       children: closure(elementRender, setElements),
     }),
