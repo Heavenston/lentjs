@@ -1,4 +1,4 @@
-import { h, closure, type ComponentFn, register, createSignal } from "lent";
+import { h, closure, type ComponentFn, register, createSignal } from "@lentjs/core";
 
 type CounterButtonProps = {
   min: () => number,

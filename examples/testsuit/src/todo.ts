@@ -1,4 +1,4 @@
-import { h, type ComponentFn, createStore, closure, RefFor, createSignal, register } from "lent";
+import { h, type ComponentFn, createStore, closure, RefFor, createSignal, register } from "@lentjs/core";
 import c from "./todo.module.scss";
 
 type TaskData = {

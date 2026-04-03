@@ -1,5 +1,5 @@
 import "./app";
-import { startRuntime } from "lent";
+import { startRuntime } from "@lentjs/core";
 
 console.log("Client entry point");
 const el = document.getElementById("app");

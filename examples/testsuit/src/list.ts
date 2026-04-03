@@ -1,5 +1,4 @@
-import { closure, createSignal, h, RefFor, register, type ComponentFn } from "lent";
-import type { SignalAccessor, SignalSetter } from "lent/src/store";
+import { closure, createSignal, h, RefFor, register, type ComponentFn, type SignalAccessor, type SignalSetter } from "@lentjs/core";
 import c from "./list.module.scss";
 
 function createElement(): Element {

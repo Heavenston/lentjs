@@ -1,4 +1,4 @@
-export { createStore, untrack, type Store, createSignal } from "./store";
+export { createStore, untrack, type Store, createSignal, type SignalSetter, type SignalAccessor } from "./store";
 export { createTask } from "./task";
 export { For } from "./for";
 export { RefFor } from "./ref-for";

@@ -1,4 +1,4 @@
-import { h, type ComponentFn, register } from "lent";
+import { h, type ComponentFn, register } from "@lentjs/core";
 import Counter from "./counter";
 import Todo from "./todo";
 import List from "./list";

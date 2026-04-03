@@ -1,5 +1,5 @@
 {
-  "name": "lent",
+  "name": "@lentjs/core",
   "module": "src/index.ts",
   "types": "src/index.ts",
   "type": "module",
