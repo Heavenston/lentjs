@@ -143,6 +143,22 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, prev
   }
 }
 
+/// Specialized function for arrays with no previous state (so we just adds the elements)
+function appendArray(parent: Node, anchorElement: ChildNode | null, child: JSXElement[]): JSXStateArray {
+  let currentAnchor = anchorElement;
+  let states: JSXState[] = [];
+  for (let i = child.length-1; i>=0;i--) {
+    const state = patchElement(parent, currentAnchor, null, child[i]!);
+    states.push(state);
+    currentAnchor = getFirstAnchorElement(state) ?? currentAnchor;
+  }
+  return {
+    kind: "array",
+    element: child,
+    states,
+  };
+}
+
 // Old naive algorithm for array patching, i think it's broken in this state
 // and anyways is very ineficient
 // Kept for referance
@@ -174,9 +190,9 @@ function patchElementArray(parent: Node, anchorElement: ChildNode | null, previo
 
 // FIXME: This was supposed to be a stepping stone for an efficient algorithm
 // but i lost interest in this so we are stuck with this one
-export function patchElementArrayNew(parent: Node, anchorElement: ChildNode | null, previousState_: JSXStateSingular | JSXStateArray | null, child: JSXElement[]): JSXStateArray {
-  const previousState: JSXStateArray = previousState_?.kind !== "array"
-    ? { kind: "array", element: child, states: previousState_ === null ? [] : [previousState_] }
+export function patchElementArrayNew(parent: Node, anchorElement: ChildNode | null, previousState_: JSXStateSingular | JSXStateArray, child: JSXElement[]): JSXStateArray {
+  const previousState: JSXStateArray = previousState_.kind !== "array"
+    ? { kind: "array", element: child, states: [previousState_] }
     : previousState_;
 
   type Operation =
@@ -191,47 +207,44 @@ export function patchElementArrayNew(parent: Node, anchorElement: ChildNode | nu
       : val;
   }
   function compareAnchor(a: number | ChildNode | null, b: number | ChildNode | null): boolean {
+    if (a === null && b === null)
+      return true;
     if (typeof a === "number" && typeof b === "number")
       return a === b;
     return compareEl(anchorToJSXElement(a), anchorToJSXElement(b));
   }
 
-  // function logOp(op: Operation) {
-  //   switch (op.kind) {
-  //   case "add":
-  //     console.log("add", op.element, child[op.element], "anchor", op.anchor, anchorToJSXElement(op.anchor));
-  //     break;
-  //   case "remove":
-  //     console.log("sub", op.element, "anchor", anchorToJSXElement(op.anchor));
-  //     break;
-  //   }
-  // }
-  // function logOperations() {
-  //   console.log("---");
-  //   operations.forEach(logOp);
-  // }
-
-  // console.log("#".repeat(200));
-
-  const size = Math.max(previousState.states.length, child.length);
-  let currentRemoveAnchor: ChildNode | null = null;
-  let currentInsertAnchor: number | null = null;
-  for (let index = size-1; index >= 0; index--) {
-    let sidx = index - (size - previousState.states.length);
-    let cidx = index;
-    if (sidx >= 0 && sidx < previousState.states.length) {
-      const state = previousState.states[sidx]!;
-      operations.push({ kind: "remove", state, element: state.element, anchor: currentRemoveAnchor })
-      currentRemoveAnchor = getFirstAnchorElement(state);
-    }
-    if (cidx >= 0 && cidx < child.length) {
-      operations.push({ kind: "add", element: cidx, anchor: currentInsertAnchor })
-      currentInsertAnchor = cidx;
+  function logOp(op: Operation) {
+    switch (op.kind) {
+    case "add":
+      console.log("add", op.element, child[op.element], "anchor", op.anchor, anchorToJSXElement(op.anchor));
+      break;
+    case "remove":
+      console.log("sub", op.element, "anchor", anchorToJSXElement(op.anchor));
+      break;
     }
   }
+  function logOperations() {
+    console.log("---");
+    operations.forEach(logOp);
+  }
 
-  // console.log("STEP1");
-  // logOperations();
+  console.log("#".repeat(200));
+
+  let currentRemoveAnchor: ChildNode | null = null;
+  for (let i = previousState.states.length-1; i>=0; i--) {
+    const state = previousState.states[i]!;
+    operations.push({ kind: "remove", state, element: state.element, anchor: currentRemoveAnchor })
+    currentRemoveAnchor = getFirstAnchorElement(state);
+  }
+  let currentInsertAnchor: number | null = null;
+  for (let i = child.length-1; i>=0; i--) {
+    operations.push({ kind: "add", element: i, anchor: currentInsertAnchor })
+    currentInsertAnchor = i;
+  }
+
+  console.log("STEP1");
+  logOperations();
   const childsAsAnchors = new Map<number, ChildNode | null>;
   const newStates: (JSXState | null)[] = child.map(() => null);
 
@@ -240,29 +253,15 @@ export function patchElementArrayNew(parent: Node, anchorElement: ChildNode | nu
     if (op1.kind === "add") {
     }
     else if (op1.kind === "remove") {
-      let anchor: ChildNode | number | null = op1.anchor;
       for (let j = 0; j < operations.length; j++) {
         const op2 = operations[j]!;
-        if (op2.kind === "add" && compareAnchor(op2.anchor, anchor) && compareEl(child[op2.element], op1.element)) {
+        if (op2.kind === "add" && compareAnchor(op2.anchor, op1.anchor) && compareEl(child[op2.element], op1.element)) {
           childsAsAnchors.set(op2.element, getFirstAnchorElement(op1.state));
           newStates[op2.element] = op1.state;
-          if (j > i) {
-            operations.splice(j, 1);
-            operations.splice(i, 1);
-          }
-          else {
-            operations.splice(i, 1);
-            operations.splice(j, 1);
-          }
+          operations.splice(j, 1);
+          operations.splice(i, 1);
           i--;
           break;
-        }
-
-        if (op2.kind === "add" && compareAnchor(op2.anchor, anchor)) {
-          anchor = op2.element;
-        }
-        else if (op2.kind == "remove" && compareEl(op2.element, anchorToJSXElement(anchor))) {
-          anchor = op2.anchor;
         }
       }
     }
@@ -275,8 +274,8 @@ export function patchElementArrayNew(parent: Node, anchorElement: ChildNode | nu
     childsAsAnchors.set(i, anchor);
   }
 
-  // console.log("STEP2");
-  // logOperations();
+  console.log("STEP2");
+  logOperations();
 
   for (const op of operations) {
     switch (op.kind) {
@@ -301,8 +300,8 @@ export function patchElementArrayNew(parent: Node, anchorElement: ChildNode | nu
     }
   }
 
-  // console.log("final:", newStates);
-  // assert(newStates.every(p => p !== null));
+  console.log("final:", newStates);
+  assert(newStates.every(p => p !== null));
 
   return {
     kind: "array",
@@ -326,7 +325,12 @@ export function patchElement(parent: Node, anchorElement: ChildNode | null, prev
   }
   
   if (Array.isArray(child)) {
-    return patchElementArrayNew(parent, anchorElement, previousState, child);
+    if (previousState === null) {
+      return appendArray(parent, anchorElement, child);
+    }
+    else {
+      return patchElementArrayNew(parent, anchorElement, previousState, child);
+    }
   }
   else {
     child satisfies JSXElementSingular;
