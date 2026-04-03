@@ -1,6 +1,6 @@
 import { isJSXElementString, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular } from ".";
 import { listenForStoreReads, subscribeToStoreReads } from "./store";
-import { assert, isFunction, microtaskDebounce } from "./utils";
+import { assert, filterInPlace, isFunction, microtaskDebounce } from "./utils";
 
 export type JSXStateCommon = { kind: string, element: JSXElement };
 export type JSXStateSingular = JSXStateCommon & { kind: "singular", element: JSXElementSingular, node: ChildNode | null };
@@ -196,10 +196,10 @@ export function patchElementArrayNew(parent: Node, anchorElement: ChildNode | nu
     : previousState_;
 
   type AddOperation = { kind: "add", element: number, anchor: number | null };
-  type RemoveOperation = { kind: "remove", element: JSXElement, state: JSXState, anchor: ChildNode | null };
+  type RemoveOperation = { kind: "remove", useless?: true, element: JSXElement, state: JSXState, anchor: ChildNode | null };
   type Operation = AddOperation | RemoveOperation;
-  const addOperations = Array<Readonly<AddOperation>>();
-  const removeOperations = Array<Readonly<RemoveOperation>>();
+  const addOperations = Array<AddOperation>();
+  const removeOperations = Array<RemoveOperation>();
 
   function anchorToJSXElement(val: number | ChildNode | null): JSXElement {
     return typeof val === "number"
@@ -220,7 +220,7 @@ export function patchElementArrayNew(parent: Node, anchorElement: ChildNode | nu
       console.log("add", op.element, child[op.element], "anchor", op.anchor, anchorToJSXElement(op.anchor));
       break;
     case "remove":
-      console.log("sub", op.element, "anchor", anchorToJSXElement(op.anchor));
+      console.log("sub", op.element, "anchor", anchorToJSXElement(op.anchor), op.useless ? "is useless" : " ");
       break;
     }
   }
@@ -230,7 +230,7 @@ export function patchElementArrayNew(parent: Node, anchorElement: ChildNode | nu
     addOperations.forEach(logOp);
   }
 
-  console.log("#".repeat(200));
+  // console.log("#".repeat(200));
 
   let currentRemoveAnchor: ChildNode | null = null;
   for (let i = previousState.states.length-1; i>=0; i--) {
@@ -244,23 +244,49 @@ export function patchElementArrayNew(parent: Node, anchorElement: ChildNode | nu
     currentInsertAnchor = i;
   }
 
-  console.log("STEP1");
-  logOperations();
+  // console.log("STEP1");
+  // logOperations();
   const childsAsAnchors = new Map<number, ChildNode | null>;
   const newStates: (JSXState | null)[] = child.map(() => null);
 
   for (let i = 0; i < removeOperations.length; i++) {
     const op1 = removeOperations[i]!;
+    // console.log("--------------");
+    // console.log("Going through:");
+    // logOp(op1);
+    let anchor: number | ChildNode | null = op1.anchor;
+    // console.log(":", anchor);
+
+    for (let j = i+1; j < removeOperations.length; j++) {
+      const op2 = removeOperations[j]!;
+      // logOp(op2);
+      if (compareEl(anchorToJSXElement(anchor), op2.element)) {
+        anchor = op2.anchor;
+        // console.log("new anchor(rem):", anchor);
+      }
+    }
     for (let j = 0; j < addOperations.length; j++) {
       const op2 = addOperations[j]!;
-      if (op2.kind === "add" && compareAnchor(op2.anchor, op1.anchor) && compareEl(child[op2.element], op1.element)) {
-        childsAsAnchors.set(op2.element, getFirstAnchorElement(op1.state));
-        newStates[op2.element] = op1.state;
+      // logOp(op2);
+      if (compareEl(child[op2.element], op1.element)) {
+        if (compareAnchor(op2.anchor, anchor)) {
+          // console.log("Add remove with same anchor -> removing");
+          childsAsAnchors.set(op2.element, getFirstAnchorElement(op1.state));
+          newStates[op2.element] = op1.state;
 
-        removeOperations.splice(i, 1);
-        addOperations.splice(j, 1);
-        i--;
+          removeOperations.splice(i, 1);
+          addOperations.splice(j, 1);
+          i--;
+        }
+        else {
+          // console.log("Add remove different anchor -> useless remove")
+          op1.useless = true;
+        }
         break;
+      }
+      if (compareAnchor(anchor, op2.anchor)) {
+        anchor = op2.element;
+        // console.log("new anchor(add):", anchor, "->", anchorToJSXElement(anchor));
       }
     }
   }
@@ -272,12 +298,13 @@ export function patchElementArrayNew(parent: Node, anchorElement: ChildNode | nu
     childsAsAnchors.set(i, anchor);
   }
 
-  console.log("STEP2");
-  logOperations();
+  // console.log("STEP2");
+  // logOperations();
+  // debugger;
 
-  debugger;
   for (const op of removeOperations) {
-    removeStateNodes(op.state);
+    if (!op.useless)
+      removeStateNodes(op.state);
   }
   for (const op of addOperations) {
     let anchor: ChildNode | null;
@@ -293,7 +320,7 @@ export function patchElementArrayNew(parent: Node, anchorElement: ChildNode | nu
     childsAsAnchors.set(op.element, getFirstAnchorElement(ns) ?? anchor);
   }
 
-  console.log("final:", newStates);
+  // console.log("final:", newStates);
   assert(newStates.every(p => p !== null));
 
   return {

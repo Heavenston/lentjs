@@ -79,7 +79,7 @@ const elementRender = register((setElements: SignalSetter<Element[]>, element: E
 }, "____RANDOM_ID");
 const List: ComponentFn<{}> = register(() => {
   const [elements, setElements] = createSignal<Element[]>(
-    new Array(5).fill(null).map(createElement)
+    new Array(3).fill(null).map(createElement)
   );
 
   return [

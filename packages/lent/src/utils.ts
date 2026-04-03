@@ -44,3 +44,14 @@ export function fullCall<A, B>(n: InfiniteFunction<A, B>): A | B {
     return fullCall(n());
   return n;
 }
+
+export function filterInPlace<T>(arr: T[], pred: (v: T) => boolean) {
+  arr.splice(0, Infinity, ...arr.filter(pred));
+  // let j = 0;
+  // for (let i = 0; i < arr.length; i++) {
+  //   const val = arr[i]!;
+  //   if (pred(val))
+  //     arr[j++] = val;
+  // }
+  // arr.length = j;
+}
