@@ -40,7 +40,7 @@ const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
         "attr:disabled": () => count() >= props.max(),
         "on:click": () => {
           console.log(`Increment ${count()} -> ${count()+1}`);
-          setCount(clamp(count()+1));
+          setCount.update(p => clamp(p+1));
         },
       }),
       h("button", {
@@ -48,7 +48,7 @@ const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
         "attr:disabled": () => count() <= props.min(),
         "on:click": () => {
           console.log(`Decrement ${count()} -> ${count()-1}`);
-          setCount(clamp(count()-1));
+          setCount.update(p => clamp(p-1));
         },
       }),
     ],

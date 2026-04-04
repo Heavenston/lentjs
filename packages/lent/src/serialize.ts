@@ -5,35 +5,41 @@ import { createLazyProxy } from "./lazy-proxy";
 
 const isClassMethodSymbol = Symbol("is-class-method-symbol");
 
-const isClosureSymbol = Symbol("closure");
-export type Closure<F extends () => any> = F & {
-  [isClosureSymbol]: true,
+const closureDataSymbol = Symbol("closure-data");
+type ClosureData = {
   og_function: () => unknown,
   thisarg?: unknown,
-  values: unknown[],
+  values: readonly unknown[],
 };
+export type Closure<F extends () => any> = F & { [closureDataSymbol]: ClosureData };
 export function closure<A extends any[], B extends any[], R>(og_fn: (...args: [...A, ...B]) => R, ...values: A): Closure<(...args: B) => R> {
   return bind(og_fn, null, ...values);
 }
 
-export function bind<A extends any[], B extends any[], T, R>(og_fn: (this: T, ...args: [...A, ...B]) => R, thisarg: T, ...values: A): Closure<(...args: B) => R> {
-  // Created inside an object so that its 'name' is the same of the og_fn
-  // FIXME: Any other way?
-  const nfn: Closure<(...args: B) => R> = {
-    [og_fn.name](...args: B): R {
-      return og_fn.call(thisarg, ...values, ...args);
+export function bind<A extends any[], B extends any[], T, R>(og_fn: (this: T, ...args: [...A, ...B]) => R, thisarg: T, ...values_: A): Closure<(...args: B) => R> {
+  const values = Object.freeze(Array.from(values_) as A);
+  const nfn: Closure<(...args: B) => R> = Function.prototype.bind.call(og_fn, thisarg, ...values) as any;
+  Object.defineProperties(nfn, {
+    [closureDataSymbol]: {
+      value: Object.freeze({
+        og_function: og_fn,
+        values,
+        thisarg,
+      } satisfies ClosureData),
+      enumerable: true,
     },
-  }[og_fn.name] as any;
-  nfn[isClosureSymbol] = true;
-  nfn.og_function = og_fn;
-  nfn.thisarg = thisarg;
-  nfn.values = values;
-  nfn.bind = bind.bind(null, nfn);
+    bind: { value: thisBind },
+  });
   return nfn;
 }
 
+/// Rust a wrapper around bind that calls it with `this` as the first argument
+function thisBind<A extends any[], B extends any[], T, R>(this: (this: T, ...args: [...A, ...B]) => R, thisarg: T, ...values: A): (...args: B) => R {
+  return bind(this, thisarg, ...values);
+}
+
 export function isClosure<F extends () => any>(value: F): value is Closure<F> {
-  return isClosureSymbol in value && value[isClosureSymbol] === true;
+  return closureDataSymbol in value;
 }
 
 const registry = new Map<string, unknown>;
@@ -44,15 +50,15 @@ export function register<V extends object>(value: V, id: string): V {
     console.warn("Duplicate registry id", id);
   }
   registry.set(id, value);
-  Object.defineProperty(value, registryIdSymbol, {
-    writable: false,
-    value: id,
-  });
-  if (isFunction(value)) {
-    value.bind = bind.bind(null, value);
+  Object.defineProperty(value, registryIdSymbol, { enumerable: true, value: id });
+  if (isFunction(value) && !isClosure(value)) {
+    Object.defineProperty(value, "bind", { value: thisBind });
   }
   return value;
 }
+register(register, "__lentjs_register");
+register(bind, "__lentjs_bind");
+register(closure, "__lentjs_closure");
 
 export function getValueRegistryId(value: unknown): string | null {
   if ((typeof value === "function" || typeof value === "object") && value !== null && registryIdSymbol in value)
@@ -74,10 +80,11 @@ const devalueReducers: Record<string, (value: any) => any> = {
   },
   closure: (f: unknown) => {
     if (isFunction(f) && isClosure(f)) {
+      const data = f[closureDataSymbol];
       return {
-        code: devalue.stringify(f.og_function, extendedDevalueReducers),
-        thisarg: f.thisarg,
-        values: f.values,
+        code: devalue.stringify(data.og_function, extendedDevalueReducers),
+        thisarg: data.thisarg,
+        values: data.values,
         name: f.name,
       };
     }
@@ -116,13 +123,8 @@ const devalueRevivers: Record<string, (value: any) => any> = {
   },
   closure: ({ name, code, thisarg, values }: { name: string, code: string, thisarg: unknown, values: Array<unknown> }) => {
     const fn = deserialize(code) as Function;
-    // Created inside an object so that we can chose its 'name'
-    // FIXME: Any other way?
-    return {
-      [name](...args: unknown[]) {
-        return fn.call(thisarg, ...values, ...args);
-      },
-    }[name];
+    console.log({ name, code, thisarg, values, fn });
+    return fn.bind(thisarg, ...values);
   },
   function: (code: string) => {
     try {
