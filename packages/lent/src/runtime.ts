@@ -1,5 +1,5 @@
 import { deserialize, renderClasslist, setAttribute, type ClassList, type EventHandler, type JSXElement } from ".";
-import { patchElement, type JSXState } from "./patchElement";
+import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
 import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "./store";
 import { assert, microtaskDebounce } from "./utils";
 
@@ -80,18 +80,21 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     const dynamic = ctx.dynamicStateStack.pop();
     assert(dynamic?.kind === "dynamic-start");
 
+    const startAnchor = dynamic.startDirective;
+    const endAnchor = directiveNode;
+
     let resultState = state.state;
     const callback = dynamic.update;
     const unsubscribe = () => {
-      dynamic.startDirective.remove();
-      directiveNode.remove();
+      startAnchor.remove();
+      endAnchor.remove();
       currentUnsubscribe();
       return resultState;
     };
 
     const hh = microtaskDebounce(() => {
       const [previousResult, newStoreReads] = listenForStoreReads(() => callback(resultState.element));
-      resultState = patchElement(parent, directiveNode, resultState, previousResult);
+      resultState = patchElement(parent, endAnchor, resultState, previousResult);
       currentUnsubscribe = subscribeToStoreReads(hh, newStoreReads, { once: true });
     });
     let currentUnsubscribe = subscribeToStoreReads(hh, dynamic.storeReads, { once: true });
@@ -101,10 +104,15 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
         kind: "state",
         state: {
           kind: "dynamic",
-          startAnchor: dynamic.startDirective,
-          endAnchor: directiveNode,
+          startAnchor: startAnchor,
+          endAnchor: endAnchor,
           element: callback,
           unsubscribe,
+          changeAnchor: (newAnchor) => {
+            parent.insertBefore(startAnchor, newAnchor);
+            parent.insertBefore(endAnchor, newAnchor);
+            changeStateAnchor(parent, resultState, endAnchor);
+          },
         },
       });
 

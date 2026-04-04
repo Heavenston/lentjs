@@ -1,26 +1,69 @@
 import { isJSXElementString, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular } from ".";
 import { listenForStoreReads, subscribeToStoreReads } from "./store";
-import { assert, filterInPlace, isFunction, microtaskDebounce } from "./utils";
+import { assert, isFunction, microtaskDebounce } from "./utils";
 
 export type JSXStateCommon = { kind: string, element: JSXElement };
 export type JSXStateSingular = JSXStateCommon & { kind: "singular", element: JSXElementSingular, node: ChildNode | null };
-export type JSXStateDynamic = JSXStateCommon & { kind: "dynamic", startAnchor: ChildNode | null, endAnchor: ChildNode | null, element: JSXElementDynamic, unsubscribe: () => JSXState };
+export type JSXStateDynamic = JSXStateCommon & { kind: "dynamic", startAnchor: ChildNode | null, endAnchor: ChildNode | null, element: JSXElementDynamic, changeAnchor: (newAnchor: ChildNode | null) => void, unsubscribe: () => JSXState };
 export type JSXStateArray = JSXStateCommon & { kind: "array", element: JSXElementArray, states: JSXState[] }
 export type JSXState = JSXStateSingular | JSXStateArray | JSXStateDynamic;
 
-function getFirstAnchorElement(state: JSXState): ChildNode | null {
+function getFirstElement(state: JSXState): ChildNode | null {
   switch (state.kind) {
   case "singular":
     return state.node;
   case "array":
     for (const s of state.states) {
-      const potentialAnchor = getFirstAnchorElement(s);
+      const potentialAnchor = getFirstElement(s);
       if (potentialAnchor !== null)
         return potentialAnchor;
     }
     return null;
   case "dynamic":
     return state.startAnchor;
+  }
+}
+
+function getLastElement(state: JSXState): ChildNode | null {
+  switch (state.kind) {
+  case "singular":
+    return state.node;
+  case "array":
+    for (let i = state.states.length-1; i>=0; i--) {
+      const potentialAnchor = getLastElement(state);
+      if (potentialAnchor !== null)
+        return potentialAnchor;
+    }
+    return null;
+  case "dynamic":
+    return state.endAnchor;
+  }
+}
+
+/// Returns true if the given state's last node has the given anchor as a nextSibling
+/// So is used to know whether a state would need to be moved to match the given anchor
+function stateIsAnchoredTo(state: JSXState, anchor: ChildNode | null): boolean {
+  const lastEl = getLastElement(state);
+  return lastEl === null || lastEl.nextSibling === anchor;
+}
+
+export function changeStateAnchor(parent: Node, state: JSXState, newAnchor: ChildNode | null) {
+  console.log("Moving", state, "to", newAnchor);
+  switch (state.kind) {
+  case "array":
+    let currentAnchor = newAnchor;
+    for (let i = state.states.length-1; i>=0; i--) {
+      changeStateAnchor(parent, state.states[i]!, currentAnchor);
+      currentAnchor = getFirstElement(state.states[i]!) ?? currentAnchor;
+    }
+    break;
+  case "singular":
+    if (state.node !== null)
+      parent.insertBefore(state.node, newAnchor);
+    break;
+  case "dynamic":
+    state.changeAnchor(newAnchor);
+    break;
   }
 }
 
@@ -38,31 +81,6 @@ function removeStateNodes(state: JSXState) {
     removeStateNodes(state.unsubscribe());
     break;
   }
-}
-
-function compareEl(a: JSXElement, b: JSXElement) {
-  // Null elements are never the same
-  if (a == null || b == null)
-    return false;
-  if (a === b)
-    return true;
-  if (isJSXElementString(a)) {
-    if (isJSXElementString(b))
-      return a.toString() === b.toString();
-    else if (b instanceof Text)
-      return b.textContent === a.toString();
-    else
-      return false;
-  }
-  if (isJSXElementString(b)) {
-    if (isJSXElementString(a))
-      return a.toString() === b.toString();
-    else if (a instanceof Text)
-      return a.textContent === b.toString();
-    else
-      return false;
-  }
-  return false;
 }
 
 function patchElementSingular(parent: Node, anchorElement: ChildNode | null, previousState: JSXStateSingular | null, child: JSXElementSingular): JSXStateSingular {
@@ -90,7 +108,8 @@ function patchElementSingular(parent: Node, anchorElement: ChildNode | null, pre
   else {
     const childAsNode = isJSXElementString(child) ? document.createTextNode(child.toString()) : child;
     if (previousState?.node === childAsNode) {
-      // Do nothing
+      if (childAsNode.nextSibling !== anchorElement)
+        parent.insertBefore(childAsNode, anchorElement);
     }
     else {
       parent.replaceChild(childAsNode, previousState.node);
@@ -110,13 +129,16 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, prev
       endAnchor: null,
       element: child,
       unsubscribe: () => resultState,
+      changeAnchor: (newAnchor) => {
+        changeStateAnchor(parent, resultState, newAnchor);
+      },
     };
   }
   else {
     const dynamicStartAnchor = new Comment("lentjs start-dynamic-anchor");
     const dynamicEndAnchor = new Comment("lentjs end-dynamic-anchor");
-    parent.insertBefore(dynamicEndAnchor, anchorElement);
     parent.insertBefore(dynamicStartAnchor, anchorElement);
+    parent.insertBefore(dynamicEndAnchor, anchorElement);
 
     let lastResultState = patchElement(parent, dynamicEndAnchor, previousState, newChild);
 
@@ -139,6 +161,11 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, prev
         dynamicEndAnchor.remove();
         return lastResultState;
       },
+      changeAnchor(newAnchor) {
+        parent.insertBefore(dynamicStartAnchor, newAnchor);
+        parent.insertBefore(dynamicEndAnchor, newAnchor);
+        changeStateAnchor(parent, lastResultState, dynamicEndAnchor);
+      },
     };
   }
 }
@@ -150,7 +177,7 @@ function appendArray(parent: Node, anchorElement: ChildNode | null, child: JSXEl
   for (let i = child.length-1; i>=0;i--) {
     const state = patchElement(parent, currentAnchor, null, child[i]!);
     states.push(state);
-    currentAnchor = getFirstAnchorElement(state) ?? currentAnchor;
+    currentAnchor = getFirstElement(state) ?? currentAnchor;
   }
   return {
     kind: "array",
@@ -159,46 +186,41 @@ function appendArray(parent: Node, anchorElement: ChildNode | null, child: JSXEl
   };
 }
 
-// Old naive algorithm for array patching, i think it's broken in this state
-// and anyways is very ineficient
-// Kept for referance
-function patchElementArray(parent: Node, anchorElement: ChildNode | null, previousState: JSXStateSingular | JSXStateArray | null, child: JSXElement[]): JSXStateArray {
-  if (previousState?.kind !== "array") {
-    previousState = {
-      kind: "array",
-      states: previousState === null ? [] : [previousState],
-      element: child,
-    };
-  }
-
-  // let currentAnchor = nextSibling;
-  const newState: JSXStateArray = {
-    kind: "array",
-    states: [],
-    element: child,
-  };
-
-  let currentAnchor = anchorElement;
-  for (let i = Math.max(previousState.states.length, child.length)-1; i >= 0; i--) {
-    const outState = patchElement(parent, currentAnchor, previousState.states[i] ?? null, child[i]);
-    newState.states.push(outState);
-    currentAnchor = getFirstAnchorElement(outState) ?? anchorElement;
-  }
-  newState.states.reverse();
-  return newState;
-}
-
 export function patchElementArrayNew(
   parent: Node,
   anchorElement: ChildNode | null,
-  previousState_: JSXStateSingular | JSXStateArray,
+  previousState: JSXStateArray,
   child: JSXElement[],
 ): JSXStateArray {
-  throw new Error("todo");
+  const toKeepMap = new Map<JSXElement, JSXState>;
+  for (const old of previousState.states) {
+    if (old.element == null) { continue; }
+    toKeepMap.set(old.element, old);
+  }
+
+  const states = Array<JSXState>();
+  let currentAnchor = anchorElement;
+  for (let i = child.length-1; i>=0; i--) {
+    const prev = toKeepMap.get(child[i]);
+    toKeepMap.delete(child[i]);
+    const newState = patchElement(parent, currentAnchor, prev ?? null, child[i]);
+    currentAnchor = getFirstElement(newState) ?? currentAnchor;
+    states.push(newState);
+  }
+
+  for (const old of toKeepMap.values()) {
+    removeStateNodes(old);
+  }
+  
+  return {
+    kind: "array",
+    element: child,
+    states,
+  };
 }
 
 export function patchElement(parent: Node, anchorElement: ChildNode | null, previousState: JSXState | null, child: JSXElement): JSXState {
-  if (previousState !== null && previousState.element === child) return previousState;
+  if (previousState !== null && previousState.element === child && stateIsAnchoredTo(previousState, anchorElement)) return previousState;
 
   assert(anchorElement === null || anchorElement.parentNode === parent);
   assert(!isSSRElement(child));
@@ -212,12 +234,12 @@ export function patchElement(parent: Node, anchorElement: ChildNode | null, prev
   }
   
   if (Array.isArray(child)) {
-    if (previousState === null) {
+    if (previousState?.kind !== "array") {
+      if (previousState)
+        removeStateNodes(previousState);
       return appendArray(parent, anchorElement, child);
     }
-    else {
-      return patchElementArrayNew(parent, anchorElement, previousState, child);
-    }
+    return patchElementArrayNew(parent, anchorElement, previousState, child);
   }
   else {
     child satisfies JSXElementSingular;
