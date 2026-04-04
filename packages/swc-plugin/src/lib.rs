@@ -37,8 +37,12 @@ impl VisitMut for FindCapturedValues {
     }
 
     fn visit_mut_ident(&mut self, ident: &mut Ident) {
+        // ignore global scope idents
+        if ident.ctxt.as_u32() == 1 { return; }
+        // ignore top-level (module) scope idents
+        if ident.ctxt.as_u32() == 2 { return; }
+
         let id = Id::from(ident.clone());
-        if id.1.as_u32() == 1 { return; }
         if self.is_in_decl {
             self.decls.insert(id);
         }
