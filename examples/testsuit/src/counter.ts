@@ -1,4 +1,4 @@
-import { h, type ComponentFn, register, createSignal } from "@lentjs/core";
+import { h, type ComponentFn, register, createSignal, createTask } from "@lentjs/core";
 
 type CounterButtonProps = {
   min: () => number,
@@ -7,7 +7,7 @@ type CounterButtonProps = {
 const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
   "use component";
 
-  const [count, setCount] = createSignal(props.min());
+  const [rawCount, setCount] = createSignal(props.min());
 
   const clamp = (val: number): number => {
     if (val > props.max())
@@ -16,6 +16,12 @@ const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
       return props.min();
     return val;
   };
+  const count = () => clamp(rawCount());
+
+  createTask(({ track }) => {
+    if (typeof document !== "undefined")
+      alert(track(rawCount));
+  });
 
   return h("div", {
     children: [
@@ -30,7 +36,7 @@ const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
         "attr:disabled": () => count() >= props.max(),
         "on:click": () => {
           console.log(`Increment ${count()} -> ${count()+1}`);
-          setCount.update(p => clamp(p+1));
+          setCount.update(p => clamp(clamp(p)+1));
         },
       }),
       h("button", {
@@ -38,7 +44,7 @@ const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
         "attr:disabled": () => count() <= props.min(),
         "on:click": () => {
           console.log(`Decrement ${count()} -> ${count()-1}`);
-          setCount.update(p => clamp(p-1));
+          setCount.update(p => clamp(clamp(p)-1));
         },
       }),
     ],
