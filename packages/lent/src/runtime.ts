@@ -1,9 +1,9 @@
-import { deserialize, renderClasslist, setAttribute, type ClassList, type EventHandler, type JSXElement } from ".";
+import { deserialize, renderClasslist, setAttribute, type AttributeValue, type ClassList, type EventHandler, type JSXElement } from ".";
 import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
 import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "./store";
 import { assert, microtaskDebounce } from "./utils";
 
-const REMOVE_DIRECTIVES = false;
+const REMOVE_DIRECTIVES = true;
 
 export const DIRECTIVE_PREFIX = "lentjs";
 export type Directives = {
@@ -28,6 +28,11 @@ export type MarkerDirectiveName = keyof {
 };
 type DirectiveHelper<K> = K extends keyof Directives ? { name: K, data: Directives[K] } : never
 export type Directive = DirectiveHelper<DirectiveName>;
+
+export type DynamicValueData<R = any> = [
+  storeReads: StoreRead[],
+  callback: () => R,
+];
 
 type StateStackElement =
   | { kind: "dynamic-start", startDirective: Comment, storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement }
@@ -174,39 +179,39 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
 
     if (t.name.startsWith("lentjs:attr:")) {
       const attr = t.name.replace(/^lentjs:attr:/, "");
-      let { callback, found_reads } = ctx.directivesData![parseInt(t.value)] as { found_reads: StoreRead[], callback: () => any };
+      let [storeReads, callback] = ctx.directivesData![parseInt(t.value)] as DynamicValueData<AttributeValue>;
 
       const hh = microtaskDebounce(() => {
-        const [new_value, new_found_reads] = listenForStoreReads(() => callback());
-        setAttribute(el, attr, new_value);
-        subscribeToStoreReads(hh, new_found_reads, { once: true });
+        const [newValue, newStoreReads] = listenForStoreReads(() => callback());
+        setAttribute(el, attr, newValue);
+        subscribeToStoreReads(hh, newStoreReads, { once: true });
       });
-      subscribeToStoreReads(hh, found_reads, { once: true });
+      subscribeToStoreReads(hh, storeReads, { once: true });
     }
 
     if (t.name.startsWith("lentjs:class")) {
-      let { update, found_reads } = ctx.directivesData![parseInt(t.value)] as { found_reads: StoreRead[], update: () => ClassList };
+      let [storeReads, callback] = ctx.directivesData![parseInt(t.value)] as DynamicValueData<ClassList>;
 
       const hh = microtaskDebounce(() => {
-        const [new_value, new_found_reads] = listenForStoreReads(() => update());
+        const [newValue, newStoreReads] = listenForStoreReads(() => callback());
         el.className = "";
-        el.classList.add(...renderClasslist(new_value));
-        subscribeToStoreReads(hh, new_found_reads, { once: true });
+        el.classList.add(...renderClasslist(newValue));
+        subscribeToStoreReads(hh, newStoreReads, { once: true });
       });
-      subscribeToStoreReads(hh, found_reads, { once: true });
+      subscribeToStoreReads(hh, storeReads, { once: true });
     }
 
     if (t.name.startsWith("lentjs:prop")) {
       const prop = t.name.replace(/^lentjs:prop:/, "");
-      let { callback, found_reads } = ctx.directivesData![parseInt(t.value)] as { found_reads: StoreRead[], callback: () => any };
+      let [storeReads, callback] = ctx.directivesData![parseInt(t.value)] as DynamicValueData<JSXElement>;
 
       const hh = microtaskDebounce(() => {
-        const [new_value, new_found_reads] = listenForStoreReads(() => callback());
+        const [newValue, newStoreReads] = listenForStoreReads(() => callback());
         // @ts-ignore
-        el[prop] = new_value;
-        subscribeToStoreReads(hh, new_found_reads, { once: true });
+        el[prop] = newValue;
+        subscribeToStoreReads(hh, newStoreReads, { once: true });
       });
-      subscribeToStoreReads(hh, found_reads, { once: true });
+      subscribeToStoreReads(hh, storeReads, { once: true });
     }
   }
 }

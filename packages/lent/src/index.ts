@@ -9,7 +9,7 @@ import { immediateTrack } from "./task";
 import { closure, register, serialize } from "./serialize";
 import { isFunction } from "./utils";
 import { listenForStoreReads, signals, stores, untrack, type StoreRead } from "./store";
-import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type MarkerDirectiveName } from "./runtime";
+import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type DynamicValueData, type MarkerDirectiveName } from "./runtime";
 import { patchElement } from "./patchElement";
 import { escapeHtml } from "./escape-html";
 
@@ -30,7 +30,7 @@ export type ComponentFn<P> = (props: P) => JSXElement;
 
 export type EventHandler<E> = (event: E) => unknown;
 
-type AttributeValue = string | boolean | number | undefined;
+export type AttributeValue = string | boolean | number | undefined;
 export type Attributes = {
   children?: JSXElement,
   class?: ClassList | (() => ClassList),
@@ -275,10 +275,7 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
         const [class_list, found_reads] = listenForStoreReads(tv);
         t += `class="${renderClasslist(class_list).join(" ")}" `;
         if (found_reads.length > 0) {
-          t += `lentjs:class="${sharedSSRSerialize({
-            found_reads,
-            update: tv,
-          })}" `;
+          t += `lentjs:class="${sharedSSRSerialize([found_reads, tv] satisfies DynamicValueData<ClassList>)}" `;
         }
       }
       else if(tv)
@@ -318,10 +315,7 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
         let found_reads: StoreRead[];
         [val, found_reads] = listenForStoreReads(tv);
         if (found_reads.length > 0) {
-          t += `lentjs:attr:${tk}="${sharedSSRSerialize({
-            callback: tv,
-            found_reads,
-          })}" `;
+          t += `lentjs:attr:${tk}="${sharedSSRSerialize([found_reads, tv] satisfies DynamicValueData<AttributeValue>)}" `;
         }
       }
       else {
@@ -342,10 +336,7 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
       if (isFunction(tv)) {
         const [_val, found_reads] = listenForStoreReads(tv);
         if (found_reads.length > 0) {
-          t += `lentjs:prop:${tk}="${sharedSSRSerialize({
-            callback: tv,
-            found_reads,
-          })}" `;
+          t += `lentjs:prop:${tk}="${sharedSSRSerialize([found_reads, tv] satisfies DynamicValueData<ClassList>)}" `;
         }
       }
 

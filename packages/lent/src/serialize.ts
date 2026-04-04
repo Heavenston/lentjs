@@ -65,26 +65,27 @@ export function getValueRegistryId(value: unknown): string | null {
 }
 
 const devalueReducers: Record<string, (value: any) => any> = {
-  registered: (val: unknown) => getValueRegistryId(val) ?? undefined,
-  signalAccessor: (f: unknown) => {
+  reg: (val: unknown) => getValueRegistryId(val) ?? undefined,
+  sia: (f: unknown) => {
     if (isSignalAccessor(f)) {
       return f.signalId;
     }
   },
-  signalSetter: (f: unknown) => {
+  sis: (f: unknown) => {
     if (isSignalSetter(f)) {
       return f.signalId;
     }
   },
-  closure: (f: unknown) => {
+  clo: (f: unknown) => {
     if (isFunction(f) && isClosure(f)) {
-      return f[closureDataSymbol];
+      const data = f[closureDataSymbol];
+      return [data.og_function, data.values, data.thisarg];
     }
   },
-  store: (f: unknown) => {
+  sto: (f: unknown) => {
     if (isStore(f)) return getStoreId(f);
   },
-  function: (f: unknown) => {
+  fun: (f: unknown) => {
     if (isFunction(f)) {
       throw new Error(`Cannot stringify function ${f}`);
     }
@@ -92,20 +93,20 @@ const devalueReducers: Record<string, (value: any) => any> = {
 };
 
 const devalueRevivers: Record<string, (value: any) => any> = {
-  registered: (id: string) => {
+  reg: (id: string) => {
     assert(registry.has(id), `No values in registry with id '${id}'`);
     return registry.get(id);
   },
-  signalAccessor: (id: string) => {
+  sia: (id: string) => {
     return signalAccessorFromId(id);
   },
-  signalSetter: (id: string) => {
+  sis: (id: string) => {
     return signalSetterFromId(id);
   },
-  closure: ({ og_function, thisarg, values }: ClosureData) => {
+  clo: ([og_function, values, thisarg]: [ClosureData["og_function"], ClosureData["values"], ClosureData["thisarg"]]) => {
     return og_function.bind(thisarg, ...values);
   },
-  store: (id) => {
+  sto: (id) => {
     return createLazyProxy(() => {
       const store = storeFromId(id);
       if (store === null)
