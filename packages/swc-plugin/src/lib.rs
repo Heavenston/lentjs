@@ -153,7 +153,7 @@ impl VisitMut for TransformVisitor {
         // Remove all values that are declared within the arrow function
         captured_values.values.retain(|o| !captured_values.decls.contains(o));
 
-        let chosen_name = Ident::new_private(Atom::new("__hoisted"), Span::dummy());
+        let chosen_name = Ident::new_private(Atom::new("h"), Span::dummy());
 
         let mut captured_mappings: Vec<(Id, Id)> = captured_values.values.iter()
             .map(|id| (id.clone(), Ident::from(id.clone()).into_private().into()))
