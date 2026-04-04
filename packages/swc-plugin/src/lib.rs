@@ -92,22 +92,47 @@ impl VisitMut for TransformVisitor {
 
     fn visit_mut_module_items(&mut self, items: &mut Vec<swc_core::ecma::ast::ModuleItem>) {
         items.visit_mut_children_with(self);
+        let foreach_closure_ident = items.iter()
+            .filter_map(|i| i.as_stmt())
+            .filter_map(|i| i.as_decl())
+            .filter_map(|i| i.as_fn_decl())
+            .map(|i| &i.ident)
+            .find(|ident| ident.sym == "foreachClosure");
         let insert_point = items.iter().enumerate().find(|p| p.1.is_stmt()).map(|(idx, _)| idx).unwrap_or(items.len());
 
-        if !self.hoisted_closured.is_empty() {
-            items.insert(insert_point, Box::new(VarDecl {
-                kind: swc_core::ecma::ast::VarDeclKind::Const,
-                decls: self.hoisted_closured.drain(..).map(|h| {
-                    VarDeclarator {
-                        span: Default::default(),
-                        name: swc_core::ecma::ast::Pat::Ident(swc_core::ecma::ast::BindingIdent { id: h.chosen_name, type_ann: None }),
-                        init: Some(Box::new(h.code.into())),
-                        definite: false,
-                    }
-                }).collect(),
-                ..Default::default()
-            }).into());
+        if self.hoisted_closured.is_empty() {
+            return;
         }
+        
+        items.insert(insert_point, Box::new(VarDecl {
+            kind: swc_core::ecma::ast::VarDeclKind::Const,
+            decls: self.hoisted_closured.drain(..).map(|h| {
+                let init: Expr = if let Some(foreach_closure_ident) = foreach_closure_ident.cloned() {
+                    CallExpr {
+                        callee: swc_core::ecma::ast::Callee::Expr(foreach_closure_ident.into()),
+                        args: vec![
+                            ExprOrSpread::from(Box::new(h.code.into())),
+                            ExprOrSpread::from(Box::new(swc_core::ecma::ast::Str {
+                                span: Span::dummy(),
+                                value: Wtf8Atom::new("____RANDOM_ID"),
+                                raw: None,
+                            }.into())),
+                        ],
+                        ..Default::default()
+                    }.into()
+                } else {
+                    h.code.into()
+                };
+
+                VarDeclarator {
+                    span: Default::default(),
+                    name: swc_core::ecma::ast::Pat::Ident(swc_core::ecma::ast::BindingIdent { id: h.chosen_name, type_ann: None }),
+                    init: Some(Box::new(init)),
+                    definite: false,
+                }
+            }).collect(),
+            ..Default::default()
+        }).into());
     }
 
     fn visit_mut_expr(&mut self, node: &mut swc_core::ecma::ast::Expr) {

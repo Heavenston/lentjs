@@ -1,7 +1,13 @@
-import { h, closure, type ComponentFn, register, createSignal } from "@lentjs/core";
+import { h, type ComponentFn, register, createSignal } from "@lentjs/core";
+import { isFunction } from "@lentjs/core/src/utils";
 
-function foreachClosure() {
-  
+function foreachClosure(f: unknown, id: string) {
+  if (isFunction(f)) {
+    return register(f, id);
+  }
+  else {
+    return f;
+  }
 }
 
 type CounterButtonProps = {
@@ -13,13 +19,13 @@ const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
 
   const [count, setCount] = createSignal(props.min());
 
-  const clamp = closure((min, max, val: number): number => {
-    if (val > max())
-      return max();
-    if (val < min())
-      return min();
+  const clamp = (val: number): number => {
+    if (val > props.max())
+      return props.max();
+    if (val < props.min())
+      return props.min();
     return val;
-  }, props.min, props.max);
+  };
 
   return h("div", {
     children: [
@@ -27,23 +33,23 @@ const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
         children: ["Count: ", count],
       }),
       h("div", {
-        children: ["Digits: ", closure(count => new Array(count()).fill(null).map((_val, idx) => `${idx} `), count)],
+        children: ["Digits: ", () => new Array(count()).fill(null).map((_val, idx) => `${idx} `)],
       }),
       h("button", {
-        children: ["Increment to ", closure(count => count()+1, count)],
-        "attr:disabled": closure((count, max) => count() >= max(), count, props.max),
-        "on:click": closure((clamp, count, setCount) => {
+        children: ["Increment to ", () => count()+1],
+        "attr:disabled": () => count() >= props.max(),
+        "on:click": () => {
           console.log(`Increment ${count()} -> ${count()+1}`);
           setCount(clamp(count()+1));
-        }, clamp, count, setCount),
+        },
       }),
       h("button", {
-        children: ["Decrement to ", closure(count => count()-1, count)],
-        "attr:disabled": closure((count, min) => count() <= min(), count, props.min),
-        "on:click": closure((clamp, count, setCount) => {
+        children: ["Decrement to ", () => count()-1],
+        "attr:disabled": () => count() <= props.min(),
+        "on:click": () => {
           console.log(`Decrement ${count()} -> ${count()-1}`);
           setCount(clamp(count()-1));
-        }, clamp, count, setCount),
+        },
       }),
     ],
   });
@@ -65,13 +71,13 @@ const Counter: ComponentFn<{}> = register(() => {
             "attr:type": "number",
             "attr:value": min,
             "attr:max": max,
-            "on:change": closure((setMin, e) => {
+            "on:change": (e) => {
               if (!(e instanceof Event)) return;
               const el = e.currentTarget;
               if (!(el instanceof HTMLInputElement)) return;
               console.log(`Min Changed: ${el.valueAsNumber}`);
               setMin(el.valueAsNumber);
-            }, setMin),
+            },
           }),
         ],
       }),
@@ -82,13 +88,13 @@ const Counter: ComponentFn<{}> = register(() => {
             "attr:type": "number",
             "attr:value": max,
             "attr:min": min,
-            "on:change": closure((setMax, e) => {
+            "on:change": (e) => {
               if (!(e instanceof Event)) return;
               const el = e.currentTarget;
               if (!(el instanceof HTMLInputElement)) return;
               console.log(`Changed: ${el.valueAsNumber}`);
               setMax(el.valueAsNumber);
-            }, setMax)
+            },
           }),
         ],
       }),

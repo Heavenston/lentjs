@@ -28,6 +28,7 @@ export function bind<A extends any[], B extends any[], T, R>(og_fn: (this: T, ..
   nfn.og_function = og_fn;
   nfn.thisarg = thisarg;
   nfn.values = values;
+  nfn.bind = bind.bind(null, nfn);
   return nfn;
 }
 
@@ -47,6 +48,9 @@ export function register<V extends object>(value: V, id: string): V {
     writable: false,
     value: id,
   });
+  if (isFunction(value)) {
+    value.bind = bind.bind(null, value);
+  }
   return value;
 }
 
@@ -115,7 +119,9 @@ const devalueRevivers: Record<string, (value: any) => any> = {
     // Created inside an object so that we can chose its 'name'
     // FIXME: Any other way?
     return {
-      [name](...args: unknown[]) { return fn.call(thisarg, ...values, ...args) },
+      [name](...args: unknown[]) {
+        return fn.call(thisarg, ...values, ...args);
+      },
     }[name];
   },
   function: (code: string) => {

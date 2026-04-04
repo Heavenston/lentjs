@@ -17,14 +17,14 @@ const App: ComponentFn<{}> = () => {
     h("div", {
       children: h(Counter),
     }),
-    h("hr"),
-    h("div", {
-      children: h(Todo),
-    }),
-    h("hr"),
-    h(Complex),
-    h("hr"),
-    h(List),
+    // h("hr"),
+    // h("div", {
+    //   children: h(Todo),
+    // }),
+    // h("hr"),
+    // h(Complex),
+    // h("hr"),
+    // h(List),
   ];
 };
 export default App;

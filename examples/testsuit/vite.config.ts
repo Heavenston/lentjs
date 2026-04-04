@@ -50,10 +50,9 @@ export default defineConfig({
   oxc: false,
 
   plugins: [
+    lentjsCompilerPlugin(),
     (() => ({
       name: "lent-id",
-      enforce: "pre",
-
       transform: {
         filter: {
           id: /\.ts$/,
@@ -69,7 +68,6 @@ export default defineConfig({
         },
       },
     }) satisfies Plugin)(),
-    lentjsCompilerPlugin(),
     (() => ({
       name: "lent-ssr",
       enforce: "pre",
