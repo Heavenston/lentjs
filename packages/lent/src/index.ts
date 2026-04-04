@@ -275,7 +275,7 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
         const [class_list, found_reads] = listenForStoreReads(tv);
         t += `class="${renderClasslist(class_list).join(" ")}" `;
         if (found_reads.length > 0) {
-          t += `lentjs:class="${sharedSSRSerialize([found_reads, tv] satisfies DynamicValueData<ClassList>)}" `;
+          t += `${DIRECTIVE_PREFIX}:class="${sharedSSRSerialize([found_reads, tv] satisfies DynamicValueData<ClassList>)}" `;
         }
       }
       else if(tv)
@@ -303,7 +303,7 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
       const tv = v as Attributes[`on:${string}`];
       const tk = k.replace(/^on:/, "");
       if (tv !== undefined)
-        t += `lentjs:on:${tk}="${sharedSSRSerialize(tv)}" `;
+        t += `${DIRECTIVE_PREFIX}:on:${tk}="${sharedSSRSerialize(tv)}" `;
     }
     else if (k.startsWith("attr:")) {
       const tv = v as Attributes[`attr:${string}`];
@@ -315,7 +315,7 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
         let found_reads: StoreRead[];
         [val, found_reads] = listenForStoreReads(tv);
         if (found_reads.length > 0) {
-          t += `lentjs:attr:${tk}="${sharedSSRSerialize([found_reads, tv] satisfies DynamicValueData<AttributeValue>)}" `;
+          t += `${DIRECTIVE_PREFIX}:attr:${tk}="${sharedSSRSerialize([found_reads, tv] satisfies DynamicValueData<AttributeValue>)}" `;
         }
       }
       else {
@@ -336,7 +336,7 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
       if (isFunction(tv)) {
         const [_val, found_reads] = listenForStoreReads(tv);
         if (found_reads.length > 0) {
-          t += `lentjs:prop:${tk}="${sharedSSRSerialize([found_reads, tv] satisfies DynamicValueData<ClassList>)}" `;
+          t += `${DIRECTIVE_PREFIX}:prop:${tk}="${sharedSSRSerialize([found_reads, tv] satisfies DynamicValueData<ClassList>)}" `;
         }
       }
 

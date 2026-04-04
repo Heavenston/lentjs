@@ -70,7 +70,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
   }
   case "start-dynamic": {
     if (REMOVE_DIRECTIVES)
-      directiveNode.textContent = "lentjs start-dynamic";
+      directiveNode.textContent = `${DIRECTIVE_PREFIX} start-dynamic`;
 
     const { storeReads, update } = d.data;
 
@@ -85,7 +85,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
   }
   case "end-dynamic": {
     if (REMOVE_DIRECTIVES)
-      directiveNode.textContent = "lentjs end-dynamic";
+      directiveNode.textContent = `${DIRECTIVE_PREFIX} end-dynamic`;
 
     const state = ctx.dynamicStateStack.pop();
     assert(state?.kind === "state");
@@ -172,13 +172,13 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
 
 function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
   for (const t of el.attributes) {
-    if (t.name.startsWith("lentjs:on:")) {
-      const event = t.name.replace(/^lentjs:on:/, "");
+    if (t.name.startsWith(`${DIRECTIVE_PREFIX}:on:`)) {
+      const event = t.name.slice(0, DIRECTIVE_PREFIX.length + 4);
       el.addEventListener(event, ctx.directivesData![parseInt(t.value)] as EventHandler<Event>);
     }
 
-    if (t.name.startsWith("lentjs:attr:")) {
-      const attr = t.name.replace(/^lentjs:attr:/, "");
+    if (t.name.startsWith(`${DIRECTIVE_PREFIX}:attr:`)) {
+      const attr = t.name.slice(0, DIRECTIVE_PREFIX.length + 6);
       let [storeReads, callback] = ctx.directivesData![parseInt(t.value)] as DynamicValueData<AttributeValue>;
 
       const hh = microtaskDebounce(() => {
@@ -189,7 +189,7 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
       subscribeToStoreReads(hh, storeReads, { once: true });
     }
 
-    if (t.name.startsWith("lentjs:class")) {
+    if (t.name === `${DIRECTIVE_PREFIX}:class`) {
       let [storeReads, callback] = ctx.directivesData![parseInt(t.value)] as DynamicValueData<ClassList>;
 
       const hh = microtaskDebounce(() => {
@@ -201,8 +201,8 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
       subscribeToStoreReads(hh, storeReads, { once: true });
     }
 
-    if (t.name.startsWith("lentjs:prop")) {
-      const prop = t.name.replace(/^lentjs:prop:/, "");
+    if (t.name.startsWith(`${DIRECTIVE_PREFIX}:prop:`)) {
+      const prop = t.name.slice(0, DIRECTIVE_PREFIX.length + 6);
       let [storeReads, callback] = ctx.directivesData![parseInt(t.value)] as DynamicValueData<JSXElement>;
 
       const hh = microtaskDebounce(() => {
