@@ -1,0 +1,24 @@
+{
+  "name": "@lentjs/compiler",
+  "version": "0.0.0",
+
+  "type": "module",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "src/index.ts"
+  },
+
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {},
+  "dependencies": {
+    "@swc/core": "^1.15.24",
+    "vite": "^8.0.3",
+    "@lentjs/swc-plugin": "workspace:*"
+  }
+}
