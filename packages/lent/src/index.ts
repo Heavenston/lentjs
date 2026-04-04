@@ -82,7 +82,7 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
   }
   else if (isFunction(el)) {
     const [val, storeReads] = listenForStoreReads(() => el());
-    if (storeReads.length <= 0) {
+    if (storeReads.length <= 0 && !isInsideDynamic) {
       return stringifyJSXElement(val, false);
     }
     const prefix = createDirective("start-dynamic", {
@@ -94,10 +94,10 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
   }
   else if (Array.isArray(el)) {
     if (!isInsideDynamic) {
-      return el.map(e => stringifyJSXElement(e, isInsideDynamic)).join("");
+      return el.map(e => stringifyJSXElement(e, false)).join("");
     }
 
-    const t = el.map(e => stringifyJSXElement(e, isInsideDynamic)).join(createDirective("array-element-separator"));
+    const t = el.map(e => stringifyJSXElement(e, true)).join(createDirective("array-element-separator"));
     const prefix = createDirective("start-array");
     const suffix = createDirective("end-array");
     return `${prefix}${t}${suffix}`;

@@ -3,6 +3,8 @@ import { patchElement, type JSXState } from "./patchElement";
 import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "./store";
 import { assert, microtaskDebounce } from "./utils";
 
+const REMOVE_DIRECTIVES = false;
+
 export const DIRECTIVE_PREFIX = "lentjs";
 export type Directives = {
   signals: [string, any][],
@@ -55,7 +57,8 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     break;
   }
   case "start-dynamic": {
-    directiveNode.textContent = "lentjs start-dynamic";
+    if (REMOVE_DIRECTIVES)
+      directiveNode.textContent = "lentjs start-dynamic";
 
     const { storeReads, update } = d.data;
 
@@ -69,7 +72,8 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     break;
   }
   case "end-dynamic": {
-    directiveNode.textContent = "lentjs end-dynamic";
+    if (REMOVE_DIRECTIVES)
+      directiveNode.textContent = "lentjs end-dynamic";
 
     const state = ctx.dynamicStateStack.pop();
     assert(state?.kind === "state");
@@ -219,9 +223,10 @@ export function startRuntime(rootElement: HTMLElement) {
     dynamicStateStack: [],
   };
   domVisitor(ctx, rootElement);
-  for (const n of ctx.nodesToRemove)
-    n.remove();
-  console.log(ctx);
+  assert(ctx.dynamicStateStack.length === 0);
+  if (REMOVE_DIRECTIVES)
+    for (const n of ctx.nodesToRemove)
+      n.remove();
   console.timeEnd("startRuntime");
 }
 
