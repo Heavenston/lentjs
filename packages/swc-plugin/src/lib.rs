@@ -47,11 +47,11 @@ impl VisitMut for FindCapturedValues {
     }
 }
 
-struct IdentReplacer<'a> {
-    mappings: &'a HashMap<Id, Id>,
+struct IdentReplacer {
+    mappings: HashMap<Id, Id>,
 }
 
-impl VisitMut for IdentReplacer<'_> {
+impl VisitMut for IdentReplacer {
     fn visit_mut_ident(&mut self, ident: &mut Ident) {
         let id: Id = ident.clone().into();
         if let Some((new_atom, new_ctxt)) = self.mappings.get(&id) {
@@ -159,15 +159,17 @@ impl VisitMut for TransformVisitor {
 
         let chosen_name = Ident::new_private(Atom::new("__hoisted"), Span::dummy());
 
-        let captured_mappings: HashMap<Id, Id> = captured_values.values.iter()
+        let mut captured_mappings: Vec<(Id, Id)> = captured_values.values.iter()
             .map(|id| (id.clone(), Ident::from(id.clone()).into_private().into()))
             .collect();
+        // Ordering needs to be deterministic
+        captured_mappings.sort_unstable();
 
         arrow_expr.visit_mut_with(&mut IdentReplacer {
-            mappings: &captured_mappings,
+            mappings: captured_mappings.iter().cloned().collect(),
         });
         arrow_expr.params = std::iter::chain(
-            captured_mappings.values().cloned().map(Ident::from).map(|id| Pat::Ident(id.into())),
+            captured_mappings.iter().map(|a| &a.1).cloned().map(Ident::from).map(|id| Pat::Ident(id.into())),
             arrow_expr.params.drain(..),
         ).collect();
         arrow_expr.visit_mut_children_with(self);
@@ -183,7 +185,7 @@ impl VisitMut for TransformVisitor {
                 }.into()).into(),
                 args: std::iter::chain(
                     std::iter::once(Expr::Lit(Null::dummy().into()).into()),
-                    captured_mappings.keys().cloned().map(Ident::from)
+                    captured_mappings.iter().map(|a| &a.0).cloned().map(Ident::from)
                         .map(|id| Expr::from(id)),
                 ).map(ExprOrSpread::from).collect(),
                 ..Default::default()
