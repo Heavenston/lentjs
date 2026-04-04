@@ -3,7 +3,7 @@ import { patchElement, type JSXState } from "./patchElement";
 import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "./store";
 import { assert, microtaskDebounce } from "./utils";
 
-const REMOVE_DIRECTIVES = false;
+const REMOVE_DIRECTIVES = true;
 
 export const DIRECTIVE_PREFIX = "lentjs";
 export type Directives = {
@@ -83,6 +83,8 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     let resultState = state.state;
     const callback = dynamic.update;
     const unsubscribe = () => {
+      dynamic.startDirective.remove();
+      directiveNode.remove();
       currentUnsubscribe();
       return resultState;
     };
