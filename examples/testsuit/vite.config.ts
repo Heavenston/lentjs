@@ -47,15 +47,12 @@ export default defineConfig({
     port: 1234,
   },
 
-  oxc: {
-    jsx: {
-      importSource: "lent",
-    },
-  },
+  oxc: false,
 
   plugins: [
     (() => ({
       name: "lent-id",
+      enforce: "pre",
 
       transform: {
         filter: {
