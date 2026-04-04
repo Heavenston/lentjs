@@ -78,28 +78,12 @@ const devalueReducers: Record<string, (value: any) => any> = {
   },
   closure: (f: unknown) => {
     if (isFunction(f) && isClosure(f)) {
-      const data = f[closureDataSymbol];
-      return {
-        code: devalue.stringify(data.og_function, extendedDevalueReducers),
-        thisarg: data.thisarg,
-        values: data.values,
-      };
+      return f[closureDataSymbol];
     }
   },
   store: (f: unknown) => {
     if (isStore(f)) return getStoreId(f);
   },
-};
-const extendedDevalueReducers: Record<string, (value: any) => any> = {
-  ...devalueReducers,
-  function: (f: unknown) => {
-    if (isFunction(f)) {
-      return f.toString();
-    }
-  },
-};
-const limitedDevalueReducers: Record<string, (value: any) => any> = {
-  ...devalueReducers,
   function: (f: unknown) => {
     if (isFunction(f)) {
       throw new Error(`Cannot stringify function ${f}`);
@@ -118,17 +102,8 @@ const devalueRevivers: Record<string, (value: any) => any> = {
   signalSetter: (id: string) => {
     return signalSetterFromId(id);
   },
-  closure: ({ code, thisarg, values }: { code: string, thisarg: unknown, values: Array<unknown> }) => {
-    return (deserialize(code) as Function).bind(thisarg, ...values);
-  },
-  function: (code: string) => {
-    try {
-      return eval(code);
-    }
-    catch(e) {
-      console.error("Eval thrown error with code:", code);
-      throw e;
-    }
+  closure: ({ og_function, thisarg, values }: ClosureData) => {
+    return og_function.bind(thisarg, ...values);
   },
   store: (id) => {
     return createLazyProxy(() => {
@@ -141,7 +116,7 @@ const devalueRevivers: Record<string, (value: any) => any> = {
 };
 
 export function serialize(value: unknown): string {
-  return devalue.stringify(value, limitedDevalueReducers);
+  return devalue.stringify(value, devalueReducers);
 }
 
 export function deserialize(text: string): unknown {

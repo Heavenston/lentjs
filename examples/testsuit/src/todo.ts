@@ -1,4 +1,4 @@
-import { h, type ComponentFn, createStore, closure, RefFor, createSignal, register } from "@lentjs/core";
+import { h, type ComponentFn, createStore, RefFor, createSignal, register } from "@lentjs/core";
 import c from "./todo.module.scss";
 
 type TaskData = {
@@ -59,7 +59,7 @@ const Todo: ComponentFn<{}> = register(() => {
   return h("div", {
     children: [
       h("form", {
-        "on:submit": closure((state, e) => {
+        "on:submit": (e) => {
           e.preventDefault();
           const el = e.currentTarget;
           if (!(el instanceof HTMLFormElement)) return;
@@ -70,7 +70,7 @@ const Todo: ComponentFn<{}> = register(() => {
             text: trimmed,
           }];
           state.input_text = "";
-        }, state),
+        },
         children: [
           h("input", {
             "prop:value": () => state.input_text,

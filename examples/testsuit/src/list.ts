@@ -1,4 +1,4 @@
-import { closure, createSignal, h, RefFor, register, type ComponentFn, type SignalAccessor, type SignalSetter } from "@lentjs/core";
+import { createSignal, h, RefFor, register, type ComponentFn, type SignalAccessor, type SignalSetter } from "@lentjs/core";
 import c from "./list.module.scss";
 
 function createElement(): Element {
@@ -7,7 +7,9 @@ function createElement(): Element {
 register(createElement, "____RANDOM_ID");
 
 type Element = { id: string };
-const elementRender = register((setElements: SignalSetter<Element[]>, element: Element, idx: SignalAccessor<number>) => {
+const elementRender = register((setElements: SignalSetter<Element[]>, element: Element, getIdx: SignalAccessor<number>) => {
+  "use component";
+
   const i = crypto.randomUUID().split("-")[0];
 
   return h("div", {
@@ -17,7 +19,7 @@ const elementRender = register((setElements: SignalSetter<Element[]>, element: E
       `${element.id}: `,
       h("button", {
         children: "+",
-        "on:click": closure((createElement, setElements, getIdx) => {
+        "on:click": () => {
           const idx = getIdx();
           setElements.update(elements => {
             const newEl = createElement();
@@ -25,11 +27,11 @@ const elementRender = register((setElements: SignalSetter<Element[]>, element: E
             elements.splice(idx, 0, newEl);
             return [...elements];
           });
-        }, createElement, setElements, idx),
+        },
       }),
       h("button", {
         children: "Swap With Previous",
-        "on:click": closure((setElements, getIdx) => {
+        "on:click": () => {
           const idx = getIdx();
           setElements.update(elements => {
             if (idx === 0) return elements;
@@ -39,17 +41,17 @@ const elementRender = register((setElements: SignalSetter<Element[]>, element: E
             elements[idx] = prev;
             return [...elements];
           });
-        }, setElements, idx),
+        },
       }),
       h("button", {
         children: ["Delete ", i],
-        "on:click": closure((setElements, id) => {
-          setElements.update(els => els.filter(e => e.id !== id));
-        }, setElements, element.id),
+        "on:click": () => {
+          setElements.update(els => els.filter(e => e.id !== element.id));
+        },
       }),
       h("button", {
         children: "Swap With Next",
-        "on:click": closure((setElements, getIdx) => {
+        "on:click": () => {
           const idx = getIdx();
           setElements.update(elements => {
             if (idx+1 >= elements.length) return elements;
@@ -59,11 +61,11 @@ const elementRender = register((setElements: SignalSetter<Element[]>, element: E
             elements[idx] = next;
             return [...elements];
           });
-        }, setElements, idx),
+        },
       }),
       h("button", {
         children: "+",
-        "on:click": closure((createElement, setElements, getIdx) => {
+        "on:click": () => {
           const idx = getIdx();
           setElements.update(elements => {
             const newEl = createElement();
@@ -71,27 +73,29 @@ const elementRender = register((setElements: SignalSetter<Element[]>, element: E
             elements.splice(idx+1, 0, newEl);
             return [...elements];
           });
-        }, createElement, setElements, idx),
+        },
       }),
     ],
   });
 }, "____RANDOM_ID");
+
 const List: ComponentFn<{}> = register(() => {
+  "use component";
   const [elements, setElements] = createSignal<Element[]>(
     new Array(3).fill(null).map(createElement)
   );
 
   return [
     h("div", {
-      children: ["Count: ", closure(g => g().length, elements)],
+      children: ["Count: ", () => elements().length],
     }),
     h("div", {
-      children: ["List: ", closure(g => g().map(p => p.id).join(", "), elements)],
+      children: ["List: ", () => elements().map(p => p.id).join(", ")],
     }),
     h(RefFor<Element>, {
       each: elements,
-      key: closure(el => el.id),
-      children: closure(elementRender, setElements),
+      key: el => el.id,
+      children: elementRender.bind(null, setElements),
     }),
   ];
 }, "____RANDOM_ID");
