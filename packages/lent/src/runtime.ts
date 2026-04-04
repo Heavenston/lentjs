@@ -1,5 +1,5 @@
 import { deserialize, renderClasslist, setAttribute, type AttributeValue, type ClassList, type EventHandler, type JSXElement } from ".";
-import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
+import { changeStateAnchor, patchElement, type JSXState, type JSXStateDynamic } from "./patchElement";
 import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "./store";
 import { assert, microtaskDebounce } from "./utils";
 
@@ -87,40 +87,48 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     if (REMOVE_DIRECTIVES)
       directiveNode.textContent = null;
 
-    const state = ctx.dynamicStateStack.pop();
-    assert(state?.kind === "state");
+    const stateFromStack = ctx.dynamicStateStack.pop();
+    assert(stateFromStack?.kind === "state");
     const dynamic = ctx.dynamicStateStack.pop();
     assert(dynamic?.kind === "dynamic-start");
 
+    const isStatic = dynamic.storeReads.length !== 0;
     const startAnchor = dynamic.startDirective;
     const endAnchor = directiveNode;
 
-    let resultState = state.state;
+    let resultState = stateFromStack.state;
     const callback = dynamic.update;
-    const unsubscribe = () => {
-      startAnchor.remove();
-      endAnchor.remove();
-      currentUnsubscribe();
-      return resultState;
-    };
+    let currentUnsubscribe: (() => void) | null = null;
 
-    const hh = microtaskDebounce(() => {
-      const [previousResult, newStoreReads] = listenForStoreReads(() => callback(resultState.element));
-      resultState = patchElement(parent, endAnchor, resultState, previousResult);
-      currentUnsubscribe = subscribeToStoreReads(hh, newStoreReads, { once: true });
-    });
-    let currentUnsubscribe = subscribeToStoreReads(hh, dynamic.storeReads, { once: true });
+    if (isStatic) {
+      const hh = microtaskDebounce(() => {
+        const [previousResult, newStoreReads] = listenForStoreReads(() => callback(resultState.element));
+        resultState = patchElement(parent, endAnchor, resultState, previousResult);
+        currentUnsubscribe = subscribeToStoreReads(hh, newStoreReads, { once: true });
+      });
+      currentUnsubscribe = subscribeToStoreReads(hh, dynamic.storeReads, { once: true });
+    }
+    else {
+      ctx.nodesToRemove.push(startAnchor, endAnchor);
+    }
 
     if (ctx.dynamicStateStack.length > 0)
       ctx.dynamicStateStack.push({
         kind: "state",
         state: {
           kind: "dynamic",
-          startAnchor: startAnchor,
-          endAnchor: endAnchor,
+          startAnchor: isStatic ? null : startAnchor,
+          endAnchor: isStatic ? null : endAnchor,
           element: callback,
-          unsubscribe,
-          changeAnchor: (newAnchor) => {
+          unsubscribe: isStatic ? () => resultState : () => {
+            startAnchor.remove();
+            endAnchor.remove();
+            currentUnsubscribe?.();
+            return resultState;
+          },
+          changeAnchor: isStatic ? (newAnchor) => {
+            changeStateAnchor(parent, resultState, newAnchor);
+          } : (newAnchor) => {
             parent.insertBefore(startAnchor, newAnchor);
             parent.insertBefore(endAnchor, newAnchor);
             changeStateAnchor(parent, resultState, endAnchor);
