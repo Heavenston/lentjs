@@ -1,7 +1,9 @@
 import { type Plugin } from "vite";
 import { transform } from "@swc/core";
+import { fileURLToPath } from "node:url";
 
 export const lentjsCompilerPlugin = (): Plugin => {
+  console.log();
   return {
     name: "lentjs-compiler",
 
@@ -20,7 +22,7 @@ export const lentjsCompilerPlugin = (): Plugin => {
           swcrc: false,
           configFile: false,
           sourceMaps: true,
-          minify: true,
+          minify: false,
           jsc: {
             target: "es2022",
             parser: options.moduleType.startsWith("ts")
@@ -32,6 +34,13 @@ export const lentjsCompilerPlugin = (): Plugin => {
                 syntax: "ecmascript",
                 jsx: options.moduleType.endsWith("x"),
               },
+            experimental: {
+              plugins: [
+                [fileURLToPath(import.meta.resolve("@lentjs/swc-plugin")), {
+                  
+                }]
+              ],
+            },
           },
         });
 

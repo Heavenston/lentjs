@@ -748,6 +748,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 
 [[package]]
+name = "lentjs-swc-plugin"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "swc_core",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.184"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1406,14 +1414,6 @@ name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
-
-[[package]]
-name = "swc-plugin"
-version = "0.1.0"
-dependencies = [
- "serde",
- "swc_core",
-]
 
 [[package]]
 name = "swc_allocator"
