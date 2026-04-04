@@ -6,7 +6,7 @@ export { startRuntime } from "./runtime";
 export { serialize, deserialize, closure, bind, register } from "./serialize";
 
 import { immediateTrack } from "./task";
-import { closure, register, serialize } from "./serialize";
+import { register, serialize } from "./serialize";
 import { isFunction } from "./utils";
 import { listenForStoreReads, signals, stores, untrack, type StoreRead } from "./store";
 import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type DynamicValueData, type MarkerDirectiveName } from "./runtime";
@@ -99,11 +99,11 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
     if (storeReads.length <= 0 && !isInsideDynamic) {
       return stringifyJSXElement(val, false);
     }
-    const prefix = createSSRDirective("start-dynamic", {
+    const prefix = createSSRDirective("dyn", {
       storeReads,
       update: el,
     });
-    const suffix = createSSRDirective("end-dynamic");
+    const suffix = createSSRDirective("dyn/");
     return `${prefix}${stringifyJSXElement(val, true)}${suffix}`;
   }
   else if (Array.isArray(el)) {
@@ -111,16 +111,16 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
       return el.map(e => stringifyJSXElement(e, false)).join("");
     }
 
-    const t = el.map(e => stringifyJSXElement(e, true)).join(createSSRDirective("array-element-separator"));
-    const prefix = createSSRDirective("start-array");
-    const suffix = createSSRDirective("end-array");
+    const t = el.map(e => stringifyJSXElement(e, true)).join(createSSRDirective("sep"));
+    const prefix = createSSRDirective("arr");
+    const suffix = createSSRDirective("arr/");
     return `${prefix}${t}${suffix}`;
   }
   else if (el === null) {
-    return isInsideDynamic ? createSSRDirective("null", null) : "";
+    return isInsideDynamic ? createSSRDirective("nul", null) : "";
   }
   else if (el === undefined) {
-    return isInsideDynamic ? createSSRDirective("undefined", null) : "";
+    return isInsideDynamic ? createSSRDirective("und", null) : "";
   }
   else if (el instanceof Node) {
     throw new Error("Unsupported Node");

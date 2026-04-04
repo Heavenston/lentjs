@@ -12,15 +12,15 @@ export type Directives = {
   signals: [string, any][],
   stores: [string, any][],
 
-  "start-dynamic": { storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement },
-  "end-dynamic": null,
+  "dyn": { storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement },
+  "dyn/": null,
 
-  "start-array": null,
-  "end-array": null,
-  "array-element-separator": null,
+  "arr": null,
+  "arr/": null,
+  "sep": null,
 
-  "null": null,
-  "undefined": null,
+  "nul": null,
+  "und": null,
 };
 export type DirectiveName = keyof Directives;
 export type MarkerDirectiveName = keyof {
@@ -68,7 +68,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     }
     break;
   }
-  case "start-dynamic": {
+  case "dyn": {
     if (REMOVE_DIRECTIVES)
       directiveNode.textContent = `${DIRECTIVE_PREFIX} start-dynamic`;
 
@@ -83,7 +83,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
 
     break;
   }
-  case "end-dynamic": {
+  case "dyn/": {
     if (REMOVE_DIRECTIVES)
       directiveNode.textContent = `${DIRECTIVE_PREFIX} end-dynamic`;
 
@@ -130,14 +130,14 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
 
     break;
   }
-  case "start-array": {
+  case "arr": {
     ctx.nodesToRemove.push(directiveNode);
     ctx.dynamicStateStack.push({
       kind: "array-start",
     });
     break;
   }
-  case "end-array": {
+  case "arr/": {
     ctx.nodesToRemove.push(directiveNode);
     const states: JSXState[] = [];
     while (ctx.dynamicStateStack.length > 0 && ctx.dynamicStateStack.at(-1)?.kind !== "array-start") {
@@ -152,15 +152,15 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     break;
   }
   // Dummy directive, does nothing (makes sure text nodes are broken up)
-  case "array-element-separator":
+  case "sep":
     ctx.nodesToRemove.push(directiveNode);
     break;
-  case "null": {
+  case "nul": {
     ctx.nodesToRemove.push(directiveNode);
     ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", element: null, node: null } })
     break;
   }
-  case "undefined": {
+  case "und": {
     ctx.nodesToRemove.push(directiveNode);
     ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", element: undefined, node: null } })
     break;
