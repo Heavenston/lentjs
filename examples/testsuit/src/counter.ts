@@ -1,10 +1,16 @@
 import { h, closure, type ComponentFn, register, createSignal } from "@lentjs/core";
 
+function foreachClosure() {
+  
+}
+
 type CounterButtonProps = {
   min: () => number,
   max: () => number,
 };
 const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
+  "use component";
+
   const [count, setCount] = createSignal(props.min());
 
   const clamp = closure((min, max, val: number): number => {
@@ -44,6 +50,8 @@ const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
 }, "____RANDOM_ID");
 
 const Counter: ComponentFn<{}> = register(() => {
+  "use component";
+
   const [min, setMin] = createSignal(0);
   const [max, setMax] = createSignal(10);
 

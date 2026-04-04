@@ -1,7 +1,7 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ SyntaxContext, util::take::Take }, ecma::{
-    ast::{ArrayLit, ArrowExpr, AssignExpr, BlockStmt, CallExpr, Expr, ExprOrSpread, ExprStmt, Id, Ident, MemberExpr, Program, ReturnStmt, VarDecl, VarDeclarator},
+use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ Span, SyntaxContext, util::take::Take }, ecma::{
+    ast::{ArrayLit, ArrowExpr, AssignExpr, BlockStmt, CallExpr, Expr, ExprOrSpread, ExprStmt, Id, Ident, MemberExpr, MemberProp, Null, Pat, Program, ReturnStmt, VarDecl, VarDeclarator},
     transforms::testing::test_inline,
     visit::{ VisitMut, VisitMutWith, visit_mut_pass },
 }};
@@ -47,10 +47,74 @@ impl VisitMut for FindCapturedValues {
     }
 }
 
-pub struct TransformVisitor;
+struct IdentReplacer<'a> {
+    mappings: &'a HashMap<Id, Id>,
+}
+
+impl VisitMut for IdentReplacer<'_> {
+    fn visit_mut_ident(&mut self, ident: &mut Ident) {
+        let id: Id = ident.clone().into();
+        if let Some((new_atom, new_ctxt)) = self.mappings.get(&id) {
+            ident.sym = new_atom.clone();
+            ident.ctxt = *new_ctxt;
+        }
+    }
+}
+
+struct HoistedClosure {
+    chosen_name: Ident,
+    code: ArrowExpr,
+}
+
+#[derive(Default)]
+pub struct TransformVisitor {
+    enabled: bool,
+    hoisted_closured: Vec<HoistedClosure>,
+}
 
 impl VisitMut for TransformVisitor {
+    fn visit_mut_script(&mut self, _node: &mut swc_core::ecma::ast::Script) {
+        panic!("Script are not supported");
+    }
+
+    fn visit_mut_stmts(&mut self, node: &mut Vec<swc_core::ecma::ast::Stmt>) {
+        let enable_directive = node.first()
+            .and_then(|stmt| stmt.as_expr())
+            .and_then(|expr_stmt| expr_stmt.expr.as_lit())
+            .and_then(|lit| lit.as_str())
+            .is_some_and(|ss| ss.value == "use component");
+
+        let old_enabled = self.enabled;
+        self.enabled = enable_directive;
+        node.visit_mut_children_with(self);
+        self.enabled = old_enabled;
+    }
+
+    fn visit_mut_module_items(&mut self, items: &mut Vec<swc_core::ecma::ast::ModuleItem>) {
+        items.visit_mut_children_with(self);
+        let insert_point = items.iter().enumerate().find(|p| p.1.is_stmt()).map(|(idx, _)| idx).unwrap_or(items.len());
+
+        if !self.hoisted_closured.is_empty() {
+            items.insert(insert_point, Box::new(VarDecl {
+                kind: swc_core::ecma::ast::VarDeclKind::Const,
+                decls: self.hoisted_closured.drain(..).map(|h| {
+                    VarDeclarator {
+                        span: Default::default(),
+                        name: swc_core::ecma::ast::Pat::Ident(swc_core::ecma::ast::BindingIdent { id: h.chosen_name, type_ann: None }),
+                        init: Some(Box::new(h.code.into())),
+                        definite: false,
+                    }
+                }).collect(),
+                ..Default::default()
+            }).into());
+        }
+    }
+
     fn visit_mut_expr(&mut self, node: &mut swc_core::ecma::ast::Expr) {
+        if !self.enabled {
+            return node.visit_mut_children_with(self);
+        }
+
         let Some(mut arrow_expr) = (match node {
             Expr::Arrow(arrow_expr) => Some(arrow_expr.take()),
             _ => None,
@@ -59,126 +123,57 @@ impl VisitMut for TransformVisitor {
             return;
         };
 
-        let mut captured_values = FindCapturedValues::default();
-        arrow_expr.visit_mut_with(&mut captured_values);
+        let mut captured_values = {
+            let mut v = FindCapturedValues::default();
+            arrow_expr.visit_mut_with(&mut v);
+            v
+        };
+
+        // Remove all values that are declared within the arrow function
+        captured_values.values.retain(|o| !captured_values.decls.contains(o));
+
+        let chosen_name = Ident::new_private(Atom::new("__hoisted"), Span::dummy());
+
+        let captured_mappings: HashMap<Id, Id> = captured_values.values.iter()
+            .map(|id| (id.clone(), Ident::from(id.clone()).into_private().into()))
+            .collect();
+
+        arrow_expr.visit_mut_with(&mut IdentReplacer {
+            mappings: &captured_mappings,
+        });
+        arrow_expr.params = std::iter::chain(
+            captured_mappings.values().cloned().map(Ident::from).map(|id| Pat::Ident(id.into())),
+            arrow_expr.params.drain(..),
+        ).collect();
         arrow_expr.visit_mut_children_with(self);
 
-        let mut stmt = BlockStmt::default();
-
-        let closure_ident = Ident::new_private(Atom::new("__closure"), Default::default());
-        let closure_expr = Box::<Expr>::new(closure_ident.clone().into());
-
-        stmt.stmts.push(VarDecl {
-            kind: swc_core::ecma::ast::VarDeclKind::Const,
-            decls: vec![
-                VarDeclarator {
-                    name: closure_ident.clone().into(),
-                    init: Some(Box::new(arrow_expr.into())),
-                    ..Take::dummy()
-                },
-            ],
-            ..Default::default()
-        }.into());
-
-        let values: Vec<Option<ExprOrSpread>> = captured_values.values.iter()
-            .filter(|p| !captured_values.decls.contains(p))
-            .map(|(a, c)| format!("{a}{c:?}"))
-            .map(|p| swc_core::ecma::ast::Str {
-                value: Wtf8Atom::from(p),
-                span: Default::default(),
-                raw: None,
-            })
-            .map(|p| Some(ExprOrSpread::from(Expr::from(p))))
-            .collect();
-        let decls: Vec<Option<ExprOrSpread>> = captured_values.decls.iter()
-            .map(|(a, c)| format!("{a}{c:?}"))
-            .map(|p| swc_core::ecma::ast::Str {
-                value: Wtf8Atom::from(p),
-                span: Default::default(),
-                raw: None,
-            })
-            .map(|p| Some(ExprOrSpread::from(Expr::from(p))))
-            .collect();
-
-        stmt.stmts.push(ExprStmt {
-            expr: Box::new(AssignExpr {
-                left: MemberExpr {
-                    obj: closure_expr.clone(),
-                    prop: swc_core::ecma::ast::MemberProp::Ident(Atom::new("values").into()),
-                    ..Default::default()
-                }.into(),
-                right: ArrayLit {
-                    elems: values,
-                    ..Default::default()
-                }.into(),
+        *node = if captured_mappings.is_empty() {
+            chosen_name.clone().into()
+        } else {
+            CallExpr {
+                callee: Box::<Expr>::new(MemberExpr {
+                    span: Span::default(),
+                    obj: Box::<Expr>::new(chosen_name.clone().into()).into(),
+                    prop: MemberProp::Ident(Atom::new("bind").into()),
+                }.into()).into(),
+                args: std::iter::chain(
+                    std::iter::once(Expr::Lit(Null::dummy().into()).into()),
+                    captured_mappings.keys().cloned().map(Ident::from)
+                        .map(|id| Expr::from(id)),
+                ).map(ExprOrSpread::from).collect(),
                 ..Default::default()
-            }.into()),
-            ..Default::default()
-        }.into());
-        stmt.stmts.push(ExprStmt {
-            expr: Box::new(AssignExpr {
-                left: MemberExpr {
-                    obj: closure_expr.clone(),
-                    prop: swc_core::ecma::ast::MemberProp::Ident(Atom::new("decls").into()),
-                    ..Default::default()
-                }.into(),
-                right: ArrayLit {
-                    elems: decls,
-                    ..Default::default()
-                }.into(),
-                ..Default::default()
-            }.into()),
-            ..Default::default()
-        }.into());
+            }.into()
+        };
 
-        stmt.stmts.push(ReturnStmt {
-            arg: Some(closure_expr.clone()),
-            ..Default::default()
-        }.into());
-
-        *node = CallExpr {
-            callee: swc_core::ecma::ast::Callee::Expr(ArrowExpr {
-                body: Box::new(stmt.into()),
-                ..Default::default()
-            }.into()),
-            ..Default::default()
-        }.into();
+        self.hoisted_closured.push(HoistedClosure {
+            chosen_name: chosen_name.clone(),
+            code: arrow_expr.clone(),
+        });
     }
 }
 
-/// An example plugin function with macro support.
-/// `plugin_transform` macro interop pointers into deserialized structs, as well
-/// as returning ptr back to host.
-///
-/// It is possible to opt out from macro by writing transform fn manually
-/// if plugin need to handle low-level ptr directly via
-/// `__transform_plugin_process_impl(
-///     ast_ptr: *const u8, ast_ptr_len: i32,
-///     unresolved_mark: u32, should_enable_comments_proxy: i32) ->
-///     i32 /*  0 for success, fail otherwise.
-///             Note this is only for internal pointer interop result,
-///             not actual transform result */`
-///
-/// This requires manual handling of serialization / deserialization from ptrs.
-/// Refer swc_plugin_macro to see how does it work internally.
 #[plugin_transform]
 pub fn process_transform(mut program: Program, _metadata: TransformPluginProgramMetadata) -> Program {
-    program.visit_mut_with(&mut TransformVisitor);
+    program.visit_mut_with(&mut TransformVisitor::default());
     program
 }
-
-// An example to test plugin transform.
-// Recommended strategy to test plugin's transform is verify
-// the Visitor's behavior, instead of trying to run `process_transform` with mocks
-// unless explicitly required to do so.
-test_inline!(
-    Default::default(),
-    |_| visit_mut_pass(TransformVisitor),
-    boo,
-    // Input codes
-    r#"{ const feur = "bonjour"; () => feur }"#,
-    // Output codes after transformed with plugin
-    r#"() => {
-        return () => "test";
-    }"#
-);

@@ -36,9 +36,7 @@ export const lentjsCompilerPlugin = (): Plugin => {
               },
             experimental: {
               plugins: [
-                [fileURLToPath(import.meta.resolve("@lentjs/swc-plugin")), {
-                  
-                }]
+                [fileURLToPath(import.meta.resolve("@lentjs/swc-plugin")), { }]
               ],
             },
           },

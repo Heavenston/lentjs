@@ -119,7 +119,13 @@ const devalueRevivers: Record<string, (value: any) => any> = {
     }[name];
   },
   function: (code: string) => {
-    return eval(code);
+    try {
+      return eval(code);
+    }
+    catch(e) {
+      console.error("Eval thrown error with code:", code);
+      throw e;
+    }
   },
   store: (id) => {
     return createLazyProxy(() => {
