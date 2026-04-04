@@ -346,26 +346,26 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
 
 let global_h_config: "ssr" | "dom" = "dom";
 
-function hComponent<P>(component: ComponentFn<P>, props: P): JSXElement {
-  return closure((untrack, props) => untrack(() => component(props)), untrack, props);
-}
+const hComponent = register(<P>(component: ComponentFn<P>, props: P): JSXElement => {
+  return untrack(() => component(props));
+}, "__lentjs_hcomponent");
 
 export function h(element: string, props?: Attributes): JSXElement;
 export function h(element: ComponentFn<{}>): JSXElement;
 export function h<P>(element: ComponentFn<P>, props: P): JSXElement;
-export function h(element: any, props: any = {}): JSXElement {
+export function h<P>(element: string | ComponentFn<P>, props?: P): JSXElement {
   if (typeof element === "string") {
     if (global_h_config === "ssr") {
-      return createSSRElement(element, props);
+      return createSSRElement(element, props ?? {});
     }
     else if (global_h_config === "dom") {
-      return createHTMLElement(element, props);
+      return createHTMLElement(element, props ?? {});
     }
     else {
       throw new Error("Invalid global_h_config value");
     }
   }
   else {
-    return hComponent(element, props);
+    return (hComponent<P>).bind(null, element, props!);
   }
 }
