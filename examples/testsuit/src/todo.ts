@@ -11,28 +11,30 @@ type TaskProps = {
   onDelete: (id: string) => void,
 };
 const Task: ComponentFn<TaskProps> = register((props) => {
+  "use component";
+
   const [done, setDone] = createSignal(false);
 
   return h("div", {
-    class: closure((c, done) => [c["task"], { [c["task-completed"]]: done() }], c, done),
+    class: () => [c["task"], { [c["task-completed"]]: done() }],
     children: [
       h("span", {
-        children: closure(task => task.text, props.task),
+        children: () => props.task.text,
       }),
       h("input", {
         "checked": done,
 
         "attr:type": "checkbox",
-        "on:change": closure((setDone, e) => {
+        "on:change": (e) => {
           const el = e.currentTarget;
           if (!(el instanceof HTMLInputElement)) return;
           setDone(el.checked);
-        }, setDone),
+        },
       }),
       h("button", {
-        "on:click": closure((onDelete, task) => {
-          onDelete(task.id);
-        }, props.onDelete, props.task),
+        "on:click": () => {
+          props.onDelete(props.task.id);
+        },
         children: "delete",
       }),
     ],
@@ -43,15 +45,9 @@ type TodoState = {
   input_text: string,
   tasks: TaskData[],
 };
-const taskRender = register((state: TodoState, task: TaskData) => {
-  return h(Task, {
-    task,
-    onDelete: closure((state, task) => {
-      state.tasks = state.tasks.filter(p => p.id !== task.id);
-    }, state, task),
-  });
-}, "____RANDOM_ID");
 const Todo: ComponentFn<{}> = register(() => {
+  "use component";
+
   const state = createStore<TodoState>({
     input_text: "Hi",
     tasks: [
@@ -77,17 +73,17 @@ const Todo: ComponentFn<{}> = register(() => {
         }, state),
         children: [
           h("input", {
-            "prop:value": closure(state => state.input_text, state),
+            "prop:value": () => state.input_text,
             "attr:value": state.input_text,
-            "on:input": closure((state, e) => {
+            "on:input": (e) => {
               const el = e.currentTarget;
               if (!(el instanceof HTMLInputElement)) return;
               state.input_text = el.value;
-            }, state),
+            },
           }),
           h("button", {
             children: "Create Task",
-            "attr:disabled": closure(state => !state.input_text.trim(), state),
+            "attr:disabled": () => !state.input_text.trim(),
           }),
         ],
       }),
@@ -95,9 +91,14 @@ const Todo: ComponentFn<{}> = register(() => {
       h("div", {
         class: ["tasks-container"],
         children: h(RefFor<TaskData>, {
-          each: closure(state => state.tasks, state),
-          key: closure(task => task.id),
-          children: closure(taskRender, state),
+          each: () => state.tasks,
+          key: task => task.id,
+          children: task => h(Task, {
+            task,
+            onDelete: () => {
+              state.tasks = state.tasks.filter(p => p.id !== task.id);
+            },
+          }),
         }),
       }),
     ],
