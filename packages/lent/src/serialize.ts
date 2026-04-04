@@ -46,9 +46,7 @@ const registry = new Map<string, unknown>;
 const registryIdSymbol = Symbol("registry-id");
 export function register<V extends object>(value: V, id: string): V {
   if (registryIdSymbol in value) { return value; }
-  if (registry.has(id)) {
-    console.warn("Duplicate registry id", id);
-  }
+  if (registry.has(id)) { console.warn("Duplicate registry id", id) }
   registry.set(id, value);
   Object.defineProperty(value, registryIdSymbol, { enumerable: true, value: id });
   if (isFunction(value) && !isClosure(value)) {
@@ -85,7 +83,6 @@ const devalueReducers: Record<string, (value: any) => any> = {
         code: devalue.stringify(data.og_function, extendedDevalueReducers),
         thisarg: data.thisarg,
         values: data.values,
-        name: f.name,
       };
     }
   },
@@ -121,10 +118,8 @@ const devalueRevivers: Record<string, (value: any) => any> = {
   signalSetter: (id: string) => {
     return signalSetterFromId(id);
   },
-  closure: ({ name, code, thisarg, values }: { name: string, code: string, thisarg: unknown, values: Array<unknown> }) => {
-    const fn = deserialize(code) as Function;
-    console.log({ name, code, thisarg, values, fn });
-    return fn.bind(thisarg, ...values);
+  closure: ({ code, thisarg, values }: { code: string, thisarg: unknown, values: Array<unknown> }) => {
+    return (deserialize(code) as Function).bind(thisarg, ...values);
   },
   function: (code: string) => {
     try {

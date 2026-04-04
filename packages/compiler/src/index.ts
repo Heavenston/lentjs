@@ -3,7 +3,6 @@ import { transform } from "@swc/core";
 import { fileURLToPath } from "node:url";
 
 export const lentjsCompilerPlugin = (): Plugin => {
-  console.log();
   return {
     name: "lentjs-compiler",
 
@@ -15,7 +14,6 @@ export const lentjsCompilerPlugin = (): Plugin => {
 
       async handler(code, id, options) {
         if (!options) throw new Error("Missing options");
-        console.log("Transform!!", id, options);
 
         const output = await transform(code, {
           filename: id,
