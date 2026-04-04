@@ -67,10 +67,24 @@ export function renderClasslist(list: ClassList): string[] {
     .map(([k, _]) => k);
 }
 
-function createDirective<K extends MarkerDirectiveName>(name: K): string;
-function createDirective<K extends DirectiveName>(name: K, arg: Directives[K]): string;
-function createDirective(name: string, arg: unknown = null): string {
-  return `<!--${DIRECTIVE_PREFIX} ${name}${arg === null ? "" : " "+serialize(arg)}-->`;
+let global_h_config: "ssr" | "dom" = "dom";
+const global_directive_data_array: unknown[] = [];
+
+function sharedSSRSerialize(value: unknown): number {
+  const idx = global_directive_data_array.length;
+  global_directive_data_array.push(value);
+  return idx;
+}
+
+function createSSRDirective<K extends MarkerDirectiveName>(name: K): string;
+function createSSRDirective<K extends DirectiveName>(name: K, arg: Directives[K], embed?: boolean): string;
+function createSSRDirective(name: string, arg: unknown = null, embed: boolean = false): string {
+  if (arg === null) {
+    return `<!--${DIRECTIVE_PREFIX} ${name}-->`;
+  }
+  else {
+    return `<!--${DIRECTIVE_PREFIX} ${name} ${embed ? serialize(arg) : sharedSSRSerialize(arg)}-->`;
+  }
 }
 
 function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): string {
@@ -85,11 +99,11 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
     if (storeReads.length <= 0 && !isInsideDynamic) {
       return stringifyJSXElement(val, false);
     }
-    const prefix = createDirective("start-dynamic", {
+    const prefix = createSSRDirective("start-dynamic", {
       storeReads,
       update: el,
     });
-    const suffix = createDirective("end-dynamic");
+    const suffix = createSSRDirective("end-dynamic");
     return `${prefix}${stringifyJSXElement(val, true)}${suffix}`;
   }
   else if (Array.isArray(el)) {
@@ -97,16 +111,16 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
       return el.map(e => stringifyJSXElement(e, false)).join("");
     }
 
-    const t = el.map(e => stringifyJSXElement(e, true)).join(createDirective("array-element-separator"));
-    const prefix = createDirective("start-array");
-    const suffix = createDirective("end-array");
+    const t = el.map(e => stringifyJSXElement(e, true)).join(createSSRDirective("array-element-separator"));
+    const prefix = createSSRDirective("start-array");
+    const suffix = createSSRDirective("end-array");
     return `${prefix}${t}${suffix}`;
   }
   else if (el === null) {
-    return isInsideDynamic ? createDirective("null", null) : "";
+    return isInsideDynamic ? createSSRDirective("null", null) : "";
   }
   else if (el === undefined) {
-    return isInsideDynamic ? createDirective("undefined", null) : "";
+    return isInsideDynamic ? createSSRDirective("undefined", null) : "";
   }
   else if (el instanceof Node) {
     throw new Error("Unsupported Node");
@@ -120,6 +134,7 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
 export function renderToString(el: JSXElement): string {
   signals.clear();
   stores.clear();
+  global_directive_data_array.length = 0;
 
   global_h_config = "ssr";
   try {
@@ -129,15 +144,17 @@ export function renderToString(el: JSXElement): string {
     for (const [id, { obj }] of stores.entries()) {
       ser_stores.push([id, obj]);
     }
-    const stores_data = createDirective("stores", ser_stores);
+    const stores_data = createSSRDirective("stores", ser_stores);
 
     const ser_signals: [string, any][] = [];
     for (const [id, { currentValue }] of signals.entries()) {
       ser_signals.push([id, currentValue]);
     }
-    const signals_data = createDirective("signals", ser_signals);
+    const signals_data = createSSRDirective("signals", ser_signals);
 
-    return `${stores_data}${signals_data}${t}`;
+    const directives_data = createSSRDirective("directives-data", global_directive_data_array, true);
+
+    return `${directives_data}${stores_data}${signals_data}${t}`;
   }
   catch(e) {
     throw e;
@@ -258,10 +275,10 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
         const [class_list, found_reads] = listenForStoreReads(tv);
         t += `class="${renderClasslist(class_list).join(" ")}" `;
         if (found_reads.length > 0) {
-          t += `lentjs:class="${escapeHtml(serialize({
+          t += `lentjs:class="${sharedSSRSerialize({
             found_reads,
             update: tv,
-          }))}" `;
+          })}" `;
         }
       }
       else if(tv)
@@ -289,7 +306,7 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
       const tv = v as Attributes[`on:${string}`];
       const tk = k.replace(/^on:/, "");
       if (tv !== undefined)
-        t += `lentjs:on:${tk}="${escapeHtml(serialize(tv))}" `;
+        t += `lentjs:on:${tk}="${sharedSSRSerialize(tv)}" `;
     }
     else if (k.startsWith("attr:")) {
       const tv = v as Attributes[`attr:${string}`];
@@ -301,10 +318,10 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
         let found_reads: StoreRead[];
         [val, found_reads] = listenForStoreReads(tv);
         if (found_reads.length > 0) {
-          t += `lentjs:attr:${tk}="${escapeHtml(serialize({
+          t += `lentjs:attr:${tk}="${sharedSSRSerialize({
             callback: tv,
             found_reads,
-          }))}" `;
+          })}" `;
         }
       }
       else {
@@ -325,10 +342,10 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
       if (isFunction(tv)) {
         const [_val, found_reads] = listenForStoreReads(tv);
         if (found_reads.length > 0) {
-          t += `lentjs:prop:${tk}="${escapeHtml(serialize({
+          t += `lentjs:prop:${tk}="${sharedSSRSerialize({
             callback: tv,
             found_reads,
-          }))}" `;
+          })}" `;
         }
       }
 
@@ -343,8 +360,6 @@ function createSSRElement(element: string, props: Attributes): SSRElement {
   t += `</${element}>`;
   return { [SSRElementMarker]: true, t };
 }
-
-let global_h_config: "ssr" | "dom" = "dom";
 
 const hComponent = register(<P>(component: ComponentFn<P>, props: P): JSXElement => {
   return untrack(() => component(props));

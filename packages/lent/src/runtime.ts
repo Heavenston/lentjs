@@ -3,10 +3,12 @@ import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
 import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "./store";
 import { assert, microtaskDebounce } from "./utils";
 
-const REMOVE_DIRECTIVES = true;
+const REMOVE_DIRECTIVES = false;
 
 export const DIRECTIVE_PREFIX = "lentjs";
 export type Directives = {
+  "directives-data": unknown[],
+
   signals: [string, any][],
   stores: [string, any][],
 
@@ -33,12 +35,17 @@ type StateStackElement =
   | { kind: "state", state: JSXState }
 ;
 type RunCtx = {
+  directivesData: readonly unknown[] | null,
   nodesToRemove: ChildNode[],
   dynamicStateStack: StateStackElement[],
 };
 
 function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Comment, parent: Node, d: D) {
   switch (d.name) {
+  case "directives-data":
+    ctx.nodesToRemove.push(directiveNode);
+    ctx.directivesData = d.data;
+    break;
   case "signals": {
     ctx.nodesToRemove.push(directiveNode);
     for (const [id, val] of d.data) {
@@ -158,16 +165,16 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
   }
 }
 
-function handleHTMLElement(el: HTMLElement) {
+function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
   for (const t of el.attributes) {
     if (t.name.startsWith("lentjs:on:")) {
       const event = t.name.replace(/^lentjs:on:/, "");
-      el.addEventListener(event, deserialize(t.value) as EventHandler<Event>);
+      el.addEventListener(event, ctx.directivesData![parseInt(t.value)] as EventHandler<Event>);
     }
 
     if (t.name.startsWith("lentjs:attr:")) {
       const attr = t.name.replace(/^lentjs:attr:/, "");
-      let { callback, found_reads } = deserialize(t.value) as { found_reads: StoreRead[], callback: () => any };
+      let { callback, found_reads } = ctx.directivesData![parseInt(t.value)] as { found_reads: StoreRead[], callback: () => any };
 
       const hh = microtaskDebounce(() => {
         const [new_value, new_found_reads] = listenForStoreReads(() => callback());
@@ -178,7 +185,7 @@ function handleHTMLElement(el: HTMLElement) {
     }
 
     if (t.name.startsWith("lentjs:class")) {
-      let { update, found_reads } = deserialize(t.value) as { found_reads: StoreRead[], update: () => ClassList };
+      let { update, found_reads } = ctx.directivesData![parseInt(t.value)] as { found_reads: StoreRead[], update: () => ClassList };
 
       const hh = microtaskDebounce(() => {
         const [new_value, new_found_reads] = listenForStoreReads(() => update());
@@ -191,7 +198,7 @@ function handleHTMLElement(el: HTMLElement) {
 
     if (t.name.startsWith("lentjs:prop")) {
       const prop = t.name.replace(/^lentjs:prop:/, "");
-      let { callback, found_reads } = deserialize(t.value) as { found_reads: StoreRead[], callback: () => any };
+      let { callback, found_reads } = ctx.directivesData![parseInt(t.value)] as { found_reads: StoreRead[], callback: () => any };
 
       const hh = microtaskDebounce(() => {
         const [new_value, new_found_reads] = listenForStoreReads(() => callback());
@@ -206,14 +213,21 @@ function handleHTMLElement(el: HTMLElement) {
 
 function domVisitor(ctx: RunCtx, node: ChildNode) {
   if (node instanceof HTMLElement)
-    handleHTMLElement(node);
+    handleHTMLElement(ctx, node);
 
   node.childNodes.forEach(n => {
     if (n instanceof Comment) {
       const parts = n.textContent.split(" ", 2);
       if (parts[0] !== DIRECTIVE_PREFIX) return;
       const parts_rest = n.textContent.replace(/^([^ ]+ +){2}/, "");
-      const directive = { name: parts[1], data: parts_rest !== n.textContent ? deserialize(parts_rest) : null } as unknown as Directive;
+      const directive = {
+        name: parts[1],
+          data: parts_rest !== n.textContent
+          ? /^[0-9]+$/.test(parts_rest)
+          ? ctx.directivesData![parseInt(parts_rest)]
+          : deserialize(parts_rest)
+          : null,
+      } as unknown as Directive;
       handleDirective(ctx, n, node, directive);
       return;
     }
@@ -222,13 +236,18 @@ function domVisitor(ctx: RunCtx, node: ChildNode) {
       ctx.dynamicStateStack.push({ kind: "state", state: { kind: "singular", element: n, node: n } })
     }
 
-    domVisitor({ nodesToRemove: ctx.nodesToRemove, dynamicStateStack: [] }, n);
+    domVisitor({
+      directivesData: ctx.directivesData,
+      nodesToRemove: ctx.nodesToRemove,
+      dynamicStateStack: [],
+    }, n);
   });
 }
 
 export function startRuntime(rootElement: HTMLElement) {
   console.time("startRuntime");
   const ctx: RunCtx = {
+    directivesData: null,
     nodesToRemove: [],
     dynamicStateStack: [],
   };
