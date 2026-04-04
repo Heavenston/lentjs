@@ -135,8 +135,8 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, prev
     };
   }
   else {
-    const dynamicStartAnchor = new Comment("lentjs start-dynamic-anchor");
-    const dynamicEndAnchor = new Comment("lentjs end-dynamic-anchor");
+    const dynamicStartAnchor = new Comment();
+    const dynamicEndAnchor = new Comment();
     parent.insertBefore(dynamicStartAnchor, anchorElement);
     parent.insertBefore(dynamicEndAnchor, anchorElement);
 

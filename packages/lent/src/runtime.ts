@@ -41,7 +41,7 @@ type StateStackElement =
 ;
 type RunCtx = {
   directivesData: readonly unknown[] | null,
-  nodesToRemove: ChildNode[],
+  nodesToRemove: (ChildNode | Attr)[],
   dynamicStateStack: StateStackElement[],
 };
 
@@ -70,7 +70,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
   }
   case "dyn": {
     if (REMOVE_DIRECTIVES)
-      directiveNode.textContent = `${DIRECTIVE_PREFIX} start-dynamic`;
+      directiveNode.textContent = null;
 
     const { storeReads, update } = d.data;
 
@@ -85,7 +85,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
   }
   case "dyn/": {
     if (REMOVE_DIRECTIVES)
-      directiveNode.textContent = `${DIRECTIVE_PREFIX} end-dynamic`;
+      directiveNode.textContent = null;
 
     const state = ctx.dynamicStateStack.pop();
     assert(state?.kind === "state");
@@ -172,13 +172,16 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
 
 function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
   for (const t of el.attributes) {
+    if (t.name.startsWith(DIRECTIVE_PREFIX))
+      ctx.nodesToRemove.push(t);
+
     if (t.name.startsWith(`${DIRECTIVE_PREFIX}:on:`)) {
-      const event = t.name.slice(0, DIRECTIVE_PREFIX.length + 4);
+      const event = t.name.slice(DIRECTIVE_PREFIX.length + 4);
       el.addEventListener(event, ctx.directivesData![parseInt(t.value)] as EventHandler<Event>);
     }
 
     if (t.name.startsWith(`${DIRECTIVE_PREFIX}:attr:`)) {
-      const attr = t.name.slice(0, DIRECTIVE_PREFIX.length + 6);
+      const attr = t.name.slice(DIRECTIVE_PREFIX.length + 6);
       let [storeReads, callback] = ctx.directivesData![parseInt(t.value)] as DynamicValueData<AttributeValue>;
 
       const hh = microtaskDebounce(() => {
@@ -202,7 +205,7 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
     }
 
     if (t.name.startsWith(`${DIRECTIVE_PREFIX}:prop:`)) {
-      const prop = t.name.slice(0, DIRECTIVE_PREFIX.length + 6);
+      const prop = t.name.slice(DIRECTIVE_PREFIX.length + 6);
       let [storeReads, callback] = ctx.directivesData![parseInt(t.value)] as DynamicValueData<JSXElement>;
 
       const hh = microtaskDebounce(() => {
@@ -258,9 +261,14 @@ export function startRuntime(rootElement: HTMLElement) {
   };
   domVisitor(ctx, rootElement);
   assert(ctx.dynamicStateStack.length === 0);
+  console.log(ctx.nodesToRemove.length, "total directive nodes and attributes found");
   if (REMOVE_DIRECTIVES)
-    for (const n of ctx.nodesToRemove)
-      n.remove();
+    for (const n of ctx.nodesToRemove) {
+      if (n instanceof Attr)
+        n.ownerElement?.removeAttributeNode(n);
+      else
+        n.remove();
+    }
   console.timeEnd("startRuntime");
 }
 
