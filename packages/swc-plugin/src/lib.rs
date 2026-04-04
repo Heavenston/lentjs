@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
-use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ Span, SyntaxContext, util::take::Take }, ecma::{
-    ast::{ArrayLit, ArrowExpr, AssignExpr, BlockStmt, CallExpr, Expr, ExprOrSpread, ExprStmt, Id, Ident, MemberExpr, MemberProp, Null, Pat, Program, ReturnStmt, VarDecl, VarDeclarator},
-    transforms::testing::test_inline,
-    visit::{ VisitMut, VisitMutWith, visit_mut_pass },
+use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ Span, util::take::Take }, ecma::{
+    ast::{ArrowExpr, CallExpr, Expr, ExprOrSpread, Id, Ident, MemberExpr, MemberProp, Null, Pat, Program, VarDecl, VarDeclarator},
+    visit::{ VisitMut, VisitMutWith },
 }};
 use swc_core::plugin::{plugin_transform, proxies::TransformPluginProgramMetadata};
+
+const REGISTER_FN_NAME: &str = "register";
 
 #[derive(Default)]
 struct FindCapturedValues {
@@ -92,12 +93,7 @@ impl VisitMut for TransformVisitor {
 
     fn visit_mut_module_items(&mut self, items: &mut Vec<swc_core::ecma::ast::ModuleItem>) {
         items.visit_mut_children_with(self);
-        let foreach_closure_ident = items.iter()
-            .filter_map(|i| i.as_stmt())
-            .filter_map(|i| i.as_decl())
-            .filter_map(|i| i.as_fn_decl())
-            .map(|i| &i.ident)
-            .find(|ident| ident.sym == "foreachClosure");
+        let foreach_closure_ident = Ident::new_no_ctxt(Atom::new(REGISTER_FN_NAME), Span::dummy());
         let insert_point = items.iter().enumerate().find(|p| p.1.is_stmt()).map(|(idx, _)| idx).unwrap_or(items.len());
 
         if self.hoisted_closured.is_empty() {
@@ -107,22 +103,18 @@ impl VisitMut for TransformVisitor {
         items.insert(insert_point, Box::new(VarDecl {
             kind: swc_core::ecma::ast::VarDeclKind::Const,
             decls: self.hoisted_closured.drain(..).map(|h| {
-                let init: Expr = if let Some(foreach_closure_ident) = foreach_closure_ident.cloned() {
-                    CallExpr {
-                        callee: swc_core::ecma::ast::Callee::Expr(foreach_closure_ident.into()),
-                        args: vec![
-                            ExprOrSpread::from(Box::new(h.code.into())),
-                            ExprOrSpread::from(Box::new(swc_core::ecma::ast::Str {
-                                span: Span::dummy(),
-                                value: Wtf8Atom::new("____RANDOM_ID"),
-                                raw: None,
-                            }.into())),
-                        ],
-                        ..Default::default()
-                    }.into()
-                } else {
-                    h.code.into()
-                };
+                let init: Expr = CallExpr {
+                    callee: swc_core::ecma::ast::Callee::Expr(foreach_closure_ident.clone().into()),
+                    args: vec![
+                        ExprOrSpread::from(Box::new(h.code.into())),
+                        ExprOrSpread::from(Box::new(swc_core::ecma::ast::Str {
+                            span: Span::dummy(),
+                            value: Wtf8Atom::new("____RANDOM_ID"),
+                            raw: None,
+                        }.into())),
+                    ],
+                    ..Default::default()
+                }.into();
 
                 VarDeclarator {
                     span: Default::default(),

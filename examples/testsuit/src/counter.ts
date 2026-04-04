@@ -1,14 +1,4 @@
 import { h, type ComponentFn, register, createSignal } from "@lentjs/core";
-import { isFunction } from "@lentjs/core/src/utils";
-
-function foreachClosure(f: unknown, id: string) {
-  if (isFunction(f)) {
-    return register(f, id);
-  }
-  else {
-    return f;
-  }
-}
 
 type CounterButtonProps = {
   min: () => number,
