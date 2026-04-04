@@ -188,145 +188,143 @@ function patchElementArray(parent: Node, anchorElement: ChildNode | null, previo
   return newState;
 }
 
-// FIXME: This was supposed to be a stepping stone for an efficient algorithm
-// but i lost interest in this so we are stuck with this one
-export function patchElementArrayNew(parent: Node, anchorElement: ChildNode | null, previousState_: JSXStateSingular | JSXStateArray, child: JSXElement[]): JSXStateArray {
-  const previousState: JSXStateArray = previousState_.kind !== "array"
-    ? { kind: "array", element: child, states: [previousState_] }
-    : previousState_;
-
-  type AddOperation = { kind: "add", element: number, anchor: number | null };
-  type RemoveOperation = { kind: "remove", useless?: true, element: JSXElement, state: JSXState, anchor: ChildNode | null };
-  type Operation = AddOperation | RemoveOperation;
-  const addOperations = Array<AddOperation>();
-  const removeOperations = Array<RemoveOperation>();
-
-  function anchorToJSXElement(val: number | ChildNode | null): JSXElement {
-    return typeof val === "number"
-      ? child[val]
-      : val;
+// Helper to find the very last DOM node of a JSXState block
+function getLastNodeOfState(state: JSXState): ChildNode | null {
+  switch (state.kind) {
+    case "singular":
+      return state.node;
+    case "array":
+      for (let i = state.states.length - 1; i >= 0; i--) {
+        const potentialAnchor = getLastNodeOfState(state.states[i]!);
+        if (potentialAnchor !== null) return potentialAnchor;
+      }
+      return null;
+    case "dynamic":
+      return state.endAnchor;
   }
-  function compareAnchor(a: number | ChildNode | null, b: number | ChildNode | null): boolean {
-    if (a === null && b === null)
-      return true;
-    if (typeof a === "number" && typeof b === "number")
-      return a === b;
-    return compareEl(anchorToJSXElement(a), anchorToJSXElement(b));
-  }
+}
 
-  function logOp(op: Operation) {
-    switch (op.kind) {
-    case "add":
-      console.log("add", op.element, child[op.element], "anchor", op.anchor, anchorToJSXElement(op.anchor));
+// Helper to safely move an entire block of state nodes before a given anchor
+function moveStateNodes(
+  parent: Node,
+  state: JSXState,
+  anchorElement: ChildNode | null,
+) {
+  switch (state.kind) {
+    case "singular":
+      if (state.node) {
+        parent.insertBefore(state.node, anchorElement);
+      }
       break;
-    case "remove":
-      console.log("sub", op.element, "anchor", anchorToJSXElement(op.anchor), op.useless ? "is useless" : " ");
+    case "array":
+      for (const s of state.states) {
+        moveStateNodes(parent, s, anchorElement);
+      }
       break;
-    }
-  }
-  function logOperations() {
-    console.log("------");
-    removeOperations.forEach(logOp);
-    addOperations.forEach(logOp);
-  }
-
-  // console.log("#".repeat(200));
-
-  let currentRemoveAnchor: ChildNode | null = null;
-  for (let i = previousState.states.length-1; i>=0; i--) {
-    const state = previousState.states[i]!;
-    removeOperations.push({ kind: "remove", state, element: state.element, anchor: currentRemoveAnchor })
-    currentRemoveAnchor = getFirstAnchorElement(state);
-  }
-  let currentInsertAnchor: number | null = null;
-  for (let i = child.length-1; i>=0; i--) {
-    addOperations.push({ kind: "add", element: i, anchor: currentInsertAnchor })
-    currentInsertAnchor = i;
-  }
-
-  // console.log("STEP1");
-  // logOperations();
-  const childsAsAnchors = new Map<number, ChildNode | null>;
-  const newStates: (JSXState | null)[] = child.map(() => null);
-
-  for (let i = 0; i < removeOperations.length; i++) {
-    const op1 = removeOperations[i]!;
-    // console.log("--------------");
-    // console.log("Going through:");
-    // logOp(op1);
-    let anchor: number | ChildNode | null = op1.anchor;
-    // console.log(":", anchor);
-
-    for (let j = i+1; j < removeOperations.length; j++) {
-      const op2 = removeOperations[j]!;
-      // logOp(op2);
-      if (compareEl(anchorToJSXElement(anchor), op2.element)) {
-        anchor = op2.anchor;
-        // console.log("new anchor(rem):", anchor);
-      }
-    }
-    for (let j = 0; j < addOperations.length; j++) {
-      const op2 = addOperations[j]!;
-      // logOp(op2);
-      if (compareEl(child[op2.element], op1.element)) {
-        if (compareAnchor(op2.anchor, anchor)) {
-          // console.log("Add remove with same anchor -> removing");
-          childsAsAnchors.set(op2.element, getFirstAnchorElement(op1.state));
-          newStates[op2.element] = op1.state;
-
-          removeOperations.splice(i, 1);
-          addOperations.splice(j, 1);
-          i--;
+    case "dynamic":
+      if (state.startAnchor && state.endAnchor) {
+        let curr: ChildNode | null = state.startAnchor;
+        // We collect the nodes into an array before moving to ensure 
+        // that modifying the DOM doesn't break our nextSibling iterations
+        const nodes: ChildNode[] = [];
+        while (curr) {
+          nodes.push(curr);
+          if (curr === state.endAnchor) break;
+          curr = curr.nextSibling;
         }
-        else {
-          // console.log("Add remove different anchor -> useless remove")
-          op1.useless = true;
+        for (const node of nodes) {
+          parent.insertBefore(node, anchorElement);
         }
-        break;
       }
-      if (compareAnchor(anchor, op2.anchor)) {
-        anchor = op2.element;
-        // console.log("new anchor(add):", anchor, "->", anchorToJSXElement(anchor));
+      break;
+  }
+}
+
+export function patchElementArrayNew(
+  parent: Node,
+  anchorElement: ChildNode | null,
+  previousState_: JSXStateSingular | JSXStateArray,
+  child: JSXElement[],
+): JSXStateArray {
+  // Normalize previous state into an array of states
+  const oldStates =
+    previousState_.kind === "array" ? previousState_.states : [previousState_];
+
+  const newStates: JSXState[] = new Array(child.length);
+  const usedOldStates = new Array(oldStates.length).fill(false);
+
+  // Pass 1: Find matched states to reuse them
+  for (let i = 0; i < child.length; i++) {
+    const newEl = child[i]!;
+    let matched = false;
+
+    // Optimistic fast-path: try matching the exact index first
+    if (
+      i < oldStates.length &&
+      !usedOldStates[i] &&
+      compareEl(oldStates[i]!.element, newEl)
+    ) {
+      newStates[i] = oldStates[i]!;
+      usedOldStates[i] = true;
+      matched = true;
+    }
+
+    // Search elsewhere if not found at the exact index (handles shifting)
+    if (!matched) {
+      for (let j = 0; j < oldStates.length; j++) {
+        if (!usedOldStates[j] && compareEl(oldStates[j]!.element, newEl)) {
+          newStates[i] = oldStates[j]!;
+          usedOldStates[j] = true;
+          break;
+        }
       }
     }
   }
 
-  let currentChildAnchor: ChildNode | null = null;
-  for (let i = child.length-1; i >= 0; i--) {
-    const anchor = childsAsAnchors.get(i) ?? null;
-    currentChildAnchor = anchor ?? currentChildAnchor;
-    childsAsAnchors.set(i, anchor);
-  }
-
-  // console.log("STEP2");
-  // logOperations();
-  // debugger;
-
-  for (const op of removeOperations) {
-    if (!op.useless)
-      removeStateNodes(op.state);
-  }
-  for (const op of addOperations) {
-    let anchor: ChildNode | null;
-    if (typeof op.anchor === "number") {
-      assert(childsAsAnchors.has(op.anchor));
-      anchor = childsAsAnchors.get(op.anchor)!;
+  // Pass 2: Remove completely unused old states from the DOM
+  for (let j = 0; j < oldStates.length; j++) {
+    if (!usedOldStates[j]) {
+      removeStateNodes(oldStates[j]!);
     }
-    else {
-      anchor = op.anchor;
-    }
-    const ns = patchElement(parent, anchor ?? anchorElement, null, child[op.element]);
-    newStates[op.element] = ns;
-    childsAsAnchors.set(op.element, getFirstAnchorElement(ns) ?? anchor);
   }
 
-  // console.log("final:", newStates);
-  assert(newStates.every(p => p !== null));
+  // Pass 3: Mount, move, and patch new states iterating backwards
+  let currentAnchor = anchorElement;
+  for (let i = child.length - 1; i >= 0; i--) {
+    const newEl = child[i]!;
+    const matchedOldState = newStates[i];
+
+    if (matchedOldState) {
+      // Patch the existing state (this delegates string updates to text nodes, etc.)
+      const patchedState = patchElement(
+        parent,
+        currentAnchor,
+        matchedOldState,
+        newEl,
+      );
+      newStates[i] = patchedState;
+
+      // Check if DOM nodes are physically out of place.
+      // If the node immediately after our patched block isn't our intended 
+      // anchor, we need to physically move it.
+      const lastNode = getLastNodeOfState(patchedState);
+      if (lastNode && lastNode.nextSibling !== currentAnchor) {
+        moveStateNodes(parent, patchedState, currentAnchor);
+      }
+
+      currentAnchor = getFirstAnchorElement(patchedState) ?? currentAnchor;
+    } else {
+      // No structural match was found; create a new element entirely
+      const patchedState = patchElement(parent, currentAnchor, null, newEl);
+      newStates[i] = patchedState;
+      currentAnchor = getFirstAnchorElement(patchedState) ?? currentAnchor;
+    }
+  }
 
   return {
     kind: "array",
     element: child,
-    states: newStates as any,
+    states: newStates as JSXState[],
   };
 }
 
