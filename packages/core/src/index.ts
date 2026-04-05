@@ -188,10 +188,12 @@ function createSSRElement(element: string, props: object): SSRElement {
     if (attrHandler === null) continue;
     if (attrHandler.managedDynamic && isFunction(propVal)) {
       const [val, storeReads] = listenForStoreReads(propVal);
-      dynamicAttributesData.push([storeReads, propName, propVal]);
+      attrHandler.setOnSSRElement(builder, propName, val);
+
+      if (storeReads.length > 0)
+        dynamicAttributesData.push([storeReads, propName, propVal]);
       if (attrHandler.forceResume)
         attributesResumeData.push([propName, val]);
-      attrHandler.setOnSSRElement(builder, propName, val);
     }
     else {
       if (attrHandler.forceResume)
