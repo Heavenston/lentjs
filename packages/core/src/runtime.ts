@@ -79,9 +79,6 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     break;
   }
   case "dyn": {
-    if (REMOVE_DIRECTIVES)
-      directiveNode.textContent = null;
-
     const { storeReads, update } = d.data;
 
     ctx.dynamicStateStack.push({
@@ -94,9 +91,6 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     break;
   }
   case "dyn/": {
-    if (REMOVE_DIRECTIVES)
-      directiveNode.textContent = null;
-
     const stateFromStack = ctx.dynamicStateStack.pop();
     assert(stateFromStack?.kind === "state");
     const dynamic = ctx.dynamicStateStack.pop();

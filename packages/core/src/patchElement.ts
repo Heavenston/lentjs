@@ -76,8 +76,6 @@ function removeStateNodes(state: JSXState) {
     state.states.forEach(removeStateNodes);
     break;
   case "dynamic":
-    state.startAnchor?.remove();
-    state.endAnchor?.remove();
     removeStateNodes(state.unsubscribe());
     break;
   }
@@ -135,8 +133,8 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, prev
     };
   }
   else {
-    const dynamicStartAnchor = new Comment();
-    const dynamicEndAnchor = new Comment();
+    const dynamicStartAnchor = new Comment("runtime-dyn-start");
+    const dynamicEndAnchor = new Comment("runtime-dyn-end");
     parent.insertBefore(dynamicStartAnchor, anchorElement);
     parent.insertBefore(dynamicEndAnchor, anchorElement);
 
@@ -207,6 +205,7 @@ export function patchElementArrayNew(
     currentAnchor = getFirstElement(newState) ?? currentAnchor;
     states.push(newState);
   }
+  states.reverse();
 
   for (const old of toKeepMap.values()) {
     removeStateNodes(old);
@@ -225,6 +224,9 @@ export function patchElement(parent: Node, anchorElement: ChildNode | null, prev
   assert(anchorElement === null || anchorElement.parentNode === parent);
   assert(!isSSRElement(child));
 
+  if (previousState?.kind === "dynamic" && previousState.element === child) {
+    return previousState;
+  }
   if (previousState?.kind === "dynamic") {
     return patchElement(parent, anchorElement, previousState.unsubscribe(), child);
   }
