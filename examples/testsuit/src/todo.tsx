@@ -59,21 +59,20 @@ const Todo: ComponentFn<{}> = register(() => {
       state.input_text = "";
     }}>
       <input
-        prop:value={() => state.input_text}
-        attr:value={state.input_text}
+        value={() => state.input_text}
         on:input={e => {
           const el = e.currentTarget;
           if (!(el instanceof HTMLInputElement)) return;
           state.input_text = el.value;
         }}
       />
-      <button attr:disabled={() => !state.input_text.trim()}>Create Task</button>
+      <button disabled={() => !state.input_text.trim()}>Create Task</button>
     </form>
     <button on:click={() => {
       const action = areAllDone();
       for (const task of state.tasks)
         task.done = !action;
-    }}>
+    }} disabled={() => state.tasks.length <= 0}>
       Mark all as{() => areAllDone() ? " not" : null} done
     </button>
     <RefFor<TaskData>

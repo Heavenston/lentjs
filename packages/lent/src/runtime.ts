@@ -1,4 +1,4 @@
-import { deserialize, renderClasslist, type AttributeValue, type ClassList, type EventHandler, type JSXElement } from ".";
+import { deserialize, type JSXElement } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
 import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "./store";

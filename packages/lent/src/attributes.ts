@@ -7,6 +7,7 @@ export type Attributes = {
   class?: ClassList | (() => ClassList),
   value?: string | (() => string),
   checked?: boolean | (() => boolean),
+  disabled?: boolean | (() => boolean),
 } & {
   [key in `on:${string}`]?: EventHandler<Event>
 } & {
@@ -102,19 +103,22 @@ const handlers: AttributeHandler<any>[] = [
   }),
 
   handler<unknown>({
-    filter: "checked",
+    filter: /^(?:checked|value|disabled)$/,
     managedDynamic: true,
     forceResume: false,
-    setOnHTMLElement(element, _, value) {
-      if ("checked" in element)
-        element.checked = value;
+    setOnHTMLElement(element, propName, value) {
+      if (propName in element)
+        // @ts-ignore
+        element[propName] = value;
+      else
+        console.warn("Cannot set property:", propName, "is not in", element)
     },
-    setOnSSRElement(builder, _, value) {
+    setOnSSRElement(builder, propName, value) {
       if (value === true) {
-        builder.appendAttribute("checked");
+        builder.appendAttribute(propName);
       }
       else if (value != null && value !== false) {
-        builder.appendAttribute("checked", value.toString());
+        builder.appendAttribute(propName, value.toString());
       }
     },
   }),

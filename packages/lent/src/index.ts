@@ -10,12 +10,12 @@ export { type SSRElement, isSSRElement } from "./ssr-element";
 
 import { register, serialize } from "./serialize";
 import { isFunction, microtaskDebounce } from "./utils";
-import { listenForStoreReads, signals, stores, subscribeToStoreReads, untrack, type StoreRead } from "./store";
-import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type DynamicValueData, type MarkerDirectiveName } from "./runtime";
+import { listenForStoreReads, signals, stores, subscribeToStoreReads, untrack } from "./store";
+import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName } from "./runtime";
 import { escapeHtml } from "./escape-html";
-import { getHandlerForAttribute, type Attributes, type AttributeValue } from "./attributes";
+import { getHandlerForAttribute, type Attributes } from "./attributes";
 import { global_directive_data_array, sharedSSRSerialize } from "./shared-globals";
-import { type SSRElement, isSSRElement, newSSRElement, SSRElementBuilder } from "./ssr-element";
+import { type SSRElement, isSSRElement, SSRElementBuilder } from "./ssr-element";
 import { patchElement } from "./patchElement";
 
 register(untrack, "__lentjs_untrack");
