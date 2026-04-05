@@ -1,7 +1,11 @@
+///! Code in this module is largely AI-Generated but with a few tweaks
+
 use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ Span, util::take::Take }, ecma::{
     ast::{Bool, CallExpr, Callee, Expr, ExprOrSpread, Ident, ImportDecl, ImportNamedSpecifier, ImportSpecifier, JSXAttrName, JSXAttrOrSpread, JSXAttrValue, JSXElement, JSXElementChild, JSXElementName, JSXExpr, JSXFragment, JSXMemberExpr, JSXObject, KeyValueProp, Lit, MemberExpr, MemberProp, Module, ModuleDecl, ModuleItem, Null, ObjectLit, Prop, PropName, PropOrSpread, Str},
     visit::{ VisitMut, VisitMutWith },
 }};
+
+use crate::jsx_whitespace::collapse_jsx_whitespace;
 
 const IMPORT_SOURCE: &str = "@lentjs/core";
 const FACTORY_NAME: &str = "h";
@@ -225,18 +229,11 @@ impl JsxTransform {
             .filter_map(|child| {
                 let expr: Expr = match child {
                     JSXElementChild::JSXText(text) => {
-                        // React has complex whitespace collapsing rules
-                        // (collapse newlines + surrounding spaces, dedent, etc.).
-                        // We will use something simpler: just trim and skip
-                        // whitespace-only nodes.
-                        let s = text.value.to_string();
-                        let trimmed = s.trim();
-                        if trimmed.is_empty() {
-                            return None;
-                        }
+                        let Some(s) = collapse_jsx_whitespace(&text.value)
+                        else { return None; };
                         Expr::Lit(Lit::Str(Str {
                             span: text.span,
-                            value: trimmed.into(),
+                            value: s.into(),
                             raw: None,
                         }))
                     }

@@ -1,4 +1,5 @@
 mod jsx;
+mod jsx_whitespace;
 
 use std::collections::{HashMap, HashSet};
 
