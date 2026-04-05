@@ -34,9 +34,7 @@ export const lentjsCompilerPlugin = (): Plugin => {
               },
             transform: {
               react: {
-                importSource: "@lentjs/core",
-                development: false,
-                runtime: "automatic",
+                runtime: "preserve",
                 throwIfNamespace: false,
               },
             },

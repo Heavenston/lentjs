@@ -1,3 +1,5 @@
+mod jsx;
+
 use std::collections::{HashMap, HashSet};
 
 use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ Span, util::take::Take }, ecma::{
@@ -197,6 +199,7 @@ impl VisitMut for TransformVisitor {
 
 #[plugin_transform]
 pub fn process_transform(mut program: Program, _metadata: TransformPluginProgramMetadata) -> Program {
+    program.visit_mut_with(&mut jsx::JsxTransform::default());
     program.visit_mut_with(&mut TransformVisitor::default());
     program
 }
