@@ -5,20 +5,22 @@ export { RefFor } from "./ref-for";
 export { startRuntime } from "./runtime";
 export { serialize, deserialize, closure, bind, register } from "./serialize";
 export { Fragment } from "./fragment";
+export { type Attributes, type AttributeValue } from "./attributes";
+export { type SSRElement, isSSRElement } from "./ssr-element";
 
-import { immediateTrack } from "./task";
 import { register, serialize } from "./serialize";
-import { isFunction } from "./utils";
-import { listenForStoreReads, signals, stores, untrack, type StoreRead } from "./store";
-import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type DynamicValueData, type MarkerDirectiveName } from "./runtime";
-import { patchElement } from "./patchElement";
+import { isFunction, microtaskDebounce } from "./utils";
+import { listenForStoreReads, signals, stores, subscribeToStoreReads, untrack, type StoreRead } from "./store";
+import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type DynamicValueData, type MarkerDirectiveName } from "./runtime";
 import { escapeHtml } from "./escape-html";
+import { getHandlerForAttribute, type Attributes, type AttributeValue } from "./attributes";
+import { global_directive_data_array, sharedSSRSerialize } from "./shared-globals";
+import { type SSRElement, isSSRElement, newSSRElement, SSRElementBuilder } from "./ssr-element";
+import { patchElement } from "./patchElement";
 
 register(untrack, "__lentjs_untrack");
 register(h, "__lentjs_h");
 
-const SSRElementMarker = Symbol("ssr-element-marker");
-export type SSRElement = { [SSRElementMarker]: true, t: string };
 export type JSXElementString = number | string;
 export type JSXElementSingular = SSRElement | ChildNode | JSXElementString | null | undefined;
 export type JSXElementArray = JSXElement[];
@@ -31,30 +33,8 @@ export type ComponentFn<P> = (props: P) => JSXElement;
 
 export type EventHandler<E> = (event: E) => unknown;
 
-export type AttributeValue = string | boolean | number | undefined;
-export type Attributes = {
-  children?: JSXElement,
-  class?: ClassList | (() => ClassList),
-  value?: string | (() => string),
-  checked?: boolean | (() => boolean),
-} & {
-  [key in `on:${string}`]?: EventHandler<Event>
-} & {
-  [key in `attr:${string}`]?: AttributeValue | (() => AttributeValue)
-} & {
-  [key in `prop:${string}`]?: () => any
-};
-
-export function isSSRElement(t: unknown): t is SSRElement {
-  return typeof t === "object" && t !== null && SSRElementMarker in t && t[SSRElementMarker] === true;
-}
-
 export function isJSXElementString(t: unknown): t is JSXElementString {
   return typeof t === "string" || typeof t === "number";
-}
-
-function addChild(parent: Node, child: JSXElement) {
-  patchElement(parent, null, null, child);
 }
 
 export function renderClasslist(list: ClassList): string[] {
@@ -69,13 +49,6 @@ export function renderClasslist(list: ClassList): string[] {
 }
 
 let global_h_config: "ssr" | "dom" = "dom";
-const global_directive_data_array: unknown[] = [];
-
-function sharedSSRSerialize(value: unknown): number {
-  const idx = global_directive_data_array.length;
-  global_directive_data_array.push(value);
-  return idx;
-}
 
 function createSSRDirective<K extends MarkerDirectiveName>(name: K): string;
 function createSSRDirective<K extends DirectiveName>(name: K, arg: Directives[K], embed?: boolean): string;
@@ -165,192 +138,71 @@ export function renderToString(el: ComponentFn<{}>): string {
   }
 }
 
-export function setAttribute(element: HTMLElement, name: string, value: AttributeValue) {
-  if (value !== undefined && value !== false)
-    element.setAttribute(name, value.toString());
-  else
-    element.removeAttribute(name);
-}
-
-function createHTMLElement(element: string, props: Attributes): HTMLElement {
+function createHTMLElement(element: string, props: object): HTMLElement {
   const el = document.createElement(element);
-  for (const [k, v] of Object.entries(props)) {
-    if (k === "children") {
-      const tv = v as Attributes["children"];
-      addChild(el, tv);
+  for (const [propName, propVal] of Object.entries(props)) {
+    if (propName === "children") {
+      patchElement(el, null, null, propVal);
+      continue;
     }
-    else if (k === "class") {
-      const tv = v as Attributes["class"];
-      if (typeof tv === "string")
-        el.className = tv;
-      else if (typeof tv === "function") {
-        immediateTrack(tv, (class_list) => {
-          el.className = "";
-          el.classList.add(...renderClasslist(class_list));
-        });
-      }
-      else if(tv)
-        el.classList.add(...renderClasslist(tv));
-    }
-    else if (k === "value") {
-      const tv = v as Attributes["value"];
-      if (isFunction(tv)) {
-        immediateTrack(tv, (value) => {
-          // @ts-ignore
-          el.value = value;
-        });
-      }
-      else {
-        // @ts-ignore
-        el.value = tv;
-      }
-    }
-    else if (k === "checked") {
-      const tv = v as Attributes["checked"];
-      if (isFunction(tv)) {
-        immediateTrack(tv, (checked) => {
-          // @ts-ignore
-          el.checked = checked;
-        });
-      }
-      else {
-        // @ts-ignore
-        el.checked = tv;
-      }
-    }
-    else if (k.startsWith("on:")) {
-      const tv = v as Attributes[`on:${string}`];
-      const tk = k.replace(/^on:/, "");
-      if (tv !== undefined)
-        el.addEventListener(tk, tv);
-      else
-        el.removeAttribute(tk);
-    }
-    else if (k.startsWith("attr:")) {
-      const tv = v as Attributes[`attr:${string}`];
-      const tk = k.replace(/^attr:/, "");
 
-      if (isFunction(tv)) {
-        immediateTrack(tv, (value) => {
-          setAttribute(el, tk, value);
-        });
-      }
-      else {
-        setAttribute(el, tk, tv);
-      }
-    }
-    else if (k.startsWith("prop:")) {
-      const tv = v as Attributes[`prop:${string}`];
-      const tk = k.replace(/^prop:/, "");
+    const attrHandler = getHandlerForAttribute(propName);
+    if (attrHandler === null) continue;
+    if (attrHandler.managedDynamic && isFunction(propVal)) {
+      const [val, storeReads] = listenForStoreReads(propVal);
 
-      if (isFunction(tv)) {
-        immediateTrack(tv, (value) => {
-          // @ts-ignore
-          el[tk] = value;
-        });
-      }
-      else {
-        // @ts-ignore
-        el[tk] = value;
-      }
+      attrHandler.setOnHTMLElement(el, propName, val);
+
+      const hh = microtaskDebounce(() => {
+        const [newVal, newStoreReads] = listenForStoreReads(propVal);
+        attrHandler.setOnHTMLElement(el, propName, newVal);
+        subscribeToStoreReads(hh, newStoreReads, { once: true });
+      });
+
+      subscribeToStoreReads(hh, storeReads, { once: true });
     }
     else {
-      throw new Error(`Unsupported attribute ${k}`);
+      attrHandler.setOnHTMLElement(el, propName, propVal);
     }
   }
   return el;
 }
-function createSSRElement(element: string, props: Attributes): SSRElement {
-  let t = `<${element} `;
-  let children: Attributes["children"] = null;
-  for (const [k, v] of Object.entries(props)) {
-    if (k === "children") {
-      const tv = v as Attributes["children"];
-      children = tv;
-    }
-    else if (k === "class") {
-      const tv = v as Attributes["class"];
-      if (typeof tv === "string")
-        t += `class="${tv}" `;
-      else if (typeof tv === "function") {
-        const [class_list, found_reads] = listenForStoreReads(tv);
-        t += `class="${renderClasslist(class_list).join(" ")}" `;
-        if (found_reads.length > 0) {
-          t += `${DIRECTIVE_PREFIX}:class="${sharedSSRSerialize([found_reads, tv] satisfies DynamicValueData<ClassList>)}" `;
-        }
-      }
-      else if(tv)
-        t += `class="${renderClasslist(tv).join(" ")}" `;
-    }
-    else if (k === "value") {
-      const tv = v as Attributes["value"];
-      if (isFunction(tv)) {
-        t += `value="${tv()}" `;
-      }
-      else if (tv !== undefined) {
-        t += `value="${tv}" `;
-      }
-    }
-    else if (k === "checked") {
-      const tv = v as Attributes["checked"];
-      if (isFunction(tv)) {
-        if (tv())
-          t += `checked `;
-      }
-      else if (tv !== undefined && tv === true)
-        t += `checked `;
-    }
-    else if (k.startsWith("on:")) {
-      const tv = v as Attributes[`on:${string}`];
-      const tk = k.replace(/^on:/, "");
-      if (tv !== undefined)
-        t += `${DIRECTIVE_PREFIX}:on:${tk}="${sharedSSRSerialize(tv)}" `;
-    }
-    else if (k.startsWith("attr:")) {
-      const tv = v as Attributes[`attr:${string}`];
-      const tk = k.replace(/^attr:/, "");
+function createSSRElement(element: string, props: object): SSRElement {
+  const builder = new SSRElementBuilder(element);
 
-      let val: AttributeValue;
+  const attributesResumeData: ResumeAttributesData = [];
+  const dynamicAttributesData: DynamicAttributesData = [];
 
-      if (isFunction(tv)) {
-        let found_reads: StoreRead[];
-        [val, found_reads] = listenForStoreReads(tv);
-        if (found_reads.length > 0) {
-          t += `${DIRECTIVE_PREFIX}:attr:${tk}="${sharedSSRSerialize([found_reads, tv] satisfies DynamicValueData<AttributeValue>)}" `;
-        }
-      }
-      else {
-        val = tv;
-      }
-
-      if (val === true) {
-        t += `${tk} `;
-      }
-      else if (val !== undefined && val !== false) {
-        t += `${tk}="${escapeHtml(val.toString())}" `;
-      }
+  for (const [propName, propVal] of Object.entries(props)) {
+    if (propName === "children") {
+      builder.appendInnerHTML(stringifyJSXElement(propVal, false));
+      continue;
     }
-    else if (k.startsWith("prop:")) {
-      const tv = v as Attributes[`prop:${string}`];
-      const tk = k.replace(/^prop:/, "");
 
-      if (isFunction(tv)) {
-        const [_val, found_reads] = listenForStoreReads(tv);
-        if (found_reads.length > 0) {
-          t += `${DIRECTIVE_PREFIX}:prop:${tk}="${sharedSSRSerialize([found_reads, tv] satisfies DynamicValueData<ClassList>)}" `;
-        }
-      }
-
-      // FIXME: prop: cannot be SSRd, or can it?
+    const attrHandler = getHandlerForAttribute(propName);
+    if (attrHandler === null) continue;
+    if (attrHandler.managedDynamic && isFunction(propVal)) {
+      const [val, storeReads] = listenForStoreReads(propVal);
+      dynamicAttributesData.push([storeReads, propName, propVal]);
+      if (attrHandler.forceResume)
+        attributesResumeData.push([propName, val]);
+      attrHandler.setOnSSRElement(builder, propName, val);
     }
     else {
-      throw new Error(`Unsupported attribute ${k}`);
+      if (attrHandler.forceResume)
+        attributesResumeData.push([propName, propVal]);
+      attrHandler.setOnSSRElement(builder, propName, propVal);
     }
   }
-  t += `>`;
-  t += stringifyJSXElement(children);
-  t += `</${element}>`;
-  return { [SSRElementMarker]: true, t };
+
+  if (attributesResumeData.length !== 0) {
+    builder.appendAttribute(`${DIRECTIVE_PREFIX}:res-attrs`, sharedSSRSerialize(attributesResumeData).toString());
+  }
+  if (dynamicAttributesData.length !== 0) {
+    builder.appendAttribute(`${DIRECTIVE_PREFIX}:dyn-attrs`, sharedSSRSerialize(dynamicAttributesData).toString());
+  }
+  
+  return builder.build();
 }
 
 const hComponent = register(<P>(component: ComponentFn<P>, props: P): JSXElement => {

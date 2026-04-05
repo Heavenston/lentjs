@@ -43,7 +43,7 @@ const Todo: ComponentFn<{}> = register(() => {
     ],
   });
 
-  return <div>
+  return <>
     <form on:submit={e => {
       e.preventDefault();
       const el = e.currentTarget;
@@ -67,14 +67,14 @@ const Todo: ComponentFn<{}> = register(() => {
       />
       <button attr:disabled={() => !state.input_text.trim()}>Create Task</button>
     </form>
-    <div class="tasks-container">
+    <>
       <RefFor<TaskData>
         each={() => state.tasks}
         key={task => task.id}
         children={task => <Task task={task} onDelete={() => { state.tasks = state.tasks.filter(p => p.id !== task.id) }} />}
       >
       </RefFor>
-    </div>
-  </div>;
+    </>
+  </>;
 }, "____RANDOM_ID");
 export default Todo;

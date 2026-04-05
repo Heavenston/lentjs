@@ -1,4 +1,5 @@
-import { deserialize, renderClasslist, setAttribute, type AttributeValue, type ClassList, type EventHandler, type JSXElement } from ".";
+import { deserialize, renderClasslist, type AttributeValue, type ClassList, type EventHandler, type JSXElement } from ".";
+import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
 import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "./store";
 import { assert, microtaskDebounce } from "./utils";
@@ -29,10 +30,8 @@ export type MarkerDirectiveName = keyof {
 type DirectiveHelper<K> = K extends keyof Directives ? { name: K, data: Directives[K] } : never
 export type Directive = DirectiveHelper<DirectiveName>;
 
-export type DynamicValueData<R = any> = [
-  storeReads: StoreRead[],
-  callback: () => R,
-];
+export type ResumeAttributesData = [propName: string, value: unknown][];
+export type DynamicAttributesData = [storeReads: StoreRead[], propName: string, callback: () => unknown][];
 
 type StateStackElement =
   | { kind: "dynamic-start", startDirective: Comment, storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement }
@@ -183,46 +182,27 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
     if (t.name.startsWith(DIRECTIVE_PREFIX))
       ctx.nodesToRemove.push(t);
 
-    if (t.name.startsWith(`${DIRECTIVE_PREFIX}:on:`)) {
-      const event = t.name.slice(DIRECTIVE_PREFIX.length + 4);
-      el.addEventListener(event, ctx.directivesData![parseInt(t.value)] as EventHandler<Event>);
+    if (t.name === `${DIRECTIVE_PREFIX}:res-attrs`) {
+      const data = ctx.directivesData![parseInt(t.value)] as ResumeAttributesData;
+      for (const [k, v] of data) {
+        const handler = getHandlerForAttribute(k);
+        assert(handler !== null);
+        handler.setOnHTMLElement(el, k, v);
+      }
     }
-
-    if (t.name.startsWith(`${DIRECTIVE_PREFIX}:attr:`)) {
-      const attr = t.name.slice(DIRECTIVE_PREFIX.length + 6);
-      let [storeReads, callback] = ctx.directivesData![parseInt(t.value)] as DynamicValueData<AttributeValue>;
-
-      const hh = microtaskDebounce(() => {
-        const [newValue, newStoreReads] = listenForStoreReads(() => callback());
-        setAttribute(el, attr, newValue);
-        subscribeToStoreReads(hh, newStoreReads, { once: true });
-      });
-      subscribeToStoreReads(hh, storeReads, { once: true });
-    }
-
-    if (t.name === `${DIRECTIVE_PREFIX}:class`) {
-      let [storeReads, callback] = ctx.directivesData![parseInt(t.value)] as DynamicValueData<ClassList>;
-
-      const hh = microtaskDebounce(() => {
-        const [newValue, newStoreReads] = listenForStoreReads(() => callback());
-        el.className = "";
-        el.classList.add(...renderClasslist(newValue));
-        subscribeToStoreReads(hh, newStoreReads, { once: true });
-      });
-      subscribeToStoreReads(hh, storeReads, { once: true });
-    }
-
-    if (t.name.startsWith(`${DIRECTIVE_PREFIX}:prop:`)) {
-      const prop = t.name.slice(DIRECTIVE_PREFIX.length + 6);
-      let [storeReads, callback] = ctx.directivesData![parseInt(t.value)] as DynamicValueData<JSXElement>;
-
-      const hh = microtaskDebounce(() => {
-        const [newValue, newStoreReads] = listenForStoreReads(() => callback());
-        // @ts-ignore
-        el[prop] = newValue;
-        subscribeToStoreReads(hh, newStoreReads, { once: true });
-      });
-      subscribeToStoreReads(hh, storeReads, { once: true });
+    if (t.name === `${DIRECTIVE_PREFIX}:dyn-attrs`) {
+      const data = ctx.directivesData![parseInt(t.value)] as DynamicAttributesData;
+      for (const [storeReads, propName, callback] of data) {
+        const handler = getHandlerForAttribute(propName);
+        assert(handler !== null);
+        assert(handler.managedDynamic);
+        const hh = microtaskDebounce(() => {
+          const [newVal, newStoreReads] = listenForStoreReads(callback);
+          handler.setOnHTMLElement(el, propName, newVal);
+          subscribeToStoreReads(hh, newStoreReads, { once: true });
+        });
+        subscribeToStoreReads(hh, storeReads, { once: true });
+      }
     }
   }
 }

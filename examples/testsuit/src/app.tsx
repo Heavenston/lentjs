@@ -9,18 +9,15 @@ const Complex: ComponentFn<{}> = register(() => {
     () => ["c", null, "d"],
     [() => "e", "f"],
     () => () => "g",
+    () => "<span>This is html</span>",
   ];
 }, "____RANDOM_ID");
 
 const App: ComponentFn<{}> = () => {
   return <>
-    <div>
-      <Counter />
-    </div>
+    <Counter />
     <hr />
-    <div>
-      <Todo />
-    </div>
+    <Todo />
     <hr />
     <Complex />
     <hr />
