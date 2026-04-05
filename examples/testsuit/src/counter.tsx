@@ -26,7 +26,7 @@ const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
 
   return <div>
     <div>Count: {() => count()}</div>
-    <div>Digits: <For each={() => new Array<null>(count() - props.min()).fill(null)}>{(idx) => `${idx + props.min()} `}</For></div>
+    <div>Digits: <For each={() => new Array<null>(count() - props.min()).fill(null)}>{(idx) => () => `${idx + props.min()} `}</For></div>
     <button
       attr:disabled={() => count() >= props.max()}
       on:click={() => {
