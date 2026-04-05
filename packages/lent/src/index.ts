@@ -4,6 +4,7 @@ export { For } from "./for";
 export { RefFor } from "./ref-for";
 export { startRuntime } from "./runtime";
 export { serialize, deserialize, closure, bind, register } from "./serialize";
+export { Fragment } from "./fragment";
 
 import { immediateTrack } from "./task";
 import { register, serialize } from "./serialize";
@@ -131,14 +132,14 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
   }
 }
 
-export function renderToString(el: JSXElement): string {
+export function renderToString(el: ComponentFn<{}>): string {
   signals.clear();
   stores.clear();
   global_directive_data_array.length = 0;
 
   global_h_config = "ssr";
   try {
-    const t = stringifyJSXElement(el);
+    const t = stringifyJSXElement(h(el));
 
     const ser_stores: [string, any][] = [];
     for (const [id, { obj }] of stores.entries()) {

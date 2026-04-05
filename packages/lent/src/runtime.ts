@@ -1,5 +1,5 @@
 import { deserialize, renderClasslist, setAttribute, type AttributeValue, type ClassList, type EventHandler, type JSXElement } from ".";
-import { changeStateAnchor, patchElement, type JSXState, type JSXStateDynamic } from "./patchElement";
+import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
 import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "./store";
 import { assert, microtaskDebounce } from "./utils";
 

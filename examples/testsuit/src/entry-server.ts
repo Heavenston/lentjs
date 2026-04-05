@@ -1,6 +1,12 @@
 import App from "./app";
-import { h, renderToString } from "@lentjs/core";
+import { renderToString } from "@lentjs/core";
 
 export function render(_req: Request): string {
-  return renderToString(h(App));
+  try {
+    return renderToString(App);
+  }
+  catch(e) {
+    console.error(e);
+    return e instanceof Error ? e.toString() : "";
+  }
 }

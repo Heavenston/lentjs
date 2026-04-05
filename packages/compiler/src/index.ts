@@ -32,6 +32,14 @@ export const lentjsCompilerPlugin = (): Plugin => {
                 syntax: "ecmascript",
                 jsx: options.moduleType.endsWith("x"),
               },
+            transform: {
+              react: {
+                importSource: "@lentjs/core",
+                development: false,
+                runtime: "automatic",
+                throwIfNamespace: false,
+              },
+            },
             experimental: {
               plugins: [
                 [fileURLToPath(import.meta.resolve("@lentjs/swc-plugin")), { }]

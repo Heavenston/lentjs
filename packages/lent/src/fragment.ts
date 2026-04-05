@@ -1,0 +1,6 @@
+import type { JSXElement } from ".";
+import { register } from "./serialize";
+
+export const Fragment = register((props: { children?: JSXElement }): JSXElement => {
+  return props.children;
+}, "__lentjs_fragment");
