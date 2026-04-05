@@ -55,14 +55,12 @@ const Counter: ComponentFn<{}> = register(() => {
   const [max, setMax] = createSignal(10);
 
   const onChangeMin: EventHandler<Event> = (e) => {
-    if (!(e instanceof Event)) return;
     const el = e.currentTarget;
     if (!(el instanceof HTMLInputElement)) return;
     console.log(`Min Changed: ${el.valueAsNumber}`);
     setMin(el.valueAsNumber);
   };
   const onChangeMax: EventHandler<Event> = (e) => {
-    if (!(e instanceof Event)) return;
     const el = e.currentTarget;
     if (!(el instanceof HTMLInputElement)) return;
     console.log(`Max Changed: ${el.valueAsNumber}`);
