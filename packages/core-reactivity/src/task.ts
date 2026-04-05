@@ -1,5 +1,5 @@
 import { listenForStoreReads, subscribeToStoreReads, type StoreRead } from "./store";
-import { microtaskDebounce } from "./utils";
+import { microtaskDebounce } from "@lentjs/utils";
 
 export type TaskCtx = {
   track: <T>(cb: () => T) => T,

@@ -1,0 +1,22 @@
+{
+  "name": "@lentjs/core-reactivity",
+  "version": "0.0.0",
+
+  "type": "module",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "dependencies": {
+    "@lentjs/utils": "workspace:*"
+  }
+}

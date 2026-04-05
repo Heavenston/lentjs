@@ -1,4 +1,4 @@
-import { filterInPlace } from "./utils";
+import { filterInPlace } from "@lentjs/utils";
 
 function newId(): string {
   return crypto.randomUUID().split("-",1)[0]!;

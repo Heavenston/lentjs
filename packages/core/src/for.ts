@@ -1,5 +1,5 @@
 import { createSignal, untrack, type JSXElement } from ".";
-import type { SignalSetter } from "./store";
+import type { SignalSetter } from "@lentjs/core-reactivity";
 import { closure, register } from "./serialize";
 
 type ElementState<T> = {

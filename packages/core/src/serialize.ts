@@ -1,7 +1,6 @@
 import * as devalue from "devalue";
-import { assert, isFunction } from "./utils";
-import { getStoreId, isSignalAccessor, isSignalSetter, isStore, signalAccessorFromId, signalSetterFromId, storeFromId } from "./store";
-import { createLazyProxy } from "./lazy-proxy";
+import { createLazyProxy, assert, isFunction } from "./utils";
+import { getStoreId, isSignalAccessor, isSignalSetter, isStore, signalAccessorFromId, signalSetterFromId, storeFromId } from "@lentjs/core-reactivity";
 
 const isClassMethodSymbol = Symbol("is-class-method-symbol");
 

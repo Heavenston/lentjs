@@ -37,8 +37,23 @@
       "name": "@lentjs/core",
       "version": "0.0.0",
       "dependencies": {
+        "@lentjs/core-reactivity": "workspace:*",
+        "@lentjs/utils": "workspace:*",
         "csstype": "^3.2.3",
         "devalue": "^5.6.4",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
+    "packages/core-reactivity": {
+      "name": "@lentjs/core-reactivity",
+      "version": "0.0.0",
+      "dependencies": {
+        "@lentjs/utils": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -50,6 +65,16 @@
     "packages/swc-plugin": {
       "name": "@lentjs/swc-plugin",
       "version": "0.1.0",
+    },
+    "packages/utils": {
+      "name": "@lentjs/utils",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
     },
   },
   "packages": {
@@ -65,7 +90,11 @@
 
     "@lentjs/core": ["@lentjs/core@workspace:packages/core"],
 
+    "@lentjs/core-reactivity": ["@lentjs/core-reactivity@workspace:packages/core-reactivity"],
+
     "@lentjs/swc-plugin": ["@lentjs/swc-plugin@workspace:packages/swc-plugin"],
+
+    "@lentjs/utils": ["@lentjs/utils@workspace:packages/utils"],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.1.1", "", { "dependencies": { "@emnapi/core": "^1.7.1", "@emnapi/runtime": "^1.7.1", "@tybys/wasm-util": "^0.10.1" } }, "sha512-p64ah1M1ld8xjWv3qbvFwHiFVWrq1yFvV4f7w+mzaqiR4IlSgkqhcRdHwsGgomwzBH51sRY4NEowLxnaBjcW/A=="],
 

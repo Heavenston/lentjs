@@ -1,5 +1,4 @@
-export { createStore, untrack, type Store, createSignal, type SignalSetter, type SignalAccessor } from "./store";
-export { createTask } from "./task";
+export { createTask, createStore, untrack, type Store, createSignal, type SignalSetter, type SignalAccessor } from "@lentjs/core-reactivity";
 export { For } from "./for";
 export { RefFor } from "./ref-for";
 export { startRuntime } from "./runtime";
@@ -10,14 +9,13 @@ export { type SSRElement, isSSRElement } from "./ssr-element";
 
 import { register, serialize } from "./serialize";
 import { isFunction, microtaskDebounce } from "./utils";
-import { listenForStoreReads, signals, stores, subscribeToStoreReads, untrack, type StoreRead } from "./store";
+import { captureTasks, listenForStoreReads, signals, stores, subscribeToStoreReads, untrack } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName, ATTRIBUTE_PREFIX } from "./runtime";
 import { escapeHtml } from "./escape-html";
 import { getHandlerForAttribute, type Attributes } from "./attributes";
 import { global_directive_data_array, sharedSSRSerialize } from "./shared-globals";
 import { type SSRElement, isSSRElement, SSRElementBuilder } from "./ssr-element";
 import { patchElement } from "./patchElement";
-import { type TaskCtx, captureTasks } from "./task";
 
 register(untrack, "__lentjs_untrack");
 register(h, "__lentjs_h");

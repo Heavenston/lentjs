@@ -1,6 +1,6 @@
 import { isJSXElementString, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular } from ".";
-import { listenForStoreReads, subscribeToStoreReads } from "./store";
 import { assert, isFunction, microtaskDebounce } from "./utils";
+import { listenForStoreReads, subscribeToStoreReads } from "@lentjs/core-reactivity";
 
 export type JSXStateCommon = { kind: string, element: JSXElement };
 export type JSXStateSingular = JSXStateCommon & { kind: "singular", element: JSXElementSingular, node: ChildNode | null };

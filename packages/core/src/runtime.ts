@@ -1,8 +1,7 @@
 import { deserialize, type JSXElement } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
-import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "./store";
-import { resumeTask, type TaskCtx } from "./task";
+import { resumeTask, type TaskCtx, listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "@lentjs/core-reactivity";
 import { assert, microtaskDebounce } from "./utils";
 
 const REMOVE_DIRECTIVES = true;
