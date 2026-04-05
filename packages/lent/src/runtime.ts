@@ -7,6 +7,8 @@ import { assert, microtaskDebounce } from "./utils";
 const REMOVE_DIRECTIVES = true;
 
 export const DIRECTIVE_PREFIX = "lentjs";
+export const ATTRIBUTE_PREFIX = `data-${DIRECTIVE_PREFIX}`;
+
 export type Directives = {
   "directives-data": unknown[],
 
@@ -179,10 +181,10 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
 
 function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
   for (const t of el.attributes) {
-    if (t.name.startsWith(DIRECTIVE_PREFIX))
+    if (t.name.startsWith(ATTRIBUTE_PREFIX))
       ctx.nodesToRemove.push(t);
 
-    if (t.name === `${DIRECTIVE_PREFIX}:res-attrs`) {
+    if (t.name === `${ATTRIBUTE_PREFIX}:res-attrs`) {
       const data = ctx.directivesData![parseInt(t.value)] as ResumeAttributesData;
       for (const [k, v] of data) {
         const handler = getHandlerForAttribute(k);
@@ -190,7 +192,7 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
         handler.setOnHTMLElement(el, k, v);
       }
     }
-    if (t.name === `${DIRECTIVE_PREFIX}:dyn-attrs`) {
+    if (t.name === `${ATTRIBUTE_PREFIX}:dyn-attrs`) {
       const data = ctx.directivesData![parseInt(t.value)] as DynamicAttributesData;
       for (const [storeReads, propName, callback] of data) {
         const handler = getHandlerForAttribute(propName);
