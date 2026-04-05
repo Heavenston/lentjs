@@ -33,7 +33,7 @@
         "typescript": "^5",
       },
     },
-    "packages/lent": {
+    "packages/core": {
       "name": "@lentjs/core",
       "version": "0.0.0",
       "dependencies": {
@@ -63,7 +63,7 @@
 
     "@lentjs/compiler": ["@lentjs/compiler@workspace:packages/compiler"],
 
-    "@lentjs/core": ["@lentjs/core@workspace:packages/lent"],
+    "@lentjs/core": ["@lentjs/core@workspace:packages/core"],
 
     "@lentjs/swc-plugin": ["@lentjs/swc-plugin@workspace:packages/swc-plugin"],
 
