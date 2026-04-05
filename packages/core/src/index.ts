@@ -1,6 +1,7 @@
 export { createTask, createStore, untrack, type Store, createSignal, type SignalSetter, type SignalAccessor } from "@lentjs/core-reactivity";
 export { For } from "./for";
 export { RefFor } from "./ref-for";
+export { Show } from "./show";
 export { startRuntime } from "./runtime";
 export { serialize, deserialize, closure, bind, register } from "./serialize";
 export { Fragment } from "./fragment";
