@@ -27,7 +27,7 @@ export function bind<A extends any[], B extends any[], T, R>(og_fn: (this: T, ..
       } satisfies ClosureData),
       enumerable: true,
     },
-    bind: { value: thisBind },
+    bind: { configurable: true, value: thisBind },
   });
   return nfn;
 }
@@ -49,7 +49,7 @@ export function register<V extends object>(value: V, id: string): V {
   registry.set(id, value);
   Object.defineProperty(value, registryIdSymbol, { enumerable: true, value: id });
   if (isFunction(value) && !isClosure(value)) {
-    Object.defineProperty(value, "bind", { value: thisBind });
+    Object.defineProperty(value, "bind", { configurable: true, value: thisBind });
   }
   return value;
 }
