@@ -7,8 +7,8 @@ type TaskData = {
   done: boolean,
 };
 
-function createTask(text: string): TaskData {
-  return createStore({ id: crypto.randomUUID(), text, done: false });
+function createTask(text: string, done: boolean = false): TaskData {
+  return createStore({ id: crypto.randomUUID(), text, done });
 }
 
 type TaskProps = {
@@ -41,7 +41,7 @@ const Todo: ComponentFn<{}> = register(() => {
   const state = createStore<TodoState>({
     input_text: "Hi",
     tasks: [
-      createTask("Say Hello"),
+      createTask("Say Hello", true),
       createTask("Say Bye"),
     ],
   });
