@@ -16,7 +16,7 @@ export type Attributes = {
 };
 
 export type AttributeHandler<V> = {
-  filter: (name: string) => boolean,
+  filter: string | RegExp,
 
   /**
    * If set to true, dynamic values (function) will be handled before calling
@@ -39,7 +39,7 @@ function handler<V>(v: AttributeHandler<V>): AttributeHandler<V> { return v }
 
 const handlers: AttributeHandler<any>[] = [
   handler<ClassList>({
-    filter: name => name === "class",
+    filter: "class",
     managedDynamic: true,
     forceResume: false,
     setOnHTMLElement(element, _, value) {
@@ -51,7 +51,7 @@ const handlers: AttributeHandler<any>[] = [
   }),
 
   handler<EventHandler<Event>>({
-    filter: name => name.startsWith("on:"),
+    filter: /^on:/,
     managedDynamic: false,
     forceResume: true,
     setOnHTMLElement(el, propName, value) {
@@ -64,7 +64,7 @@ const handlers: AttributeHandler<any>[] = [
     setOnSSRElement() { },
   }),
   handler<AttributeValue>({
-    filter: name => name.startsWith("attr:"),
+    filter: /^attr:/,
     managedDynamic: true,
     forceResume: false,
     setOnHTMLElement(el, propName, value) {
@@ -90,7 +90,7 @@ const handlers: AttributeHandler<any>[] = [
     },
   }),
   handler<unknown>({
-    filter: name => name.startsWith("prop:"),
+    filter: /^prop:/,
     managedDynamic: true,
     forceResume: false,
     setOnHTMLElement(el, propName, value) {
@@ -100,12 +100,34 @@ const handlers: AttributeHandler<any>[] = [
     },
     setOnSSRElement() { },
   }),
+
+  handler<unknown>({
+    filter: "checked",
+    managedDynamic: true,
+    forceResume: false,
+    setOnHTMLElement(element, _, value) {
+      if ("checked" in element)
+        element.checked = value;
+    },
+    setOnSSRElement(builder, _, value) {
+      if (value === true) {
+        builder.appendAttribute("checked");
+      }
+      else if (value != null && value !== false) {
+        builder.appendAttribute("checked", value.toString());
+      }
+    },
+  }),
 ];
 
 export function getHandlerForAttribute(name: string): AttributeHandler<any> | null {
-  for (const h of handlers)
-    if (h.filter(name))
+  for (const h of handlers) {
+    const f = h.filter;
+    if (typeof f === "string" && f === name)
       return h;
+    if (f instanceof RegExp && f.test(name))
+      return h;
+  }
   console.warn(`Unsupported attribute ${name}`);
   return null;
 }

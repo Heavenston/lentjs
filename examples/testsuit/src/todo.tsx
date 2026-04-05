@@ -1,10 +1,15 @@
-import { type ComponentFn, createStore, RefFor, createSignal, register } from "@lentjs/core";
+import { type ComponentFn, createStore, RefFor, register } from "@lentjs/core";
 import c from "./todo.module.scss";
 
 type TaskData = {
   id: string,
   text: string,
+  done: boolean,
 };
+
+function createTask(text: string): TaskData {
+  return createStore({ id: crypto.randomUUID(), text, done: false });
+}
 
 type TaskProps = {
   task: TaskData,
@@ -13,14 +18,12 @@ type TaskProps = {
 const Task: ComponentFn<TaskProps> = register((props) => {
   "use component";
 
-  const [done, setDone] = createSignal(false);
-
-  return <div class={() => [c["task"], { [c["task-completed"]]: done() }]}>
+  return <div class={() => [c["task"], { [c["task-completed"]]: props.task.done }]}>
     <span>{() => props.task.text}</span>
-    <input checked={done} attr:type="checkbox" on:change={e => {
+    <input checked={() => props.task.done} attr:type="checkbox" on:change={e => {
       const el = e.currentTarget;
       if (!(el instanceof HTMLInputElement)) return;
-      setDone(el.checked);
+      props.task.done = el.checked;
     }} />
     <button on:click={() => props.onDelete()}>
       Delete
@@ -38,10 +41,12 @@ const Todo: ComponentFn<{}> = register(() => {
   const state = createStore<TodoState>({
     input_text: "Hi",
     tasks: [
-      createStore({ id: crypto.randomUUID(), text: "Say Hello" }),
-      createStore({ id: crypto.randomUUID(), text: "Say Bye" }),
+      createTask("Say Hello"),
+      createTask("Say Bye"),
     ],
   });
+
+  const areAllDone = () => state.tasks.every(t => t.done);
 
   return <>
     <form on:submit={e => {
@@ -50,10 +55,7 @@ const Todo: ComponentFn<{}> = register(() => {
       if (!(el instanceof HTMLFormElement)) return;
       const trimmed = state.input_text.trim();
       if (!trimmed) return;
-      state.tasks = [...state.tasks, {
-        id: crypto.randomUUID(),
-        text: trimmed,
-      }];
+      state.tasks = [...state.tasks, createTask(trimmed)];
       state.input_text = "";
     }}>
       <input
@@ -67,14 +69,19 @@ const Todo: ComponentFn<{}> = register(() => {
       />
       <button attr:disabled={() => !state.input_text.trim()}>Create Task</button>
     </form>
-    <>
-      <RefFor<TaskData>
-        each={() => state.tasks}
-        key={task => task.id}
-        children={task => <Task task={task} onDelete={() => { state.tasks = state.tasks.filter(p => p.id !== task.id) }} />}
-      >
-      </RefFor>
-    </>
+    <button on:click={() => {
+      const action = areAllDone();
+      for (const task of state.tasks)
+        task.done = !action;
+    }}>
+      Mark all as{() => areAllDone() ? " not" : null} done
+    </button>
+    <RefFor<TaskData>
+      each={() => state.tasks}
+      key={task => task.id}
+      children={task => <Task task={task} onDelete={() => { state.tasks = state.tasks.filter(p => p.id !== task.id) }} />}
+    >
+    </RefFor>
   </>;
 }, "____RANDOM_ID");
 export default Todo;
