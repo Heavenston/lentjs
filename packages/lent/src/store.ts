@@ -7,7 +7,7 @@ function newId(): string {
 const isStoreSymbol = Symbol("is_store");
 export const storeIdSymbol = Symbol("store_id");
 
-export type StoreRead = { kind: "store", id: string, property: string | symbol } | { kind: "signal", id: string };
+export type StoreRead = Readonly<{ kind: "store", id: string, property: string | symbol } | { kind: "signal", id: string }>;
 export type Store<S> = S & { [isStoreSymbol]: true, [storeIdSymbol]: string };
 export type StoreReadCallback = {
   is_stopped?: boolean,
@@ -61,7 +61,7 @@ export function resumeStore<S extends object>(store_id: string, obj: S): Store<S
 
       if (current_store_read_listener !== null) {
         if (!current_store_read_listener.found_reads.some(e => e.kind === "store" && e.id === store_id && e.property === prop))
-          current_store_read_listener.found_reads.push({ kind: "store", id: store_id, property: prop });
+          current_store_read_listener.found_reads.push(Object.freeze({ kind: "store", id: store_id, property: prop }));
       }
 
       return obj[prop];
@@ -123,7 +123,7 @@ export function signalAccessorFromId(signal_id: string): SignalAccessor<unknown>
 
     if (current_store_read_listener !== null) {
       if (!current_store_read_listener.found_reads.some(e => e.kind === "store" && e.id === signal_id))
-        current_store_read_listener.found_reads.push({ kind: "signal", id: signal_id });
+        current_store_read_listener.found_reads.push(Object.freeze({ kind: "signal", id: signal_id }));
     }
 
     return state.currentValue;

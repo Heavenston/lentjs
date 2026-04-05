@@ -19,7 +19,7 @@ const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
   const count = () => clamp(rawCount());
 
   createTask(({ track }) => {
-    console.log("Task!", rawCount());
+    console.log("Task!", track(rawCount));
     if (typeof document !== "undefined")
       alert(track(rawCount));
   });

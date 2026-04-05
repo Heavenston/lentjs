@@ -2,6 +2,7 @@ import { deserialize, type JSXElement } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
 import { listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "./store";
+import { resumeTask, type TaskCtx } from "./task";
 import { assert, microtaskDebounce } from "./utils";
 
 const REMOVE_DIRECTIVES = true;
@@ -14,6 +15,7 @@ export type Directives = {
 
   signals: [string, any][],
   stores: [string, any][],
+  tasks: [StoreRead[], (ctx: TaskCtx) => void][],
 
   "dyn": { storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement },
   "dyn/": null,
@@ -66,6 +68,14 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     ctx.nodesToRemove.push(directiveNode);
     for (const [id, val] of d.data) {
       resumeStore(id, val);
+    }
+    break;
+  }
+  case "tasks": {
+    ctx.nodesToRemove.push(directiveNode);
+    for (const [storeReads, cb] of d.data) {
+      console.log("Resuming task", storeReads, cb);
+      resumeTask(cb, storeReads);
     }
     break;
   }

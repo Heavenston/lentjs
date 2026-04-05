@@ -10,13 +10,14 @@ export { type SSRElement, isSSRElement } from "./ssr-element";
 
 import { register, serialize } from "./serialize";
 import { isFunction, microtaskDebounce } from "./utils";
-import { listenForStoreReads, signals, stores, subscribeToStoreReads, untrack } from "./store";
+import { listenForStoreReads, signals, stores, subscribeToStoreReads, untrack, type StoreRead } from "./store";
 import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName, ATTRIBUTE_PREFIX } from "./runtime";
 import { escapeHtml } from "./escape-html";
 import { getHandlerForAttribute, type Attributes } from "./attributes";
 import { global_directive_data_array, sharedSSRSerialize } from "./shared-globals";
 import { type SSRElement, isSSRElement, SSRElementBuilder } from "./ssr-element";
 import { patchElement } from "./patchElement";
+import { type TaskCtx, captureTasks } from "./task";
 
 register(untrack, "__lentjs_untrack");
 register(h, "__lentjs_h");
@@ -112,23 +113,29 @@ export function renderToString(el: ComponentFn<{}>): string {
 
   global_h_config = "ssr";
   try {
-    const t = stringifyJSXElement(h(el));
+    const [tasks, t] = captureTasks(() => stringifyJSXElement(h(el)));
 
-    const ser_stores: [string, any][] = [];
+    const ser_stores: Directives["stores"] = [];
     for (const [id, { obj }] of stores.entries()) {
       ser_stores.push([id, obj]);
     }
     const stores_data = createSSRDirective("stores", ser_stores);
 
-    const ser_signals: [string, any][] = [];
+    const ser_signals: Directives["signals"] = [];
     for (const [id, { currentValue }] of signals.entries()) {
       ser_signals.push([id, currentValue]);
     }
     const signals_data = createSSRDirective("signals", ser_signals);
 
+    const ser_tasks: Directives["tasks"] = [];
+    for (const task of tasks) {
+      ser_tasks.push([task.storeReads, task.cb]);
+    }
+    const tasks_data = createSSRDirective("tasks", ser_tasks);
+
     const directives_data = createSSRDirective("directives-data", global_directive_data_array, true);
 
-    return `${directives_data}${stores_data}${signals_data}${t}`;
+    return `${directives_data}${stores_data}${signals_data}${tasks_data}${t}`;
   }
   catch(e) {
     throw e;
