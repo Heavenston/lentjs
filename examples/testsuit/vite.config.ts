@@ -55,15 +55,24 @@ export default defineConfig({
       name: "lent-id",
       transform: {
         filter: {
-          id: /\.ts$/,
+          code: /____RANDOM_ID/,
         },
-        async handler(code) {
-          if (!/____RANDOM_ID/.test(code)) return;
-
-          const d = new Uint32Array(await crypto.subtle.digest("SHA-512", Uint8Array.from(code)));
+        async handler(code, id) {
+          const pref = new BigUint64Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(id)))[0].toString(36).replace(/[/=]/g, "");
+          const d = new Uint16Array(await crypto.subtle.digest("SHA-512", Uint8Array.from(code)));
+          const usedIds = new Set<number>;
           let i = 0;
+
+          function newId() {
+            if (i+1 >= d.length) throw new Error("Ran out of ids");
+            const id = d[i++];
+            if (usedIds.has(id)) return newId;
+            usedIds.add(id);
+            return id;
+          }
+
           return {
-            code: code.replace(/____RANDOM_ID/g, () => d[i++].toString()),
+            code: code.replace(/____RANDOM_ID/g, () => `${pref}_${newId().toString(16).padStart(4, "0")}`),
           };
         },
       },
