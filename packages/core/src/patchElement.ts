@@ -123,8 +123,8 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, prev
     const resultState = patchElement(parent, anchorElement, previousState, newChild);
     return {
       kind: "dynamic",
-      startAnchor: null,
-      endAnchor: null,
+      startAnchor: getFirstElement(resultState),
+      endAnchor: getLastElement(resultState),
       element: child,
       unsubscribe: () => resultState,
       changeAnchor: (newAnchor) => {
@@ -177,6 +177,7 @@ function appendArray(parent: Node, anchorElement: ChildNode | null, child: JSXEl
     states.push(state);
     currentAnchor = getFirstElement(state) ?? currentAnchor;
   }
+  states.reverse();
   return {
     kind: "array",
     element: child,
