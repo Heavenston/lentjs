@@ -96,7 +96,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     const dynamic = ctx.dynamicStateStack.pop();
     assert(dynamic?.kind === "dynamic-start");
 
-    const isStatic = dynamic.storeReads.length !== 0;
+    const isStatic = dynamic.storeReads.length === 0;
     const startAnchor = dynamic.startDirective;
     const endAnchor = directiveNode;
 
@@ -105,15 +105,15 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     let currentUnsubscribe: (() => void) | null = null;
 
     if (isStatic) {
+      ctx.nodesToRemove.push(startAnchor, endAnchor);
+    }
+    else {
       const hh = microtaskDebounce(() => {
         const [previousResult, newStoreReads] = listenForStoreReads(() => callback(resultState.element));
         resultState = patchElement(parent, endAnchor, resultState, previousResult);
         currentUnsubscribe = subscribeToStoreReads(hh, newStoreReads, { once: true });
       });
       currentUnsubscribe = subscribeToStoreReads(hh, dynamic.storeReads, { once: true });
-    }
-    else {
-      ctx.nodesToRemove.push(startAnchor, endAnchor);
     }
 
     if (ctx.dynamicStateStack.length > 0)
