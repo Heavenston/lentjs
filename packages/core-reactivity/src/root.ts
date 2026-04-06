@@ -32,5 +32,8 @@ export function onCleanup(cb: () => void) {
   if (currentRoot === null) {
     throw new Error("Can only call onCleanup within a root");
   }
-  currentRoot.cleanupCallbacks.push(cb);
+  if (currentRoot.cleaned)
+    cb();
+  else
+    currentRoot.cleanupCallbacks.push(cb);
 }
