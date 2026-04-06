@@ -1,5 +1,6 @@
-import { onCleanup } from "./root";
-import { createRootInternal, getCurrentRoot } from "./root-internals";
+import { rootToOwner } from "./owner-internal";
+import { createRoot, onCleanup } from "./root";
+import { getCurrentRoot } from "./root-internals";
 import { listenForStoreReads, subscribeToStoreReads, type StoreRead } from "./store";
 import { microtaskDebounce } from "@lentjs/utils";
 
@@ -7,19 +8,18 @@ export type CapturedTaskData = [cb: () => void, storeReads: StoreRead[]];
 
 function internalCreateOrResumeTask(task: () => void, resumeWithStoreReads?: StoreRead[]) {
   const ownerRoot = getCurrentRoot();
-  console.log("Created task within", ownerRoot);
   let cleanup: (() => void) | null = null;
   let latestStoreReads: StoreRead[] = [];
 
   const callAndSub = () => {
     cleanup?.();
-    createRootInternal(newCleanup => {
+    createRoot(newCleanup => {
       cleanup = newCleanup;
       const [_val, storeReads] = listenForStoreReads(() => task());
       latestStoreReads = storeReads;
       const unsub = subscribeToStoreReads(debounceRun, latestStoreReads, { once: true });
       onCleanup(unsub);
-    }, { parent: ownerRoot });
+    }, rootToOwner(ownerRoot));
   };
   const debounceRun = microtaskDebounce(callAndSub);
 
