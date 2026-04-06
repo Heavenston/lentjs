@@ -1,14 +1,8 @@
-import { getCurrentRoot, rootCleanup, runWithRoot, type Root } from "./root-internals";
+import { createRootInternal, getCurrentRoot } from "./root-internals";
 import type { CapturedTaskData } from "./task";
 
 export function createRoot<T>(cb: (cleanup: () => void) => T): [cleanup: () => void, val: T] {
-  const root: Root = {
-    cleaned: false,
-    parent: getCurrentRoot(),
-    cleanupCallbacks: [],
-  };
-  const cleanup = rootCleanup.bind(root);
-  const val = runWithRoot(root, cb, cleanup);
+  const [_, cleanup, val] = createRootInternal(cb, {});
   return [cleanup, val];
 }
 
@@ -19,14 +13,9 @@ export type CapturedRootData = {
 };
 
 export function createCapturingRoot<T>(cb: () => T): [CapturedRootData, T] {
-  const root: Root = {
-    cleaned: false,
-    parent: getCurrentRoot(),
-    cleanupCallbacks: [],
+  const [root, cleanup, val] = createRootInternal(cb, {
     tasks: [],
-  };
-  const cleanup = rootCleanup.bind(root);
-  const val = runWithRoot(root, cb);
+  })
   return [{
     cleanup,
     cleanupCallbacks: root.cleanupCallbacks,

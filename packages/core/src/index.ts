@@ -1,4 +1,4 @@
-export { createTask, createStore, untrack, type Store, createSignal, type SignalSetter, type SignalAccessor } from "@lentjs/core-reactivity";
+export * from "@lentjs/core-reactivity";
 export { For } from "./for";
 export { RefFor } from "./ref-for";
 export { Show } from "./show";
@@ -10,7 +10,7 @@ export { type SSRElement, isSSRElement } from "./ssr-element";
 
 import { register, serialize } from "./serialize";
 import { isFunction, microtaskDebounce } from "./utils";
-import { captureTasks, listenForStoreReads, signals, stores, subscribeToStoreReads, untrack } from "@lentjs/core-reactivity";
+import { createCapturingRoot, listenForStoreReads, signals, stores, subscribeToStoreReads, untrack } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName, ATTRIBUTE_PREFIX } from "./runtime";
 import { escapeHtml } from "./escape-html";
 import { getHandlerForAttribute, type Attributes } from "./attributes";
@@ -69,13 +69,15 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
     return escapeHtml(el.toString());
   }
   else if (isFunction(el)) {
-    const [val, storeReads] = listenForStoreReads(() => el());
-    if (storeReads.length <= 0 && !isInsideDynamic) {
+    const [rootData, [val, storeReads]] = createCapturingRoot(() => listenForStoreReads(() => el()));
+    rootData.cleanup();
+    if (storeReads.length <= 0 && rootData.tasks.length <= 0 && !isInsideDynamic) {
       return stringifyJSXElement(val, false);
     }
     const prefix = createSSRDirective("dyn", {
       storeReads,
       update: el,
+      tasks: rootData.tasks,
     });
     const suffix = createSSRDirective("dyn/");
     return `${prefix}${stringifyJSXElement(val, true)}${suffix}`;
@@ -112,7 +114,9 @@ export function renderToString(el: ComponentFn<{}>): string {
 
   global_h_config = "ssr";
   try {
-    const [tasks, t] = captureTasks(() => stringifyJSXElement(h(el)));
+    const [rootData, t] = createCapturingRoot(() => stringifyJSXElement(h(el)));
+    rootData.cleanup();
+    console.log("tasks at root:", rootData.tasks);
 
     const ser_stores: Directives["stores"] = [];
     for (const [id, { obj }] of stores.entries()) {
@@ -126,15 +130,9 @@ export function renderToString(el: ComponentFn<{}>): string {
     }
     const signals_data = createSSRDirective("signals", ser_signals);
 
-    const ser_tasks: Directives["tasks"] = [];
-    for (const task of tasks) {
-      ser_tasks.push([task.storeReads, task.cb]);
-    }
-    const tasks_data = createSSRDirective("tasks", ser_tasks);
-
     const directives_data = createSSRDirective("directives-data", global_directive_data_array, true);
 
-    return `${directives_data}${stores_data}${signals_data}${tasks_data}${t}`;
+    return `${directives_data}${stores_data}${signals_data}${t}`;
   }
   catch(e) {
     throw e;

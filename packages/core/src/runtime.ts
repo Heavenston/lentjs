@@ -1,10 +1,10 @@
 import { deserialize, type JSXElement } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
-import { resumeTask, type TaskCtx, listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead } from "@lentjs/core-reactivity";
+import { resumeTask, listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead, createRoot, type CapturedTaskData, onCleanup } from "@lentjs/core-reactivity";
 import { assert, microtaskDebounce } from "./utils";
 
-const REMOVE_DIRECTIVES = true;
+const REMOVE_DIRECTIVES = false;
 
 export const DIRECTIVE_PREFIX = "lentjs";
 export const ATTRIBUTE_PREFIX = `data-${DIRECTIVE_PREFIX}`;
@@ -14,9 +14,12 @@ export type Directives = {
 
   signals: [string, any][],
   stores: [string, any][],
-  tasks: [StoreRead[], (ctx: TaskCtx) => void][],
 
-  "dyn": { storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement },
+  "dyn": {
+    storeReads: StoreRead[],
+    update: (previous?: JSXElement) => JSXElement,
+    tasks: CapturedTaskData[],
+  },
   "dyn/": null,
 
   "arr": null,
@@ -37,7 +40,7 @@ export type ResumeAttributesData = [propName: string, value: unknown][];
 export type DynamicAttributesData = [storeReads: StoreRead[], propName: string, callback: () => unknown][];
 
 type StateStackElement =
-  | { kind: "dynamic-start", startDirective: Comment, storeReads: StoreRead[], update: (previous?: JSXElement) => JSXElement }
+  | { kind: "dynamic-start", startDirective: Comment, data: Directives["dyn"] }
   | { kind: "array-start" }
   | { kind: "state", state: JSXState }
 ;
@@ -70,22 +73,11 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     }
     break;
   }
-  case "tasks": {
-    ctx.nodesToRemove.push(directiveNode);
-    for (const [storeReads, cb] of d.data) {
-      console.log("Resuming task", storeReads, cb);
-      resumeTask(cb, storeReads);
-    }
-    break;
-  }
   case "dyn": {
-    const { storeReads, update } = d.data;
-
     ctx.dynamicStateStack.push({
       kind: "dynamic-start",
       startDirective: directiveNode,
-      storeReads,
-      update,
+      data: d.data,
     });
 
     break;
@@ -96,25 +88,38 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     const dynamic = ctx.dynamicStateStack.pop();
     assert(dynamic?.kind === "dynamic-start");
 
-    const isStatic = dynamic.storeReads.length === 0;
+    const isStatic = dynamic.data.storeReads.length === 0;
     const startAnchor = dynamic.startDirective;
     const endAnchor = directiveNode;
 
     let resultState = stateFromStack.state;
-    const callback = dynamic.update;
-    let currentUnsubscribe: (() => void) | null = null;
+    const callback = dynamic.data.update;
 
-    if (isStatic) {
-      ctx.nodesToRemove.push(startAnchor, endAnchor);
-    }
-    else {
-      const hh = microtaskDebounce(() => {
-        const [previousResult, newStoreReads] = listenForStoreReads(() => callback(resultState.element));
-        resultState = patchElement(parent, endAnchor, resultState, previousResult);
-        currentUnsubscribe = subscribeToStoreReads(hh, newStoreReads, { once: true });
-      });
-      currentUnsubscribe = subscribeToStoreReads(hh, dynamic.storeReads, { once: true });
-    }
+    let [rootCleanup] = createRoot(() => {
+      for (const data of dynamic.data.tasks) {
+        console.log("Resume", data);
+        resumeTask(...data);
+      }
+
+      if (isStatic) {
+        ctx.nodesToRemove.push(startAnchor, endAnchor);
+      }
+      else {
+        const hh = microtaskDebounce(() => {
+          rootCleanup();
+          createRoot(newCleanup => {
+            rootCleanup = newCleanup;
+
+            const [newJSXElement, newStoreReads] = listenForStoreReads(() => callback(resultState.element));
+            resultState = patchElement(parent, endAnchor, resultState, newJSXElement);
+            const unsub = subscribeToStoreReads(hh, newStoreReads, { once: true });
+            onCleanup(unsub);
+          });
+        });
+        const unsub = subscribeToStoreReads(hh, dynamic.data.storeReads, { once: true });
+        onCleanup(unsub);
+      }
+    });
 
     if (ctx.dynamicStateStack.length > 0)
       ctx.dynamicStateStack.push({
@@ -124,10 +129,13 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
           startAnchor: isStatic ? null : startAnchor,
           endAnchor: isStatic ? null : endAnchor,
           element: callback,
-          unsubscribe: isStatic ? () => resultState : () => {
+          unsubscribe: isStatic ? () => {
+            rootCleanup?.();
+            return resultState;
+          } : () => {
             startAnchor.remove();
             endAnchor.remove();
-            currentUnsubscribe?.();
+            rootCleanup?.();
             return resultState;
           },
           changeAnchor: isStatic ? (newAnchor) => {

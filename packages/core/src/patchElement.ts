@@ -1,6 +1,6 @@
 import { isJSXElementString, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular } from ".";
 import { assert, isFunction, microtaskDebounce } from "./utils";
-import { listenForStoreReads, subscribeToStoreReads } from "@lentjs/core-reactivity";
+import { createRoot, listenForStoreReads, subscribeToStoreReads } from "@lentjs/core-reactivity";
 
 export type JSXStateCommon = { kind: string, element: JSXElement };
 export type JSXStateSingular = JSXStateCommon & { kind: "singular", element: JSXElementSingular, node: ChildNode | null };
@@ -117,7 +117,7 @@ function patchElementSingular(parent: Node, anchorElement: ChildNode | null, pre
 }
 
 function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, previousState: JSXStateSingular | JSXStateArray | null, child: JSXElementDynamic): JSXStateDynamic {
-  let [newChild, storeReads] = listenForStoreReads(() => child());
+  let [cleanupRoot, [newChild, storeReads]] = createRoot(() => listenForStoreReads(() => child()));
 
   if (storeReads.length === 0) {
     const resultState = patchElement(parent, anchorElement, previousState, newChild);
@@ -126,7 +126,10 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, prev
       startAnchor: getFirstElement(resultState),
       endAnchor: getLastElement(resultState),
       element: child,
-      unsubscribe: () => resultState,
+      unsubscribe: () => {
+        cleanupRoot();
+        return resultState;
+      },
       changeAnchor: (newAnchor) => {
         changeStateAnchor(parent, resultState, newAnchor);
       },
@@ -141,7 +144,8 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, prev
     let lastResultState = patchElement(parent, dynamicEndAnchor, previousState, newChild);
 
     const hh = microtaskDebounce(() => {
-      [newChild, storeReads] = listenForStoreReads(() => child(newChild));
+      cleanupRoot();
+      [cleanupRoot, [newChild, storeReads]] = createRoot(() => listenForStoreReads(() => child(newChild)));
       lastResultState = patchElement(parent, dynamicEndAnchor, lastResultState, newChild);
     
       currentUnsubscribe = subscribeToStoreReads(hh, storeReads, { once: true });
@@ -154,6 +158,7 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, prev
       endAnchor: dynamicEndAnchor,
       element: child,
       unsubscribe: () => {
+        cleanupRoot();
         currentUnsubscribe();
         dynamicStartAnchor.remove();
         dynamicEndAnchor.remove();

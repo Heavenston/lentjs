@@ -47,3 +47,6 @@ export function filterInPlace<T>(arr: T[], pred: (v: T) => boolean) {
   // arr.length = j;
 }
 
+export function remove<T>(arr: T[], val: T) {
+  filterInPlace(arr, val2 => val !== val2);
+}

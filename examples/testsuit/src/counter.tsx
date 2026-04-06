@@ -18,9 +18,9 @@ const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
   };
   const count = () => clamp(rawCount());
 
-  createTask(({ track, cleanup }) => {
-    console.log("Task!", track(rawCount));
-    cleanup(() => {
+  createTask(() => {
+    console.log("Task!", rawCount());
+    onCleanup(() => {
       console.log("Count task cleanup");
     });
   });

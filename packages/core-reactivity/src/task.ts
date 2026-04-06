@@ -1,47 +1,25 @@
 import { onCleanup } from "./root";
-import { getCurrentRoot } from "./root-internals";
+import { createRootInternal, getCurrentRoot } from "./root-internals";
 import { listenForStoreReads, subscribeToStoreReads, type StoreRead } from "./store";
 import { microtaskDebounce } from "@lentjs/utils";
 
-export type TaskCtx = {
-  track: <T>(cb: () => T) => T,
-  cleanup: (cb: () => void) => void,
-};
+export type CapturedTaskData = [cb: () => void, storeReads: StoreRead[]];
 
-export type CapturedTaskData = [cb: (ctx: TaskCtx) => void, storeReads: StoreRead[]];
-
-function internalCreateOrResumeTask(task: (ctx: TaskCtx) => void, resumeWithStoreReads?: StoreRead[]) {
+function internalCreateOrResumeTask(task: () => void, resumeWithStoreReads?: StoreRead[]) {
   const ownerRoot = getCurrentRoot();
-  const cleanupFunctions: (() => void)[] = [];
-  let storeReadsAccumulator: StoreRead[] = [];
+  console.log("Created task within", ownerRoot);
+  let cleanup: (() => void) | null = null;
   let latestStoreReads: StoreRead[] = [];
 
-  const runCleanups = () => {
-    for (const cn of cleanupFunctions)
-      cn();
-    cleanupFunctions.length = 0;
-  };
-  onCleanup(runCleanups);
-
-  const ctx: TaskCtx = {
-    track: (trackCb) => {
-      const [val, newStoreReads] = listenForStoreReads(() => trackCb());
-      storeReadsAccumulator.push(...newStoreReads);
-      return val;
-    },
-    cleanup: (cb) => {
-      cleanupFunctions.push(cb);
-    },
-  };
-
   const callAndSub = () => {
-    runCleanups();
-    task(ctx);
-    latestStoreReads = storeReadsAccumulator;
-    storeReadsAccumulator = [];
-    const unsub = subscribeToStoreReads(debounceRun, latestStoreReads, { once: true });
-    cleanupFunctions.push(unsub);
-    storeReadsAccumulator.length = 0;
+    cleanup?.();
+    createRootInternal(newCleanup => {
+      cleanup = newCleanup;
+      const [_val, storeReads] = listenForStoreReads(() => task());
+      latestStoreReads = storeReads;
+      const unsub = subscribeToStoreReads(debounceRun, latestStoreReads, { once: true });
+      onCleanup(unsub);
+    }, { parent: ownerRoot });
   };
   const debounceRun = microtaskDebounce(callAndSub);
 
@@ -49,7 +27,7 @@ function internalCreateOrResumeTask(task: (ctx: TaskCtx) => void, resumeWithStor
     ownerRoot.tasks.push({
       cb: task,
       capture() {
-        runCleanups();
+        cleanup?.();
         return latestStoreReads;
       },
     });
@@ -57,17 +35,17 @@ function internalCreateOrResumeTask(task: (ctx: TaskCtx) => void, resumeWithStor
   
   if (resumeWithStoreReads) {
     const unsub = subscribeToStoreReads(debounceRun, resumeWithStoreReads, { once: true });
-    cleanupFunctions.push(unsub);
+    onCleanup(unsub);
   }
   else {
     callAndSub();
   }
 }
 
-export function createTask(task: (ctx: TaskCtx) => void) {
+export function createTask(task: () => void) {
   internalCreateOrResumeTask(task);
 }
 
-export function resumeTask(task: (ctx: TaskCtx) => void, initialStoreReads: StoreRead[]) {
+export function resumeTask(task: () => void, initialStoreReads: StoreRead[]) {
   internalCreateOrResumeTask(task, initialStoreReads);
 }
