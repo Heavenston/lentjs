@@ -36,6 +36,10 @@ export function isFunction(t: unknown): t is (...args: any) => any {
   return typeof t === "function";
 }
 
+export function isObject(t: unknown): t is object {
+  return (typeof t === "function" || typeof t === "object") && t !== null;
+}
+
 export function filterInPlace<T>(arr: T[], pred: (v: T) => boolean) {
   arr.splice(0, Infinity, ...arr.filter(pred));
   // let j = 0;

@@ -1,6 +1,6 @@
 
 /// This returns a proxy, that should act and behave like T, but only creates
-/// the actual T object by calling the functino when needed once than stores it
+/// the actual T object by calling the function when needed once than stores it
 export function createLazyProxy<T extends object>(fn: () => T): T {
   type State = { object?: T };
   function getObject(state: State): T {

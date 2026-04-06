@@ -1,7 +1,7 @@
 import type { JSXElement } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
-import { resumeTask, listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead, type CapturedTaskData, onCleanup, createOwner, enterOwner } from "@lentjs/core-reactivity";
+import { resumeTask, listenForStoreReads, subscribeToStoreReads, type StoreRead, type CapturedTaskData, onCleanup, createOwner, enterOwner } from "@lentjs/core-reactivity";
 import { assert, microtaskDebounce } from "./utils";
 import type { Owner } from "@lentjs/core-reactivity/src/owner-internal";
 import { deserialize } from "@lentjs/core-serialize";
@@ -13,9 +13,6 @@ export const ATTRIBUTE_PREFIX = `data-${DIRECTIVE_PREFIX}`;
 
 export type Directives = {
   "directives-data": unknown[],
-
-  signals: [string, any][],
-  stores: [string, any][],
 
   "dyn": {
     update: (previous?: JSXElement) => JSXElement,
@@ -59,23 +56,6 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     ctx.nodesToRemove.push(directiveNode);
     ctx.directivesData = d.data;
     break;
-  case "signals": {
-    ctx.nodesToRemove.push(directiveNode);
-    for (const [id, val] of d.data) {
-      signals.set(id, {
-        callbacks: [],
-        currentValue: val,
-      });
-    }
-    break;
-  }
-  case "stores": {
-    ctx.nodesToRemove.push(directiveNode);
-    for (const [id, val] of d.data) {
-      resumeStore(id, val);
-    }
-    break;
-  }
   case "dyn": {
     const [owner, cleanup] = createOwner(ctx.ownerStack.at(-1) ?? null);
     ctx.dynamicStateStack.push({
@@ -108,7 +88,6 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
 
     enterOwner(owner, () => {
       for (const data of dynamic.data.tasks) {
-        console.log("Resume", data);
         resumeTask(...data);
       }
 

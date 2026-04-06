@@ -1,5 +1,5 @@
 import * as devalue from "devalue";
-import { assert, isFunction } from "@lentjs/utils";
+import { assert, isFunction, isObject } from "@lentjs/utils";
 
 const isClassMethodSymbol = Symbol("is-class-method-symbol");
 
@@ -57,9 +57,15 @@ register(bind, "__lentjs_bind");
 register(closure, "__lentjs_closure");
 
 export function getValueRegistryId(value: unknown): string | null {
-  if ((typeof value === "function" || typeof value === "object") && value !== null && registryIdSymbol in value)
+  if (isObject(value) && registryIdSymbol in value)
     return value[registryIdSymbol] as string ?? null;
   return null;
+}
+
+export const definedSerializationSymbol = Symbol("serialization");
+export type DefinedSerializationData<O = unknown, A = unknown> = [reducer: (val: O) => A, reviver: (data: A) => O];
+export function defineSerialization<O, A>(value: O, ...[reducer, reviver]: DefinedSerializationData<O, A>) {
+  Object.defineProperty(value, definedSerializationSymbol, { value: [reducer, reviver] });
 }
 
 const devalueReducers: Record<string, (value: any) => any> = {
@@ -68,6 +74,12 @@ const devalueReducers: Record<string, (value: any) => any> = {
     if (isFunction(f) && isClosure(f)) {
       const data = f[closureDataSymbol];
       return [data.og_function, data.values, data.thisarg];
+    }
+  },
+  rec: (val: unknown) => {
+    if (isObject(val) && definedSerializationSymbol in val) {
+      const [reducer, reviver] = val[definedSerializationSymbol] as DefinedSerializationData;
+      return [reducer(val), reviver];
     }
   },
   fun: (f: unknown) => {
@@ -84,6 +96,9 @@ const devalueRevivers: Record<string, (value: any) => any> = {
   },
   clo: ([og_function, values, thisarg]: [ClosureData["og_function"], ClosureData["values"], ClosureData["thisarg"]]) => {
     return og_function.bind(thisarg, ...values);
+  },
+  rec: ([val, reviver]: [unknown, DefinedSerializationData[1]]) => {
+    return reviver(val);
   },
 };
 

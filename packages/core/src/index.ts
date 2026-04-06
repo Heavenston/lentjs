@@ -131,22 +131,8 @@ export function renderToString(el: ComponentFn<{}>): string {
   global_h_config = "ssr";
   try {
     const t = stringifyJSXElement(() => h(el));
-
-    const ser_stores: Directives["stores"] = [];
-    for (const [id, { obj }] of stores.entries()) {
-      ser_stores.push([id, obj]);
-    }
-    const stores_data = createSSRDirective("stores", ser_stores);
-
-    const ser_signals: Directives["signals"] = [];
-    for (const [id, { currentValue }] of signals.entries()) {
-      ser_signals.push([id, currentValue]);
-    }
-    const signals_data = createSSRDirective("signals", ser_signals);
-
     const directives_data = createSSRDirective("directives-data", global_directive_data_array, true);
-
-    return `${directives_data}${stores_data}${signals_data}${t}`;
+    return `${directives_data}${t}`;
   }
   catch(e) {
     throw e;
@@ -248,3 +234,4 @@ export function h<P>(element: string | ComponentFn<P>, props?: P): JSXElement {
     return (hComponent<P>).bind(null, element, props!);
   }
 }
+register(h, "__lentjs_h");

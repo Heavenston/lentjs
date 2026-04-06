@@ -53,6 +53,7 @@
       "name": "@lentjs/core-reactivity",
       "version": "0.0.0",
       "dependencies": {
+        "@lentjs/core-serialize": "workspace:*",
         "@lentjs/utils": "workspace:*",
       },
       "devDependencies": {

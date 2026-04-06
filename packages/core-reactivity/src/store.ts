@@ -1,4 +1,5 @@
-import { filterInPlace } from "@lentjs/utils";
+import { definedSerializationSymbol, defineSerialization, register } from "@lentjs/core-serialize";
+import { assert, filterInPlace } from "@lentjs/utils";
 
 function newId(): string {
   return crypto.randomUUID().split("-",1)[0]!;
@@ -26,20 +27,24 @@ type StoreState = {
 };
 export let stores = new Map<string, StoreState>;
 
-export function resumeStore<S extends object>(store_id: string, obj: S): Store<S> {
+const storeReviver = register(([store_id, obj]: [string, object]) => {
+  return resumeStore(store_id, obj);
+}, "__lentjs_storeReviver");
+
+function resumeStore<S extends object>(store_id: string, obj: S): Store<S> {
   let props_callbacks = new Map<string | symbol, StoreReadCallback[]>;
 
   const store = new Proxy<any>(obj, {
     has: (obj, prop) => {
       return prop === isStoreSymbol ||
         prop === storeIdSymbol ||
+        prop === definedSerializationSymbol ||
         prop in obj;
     },
     set: (obj, prop, value) => {
       if (prop === isStoreSymbol && prop === storeIdSymbol) { return false; }
 
       const changed = obj[prop] !== value;
-      // @ts-ignore
       obj[prop] = value;
       if (changed) {
         const arr = props_callbacks.get(prop);
@@ -58,6 +63,9 @@ export function resumeStore<S extends object>(store_id: string, obj: S): Store<S
     get(obj, prop) {
       if (prop === isStoreSymbol) { return true; }
       if (prop === storeIdSymbol) { return store_id; }
+      if (prop === definedSerializationSymbol) {
+        return [() => [store_id, obj], storeReviver];
+      }
 
       if (current_store_read_listener !== null) {
         if (!current_store_read_listener.found_reads.some(e => e.kind === "store" && e.id === store_id && e.property === prop))
@@ -68,6 +76,7 @@ export function resumeStore<S extends object>(store_id: string, obj: S): Store<S
     },
   });
 
+  assert(!stores.has(store_id), "Duplicate store ids found");
   stores.set(store_id, {
     obj,
     props_callbacks,
@@ -93,11 +102,14 @@ export function storeFromId(id: string): Store<unknown> | null {
   return stores.get(id)?.store;
 }
 
-type SignalState = {
-  currentValue: unknown;
+type SignalState<V> = {
+  ref: {
+    id: string,
+    currentValue: V,
+  },
   callbacks: StoreReadCallback[];
 };
-export let signals: Map<string, SignalState> = new Map;
+export let signals: Map<string, SignalState<any>> = new Map;
 
 const signalAccessorSymbol = Symbol("signal-accessor");
 const signalSetterSymbol = Symbol("signal-setter");
@@ -107,39 +119,45 @@ export type SignalSetter<V> = ((new_val: V) => void) & { [signalSetterSymbol]: t
 
 export function createSignal<V>(initialValue: V): [SignalAccessor<V>, SignalSetter<V>] {
   const id = newId();
-  signals.set(id, {
+  const state: SignalState<V> = {
     callbacks: [],
-    currentValue: initialValue,
-  });
+    ref: {
+      id,
+      currentValue: initialValue,
+    },
+  };
+  signals.set(id, state);
 
-  // @ts-ignore
-  return [signalAccessorFromId(id), signalSetterFromId(id)];
+  return [createSignalAccessor(state), createSignalSetter(state)];
 }
 
-export function signalAccessorFromId(signal_id: string): SignalAccessor<unknown> {
-  const accessor: SignalAccessor<unknown> = () => {
-    const state = signals.get(signal_id);
-    if (!state) throw new Error(`No signal found with id ${signal_id}`);
-
+function createSignalAccessor<V>(state: SignalState<V>): SignalAccessor<V> {
+  const accessor: SignalAccessor<V> = () => {
     if (current_store_read_listener !== null) {
-      if (!current_store_read_listener.found_reads.some(e => e.kind === "store" && e.id === signal_id))
-        current_store_read_listener.found_reads.push(Object.freeze({ kind: "signal", id: signal_id }));
+      if (!current_store_read_listener.found_reads.some(e => e.kind === "store" && e.id === state.ref.id))
+        current_store_read_listener.found_reads.push(Object.freeze({ kind: "signal", id: state.ref.id }));
     }
 
-    return state.currentValue;
+    return state.ref.currentValue;
   };
   accessor[signalAccessorSymbol] = true;
-  accessor.signalId = signal_id;
+  accessor.signalId = state.ref.id;
+  defineSerialization(accessor, () => state.ref, resumeSignalAccessor<V>);
   return accessor;
 }
+const resumeSignalAccessor = register(<V>(ref: SignalState<V>["ref"]): SignalAccessor<V> => {
+  let state = signals.get(ref.id);
+  if (!state) {
+    state = { callbacks: [], ref };
+    signals.set(ref.id, state);
+  }
+  return createSignalAccessor(state);
+}, "__lentjs_resumeSignalAccessor");
 
-export function signalSetterFromId(id: string): SignalSetter<unknown> {
-  const setter: SignalSetter<unknown> = (new_value: unknown) => {
-    const state = signals.get(id);
-    if (!state) throw new Error(`No signal found with id ${id}`);
-
-    const changed = new_value !== state.currentValue;
-    state.currentValue = new_value;
+function createSignalSetter<V>(state: SignalState<V>): SignalSetter<V> {
+  const setter: SignalSetter<V> = (new_value: V) => {
+    const changed = new_value !== state.ref.currentValue;
+    state.ref.currentValue = new_value;
 
     if (changed) {
       for (const cb of state.callbacks) {
@@ -152,15 +170,21 @@ export function signalSetterFromId(id: string): SignalSetter<unknown> {
     }
   };
   setter[signalSetterSymbol] = true;
-  setter.signalId = id;
-  setter.update = (updater: (old_val: unknown) => unknown) => {
-    const state = signals.get(id);
-    if (!state) throw new Error(`No signal found with id ${id}`);
-
-    setter(updater(state.currentValue));
+  setter.signalId = state.ref.id;
+  setter.update = (updater: (old_val: V) => V) => {
+    setter(updater(state.ref.currentValue));
   };
+  defineSerialization(setter, () => state.ref, resumeSignalSetter<V>);
   return setter;
 }
+const resumeSignalSetter = register(<V>(ref: SignalState<V>["ref"]): SignalSetter<V> => {
+  let state = signals.get(ref.id) ?? null;
+  if (!state) {
+    state = { callbacks: [], ref };
+    signals.set(ref.id, state);
+  }
+  return createSignalSetter<V>(state);
+}, "__lentjs_resumeSignalSetter");
 
 export function isSignalAccessor(val: unknown): val is SignalAccessor<unknown> {
   return typeof val === "function" && val !== null && signalAccessorSymbol in val && val[signalAccessorSymbol] === true;
@@ -180,14 +204,20 @@ export function subscribeToStoreReads(cb: () => void, reads: StoreRead[], option
   for (const read of reads) {
     if (read.kind === "store") {
       const store = stores.get(read.id);
-      if (!store) throw new Error(`No such store with id ${read.id}`);
+      if (!store) {
+        console.warn(`No such store with id ${read.id}`);
+        continue;
+      };
       let arr = store.props_callbacks.get(read.property);
       if (!arr) store.props_callbacks.set(read.property, arr = []);
       arr.push(callback);
     }
     else if (read.kind === "signal") {
       const signal = signals.get(read.id);
-      if (!signal) throw new Error(`No such signal with id ${read.id}`);
+      if (!signal) {
+        console.warn(`No such signal with id ${read.id}`);
+        continue;
+      };
       signal.callbacks.push(callback);
     }
     else {

@@ -17,6 +17,7 @@
     "@types/bun": "latest"
   },
   "dependencies": {
-    "@lentjs/utils": "workspace:*"
+    "@lentjs/utils": "workspace:*",
+    "@lentjs/core-serialize": "workspace:*"
   }
 }
