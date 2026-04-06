@@ -30,7 +30,7 @@ function getLastElement(state: JSXState): ChildNode | null {
     return state.node;
   case "array":
     for (let i = state.states.length-1; i>=0; i--) {
-      const potentialAnchor = getLastElement(state);
+      const potentialAnchor = getLastElement(state.states[i]!);
       if (potentialAnchor !== null)
         return potentialAnchor;
     }
@@ -67,7 +67,7 @@ export function changeStateAnchor(parent: Node, state: JSXState, newAnchor: Chil
   }
 }
 
-function removeStateNodes(state: JSXState) {
+export function removeStateNodes(state: JSXState) {
   switch (state.kind) {
   case "singular":
     state.node?.remove();

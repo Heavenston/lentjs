@@ -1,4 +1,4 @@
-import type { JSXElement } from ".";
+import type { JSXElement, OwnerCleanup } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
 import { resumeTask, listenForStoreReads, subscribeToStoreReads, type StoreRead, type CapturedTaskData, onCleanup, createOwner, enterOwner } from "@lentjs/core-reactivity";
@@ -39,7 +39,7 @@ export type ResumeAttributesData = [propName: string, value: unknown][];
 export type DynamicAttributesData = [storeReads: StoreRead[], propName: string, callback: () => unknown][];
 
 type StateStackElement =
-  | { kind: "dynamic-start", startDirective: Comment, data: Directives["dyn"], ownerCleanup: () => void }
+  | { kind: "dynamic-start", startDirective: Comment, data: Directives["dyn"], ownerCleanup: OwnerCleanup }
   | { kind: "array-start" }
   | { kind: "state", state: JSXState }
 ;
@@ -120,12 +120,12 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
           endAnchor: isStatic ? null : endAnchor,
           element: callback,
           cleanup: isStatic ? () => {
-            ownerCleanup?.();
+            ownerCleanup();
             return resultState;
           } : () => {
             startAnchor.remove();
             endAnchor.remove();
-            ownerCleanup?.();
+            ownerCleanup();
             return resultState;
           },
           changeAnchor: isStatic ? (newAnchor) => {
@@ -137,6 +137,8 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
           },
         },
       });
+    else
+      ownerCleanup.detach();
 
     break;
   }

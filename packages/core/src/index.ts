@@ -10,13 +10,13 @@ export { type SSRElement, isSSRElement } from "./ssr-element";
 
 import { register, serialize } from "@lentjs/core-serialize";
 import { isFunction, microtaskDebounce } from "./utils";
-import { createCapturingOwner, enterOwner, listenForStoreReads, signals, stores, subscribeToStoreReads, untrack, type CapturedOwnerData, type StoreRead } from "@lentjs/core-reactivity";
+import { createCapturingOwner, createOwner, enterOwner, listenForStoreReads, onCleanup, signals, stores, subscribeToStoreReads, untrack, type CapturedOwnerData, type StoreRead } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName, ATTRIBUTE_PREFIX } from "./runtime";
 import { escapeHtml } from "./escape-html";
 import { getHandlerForAttribute, type Attributes } from "./attributes";
 import { global_directive_data_array, sharedSSRSerialize } from "./shared-globals";
 import { type SSRElement, isSSRElement, SSRElementBuilder } from "./ssr-element";
-import { patchElement } from "./patchElement";
+import { patchElement, removeStateNodes } from "./patchElement";
 
 export type JSXElementString = number | string;
 export type JSXElementSingular = SSRElement | ChildNode | JSXElementString | null | undefined;
@@ -123,6 +123,14 @@ function stringifyJSXElement(el: JSXElement | ResolvedJSXElementDynamic, isInsid
   }
 }
 
+export function renderToDom(parent: Node, el: ComponentFn<{}>) {
+  const [owner, cleanup] = createOwner();
+  cleanup.detach();
+  enterOwner(owner, () => {
+    globalThis.justToNotLeak = patchElement(parent, null, null, h(el));
+  });
+}
+
 export function renderToString(el: ComponentFn<{}>): string {
   signals.clear();
   stores.clear();
@@ -146,7 +154,8 @@ function createHTMLElement(element: string, props: object): HTMLElement {
   const el = document.createElement(element);
   for (const [propName, propVal] of Object.entries(props)) {
     if (propName === "children") {
-      patchElement(el, null, null, propVal);
+      const p = patchElement(el, null, null, propVal);
+      onCleanup(() => removeStateNodes(p));
       continue;
     }
 

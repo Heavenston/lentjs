@@ -2,11 +2,13 @@ import { ownerToRoot, rootToOwner, type Owner } from "./owner-internal";
 import { createRoot, enterRoot, getCurrentRoot } from "./root-internal";
 import type { CapturedTaskData } from "./task";
 
+export type OwnerCleanup = (() => void) & { detach(): void };
+
 export function getOwner(): Owner | null {
   return rootToOwner(getCurrentRoot());
 }
 
-export function createOwner(parent?: Owner | null): [owner: Owner, cleanup: () => void] {
+export function createOwner(parent?: Owner | null): [owner: Owner, cleanup: OwnerCleanup] {
   const [root, cleanup] = rootToOwner(createRoot(parent === undefined ? {} : { parent: ownerToRoot(parent) }));
   return [rootToOwner(root), cleanup];
 }

@@ -126,6 +126,7 @@ export function createSignal<V>(initialValue: V): [SignalAccessor<V>, SignalSett
       currentValue: initialValue,
     },
   };
+  assert(!signals.has(id));
   signals.set(id, state);
 
   return [createSignalAccessor(state), createSignalSetter(state)];
@@ -150,6 +151,9 @@ const resumeSignalAccessor = register(<V>(ref: SignalState<V>["ref"]): SignalAcc
   if (!state) {
     state = { callbacks: [], ref };
     signals.set(ref.id, state);
+  }
+  else {
+    assert(state.ref === ref, "Same id but different ref");
   }
   return createSignalAccessor(state);
 }, "__lentjs_resumeSignalAccessor");
@@ -182,6 +186,9 @@ const resumeSignalSetter = register(<V>(ref: SignalState<V>["ref"]): SignalSette
   if (!state) {
     state = { callbacks: [], ref };
     signals.set(ref.id, state);
+  }
+  else {
+    assert(state.ref === ref, "Same id but different ref");
   }
   return createSignalSetter<V>(state);
 }, "__lentjs_resumeSignalSetter");
