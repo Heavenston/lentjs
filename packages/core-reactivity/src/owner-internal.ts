@@ -1,4 +1,4 @@
-import type { Root } from "./root-internals";
+import type { Root } from "./root-internal";
 
 declare const ownerSymbol: unique symbol;
 /**

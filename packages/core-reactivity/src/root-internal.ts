@@ -23,7 +23,7 @@ function rootCleanup(this: Root) {
   this.cleanupCallbacks.forEach(cb => cb());
 }
 
-export function createRootCleanup(root: Root): (() => void) {
+function createRootCleanup(root: Root): (() => void) {
   const parent = root.parent;
   const cleanup = rootCleanup.bind(root);
   if (parent) {
@@ -37,7 +37,18 @@ export function getCurrentRoot(): Root | null {
   return currentRoot;
 }
 
-export function runWithRoot<A extends any[], T>(root: Root, cb: (...args: A) => T, ...args: A): T {
+export function createRoot(extend: Partial<Root> = {}): [root: Root, cleanup: () => void] {
+  const root: Root = {
+    cleaned: false,
+    parent: getCurrentRoot(),
+    cleanupCallbacks: [],
+    ...extend,
+  };
+  const cleanup = createRootCleanup(root);
+  return [root, cleanup];
+}
+
+export function enterRoot<A extends any[], T>(root: Root, cb: (...args: A) => T, ...args: A): T {
   const prev = currentRoot;
   currentRoot = root;
   try {
@@ -49,16 +60,4 @@ export function runWithRoot<A extends any[], T>(root: Root, cb: (...args: A) => 
   finally {
     currentRoot = prev;
   }
-}
-
-export function createRootInternal<T>(cb: (cleanup: () => void) => T, extend: Partial<Root> = {}): [Root, () => void, val: T] {
-  const root: Root = {
-    cleaned: false,
-    parent: getCurrentRoot(),
-    cleanupCallbacks: [],
-    ...extend,
-  };
-  const cleanup = createRootCleanup(root);
-  const val = runWithRoot(root, cb, cleanup);
-  return [root, cleanup, val];
 }

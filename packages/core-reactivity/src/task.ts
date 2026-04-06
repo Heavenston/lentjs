@@ -1,6 +1,6 @@
 import { rootToOwner } from "./owner-internal";
-import { createRoot, onCleanup } from "./root";
-import { getCurrentRoot } from "./root-internals";
+import { createOwner, enterOwner, onCleanup } from "./owner";
+import { getCurrentRoot } from "./root-internal";
 import { listenForStoreReads, subscribeToStoreReads, type StoreRead } from "./store";
 import { microtaskDebounce } from "@lentjs/utils";
 
@@ -13,13 +13,14 @@ function internalCreateOrResumeTask(task: () => void, resumeWithStoreReads?: Sto
 
   const callAndSub = () => {
     cleanup?.();
-    createRoot(newCleanup => {
-      cleanup = newCleanup;
+    const [newOwner, newCleanup] = createOwner(rootToOwner(ownerRoot));
+    cleanup = newCleanup;
+    enterOwner(newOwner, () => {
       const [_val, storeReads] = listenForStoreReads(() => task());
       latestStoreReads = storeReads;
       const unsub = subscribeToStoreReads(debounceRun, latestStoreReads, { once: true });
       onCleanup(unsub);
-    }, rootToOwner(ownerRoot));
+    });
   };
   const debounceRun = microtaskDebounce(callAndSub);
 
