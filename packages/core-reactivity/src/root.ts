@@ -1,31 +1,41 @@
-type Root = {
-  parent: Root | null,
-  cleanupCallbacks: (() => void)[],
-};
+import { getCurrentRoot, rootCleanup, runWithRoot, type Root } from "./root-internals";
+import type { CapturedTaskData } from "./task";
 
-let currentRoot: Root | null = null;
-
-export function createRoot<T>(cb: (cleanup: () => void) => T): T {
-  const parent = currentRoot;
+export function createRoot<T>(cb: (cleanup: () => void) => T): [cleanup: () => void, val: T] {
   const root: Root = {
-    parent,
+    cleaned: false,
+    parent: getCurrentRoot(),
     cleanupCallbacks: [],
   };
-  currentRoot = root;
-  try {
-    return cb(() => {
-      root.cleanupCallbacks.forEach(cb => cb());
-    });
-  }
-  catch(e) {
-    throw e;
-  }
-  finally {
-    currentRoot = parent;
-  }
+  const cleanup = rootCleanup.bind(root);
+  const val = runWithRoot(root, cb, cleanup);
+  return [cleanup, val];
+}
+
+export type CapturedRootData = {
+  cleanup: () => void,
+  cleanupCallbacks: (() => void)[],
+  tasks: CapturedTaskData[],
+};
+
+export function createCapturingRoot<T>(cb: () => T): [CapturedRootData, T] {
+  const root: Root = {
+    cleaned: false,
+    parent: getCurrentRoot(),
+    cleanupCallbacks: [],
+    tasks: [],
+  };
+  const cleanup = rootCleanup.bind(root);
+  const val = runWithRoot(root, cb);
+  return [{
+    cleanup,
+    cleanupCallbacks: root.cleanupCallbacks,
+    tasks: root.tasks!.map<CapturedTaskData>(p => [p.cb, p.capture()]),
+  }, val];
 }
 
 export function onCleanup(cb: () => void) {
+  const currentRoot = getCurrentRoot();
   if (currentRoot === null) {
     throw new Error("Can only call onCleanup within a root");
   }
