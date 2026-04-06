@@ -1,9 +1,10 @@
-import { deserialize, type JSXElement } from ".";
+import type { JSXElement } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
 import { resumeTask, listenForStoreReads, resumeStore, signals, subscribeToStoreReads, type StoreRead, type CapturedTaskData, onCleanup, createOwner, enterOwner } from "@lentjs/core-reactivity";
 import { assert, microtaskDebounce } from "./utils";
 import type { Owner } from "@lentjs/core-reactivity/src/owner-internal";
+import { deserialize } from "@lentjs/core-serialize";
 
 const REMOVE_DIRECTIVES = true;
 

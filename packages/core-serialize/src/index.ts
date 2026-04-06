@@ -1,6 +1,5 @@
 import * as devalue from "devalue";
-import { createLazyProxy, assert, isFunction } from "./utils";
-import { getStoreId, isSignalAccessor, isSignalSetter, isStore, signalAccessorFromId, signalSetterFromId, storeFromId } from "@lentjs/core-reactivity";
+import { assert, isFunction } from "@lentjs/utils";
 
 const isClassMethodSymbol = Symbol("is-class-method-symbol");
 
@@ -65,24 +64,11 @@ export function getValueRegistryId(value: unknown): string | null {
 
 const devalueReducers: Record<string, (value: any) => any> = {
   reg: (val: unknown) => getValueRegistryId(val) ?? undefined,
-  sia: (f: unknown) => {
-    if (isSignalAccessor(f)) {
-      return f.signalId;
-    }
-  },
-  sis: (f: unknown) => {
-    if (isSignalSetter(f)) {
-      return f.signalId;
-    }
-  },
   clo: (f: unknown) => {
     if (isFunction(f) && isClosure(f)) {
       const data = f[closureDataSymbol];
       return [data.og_function, data.values, data.thisarg];
     }
-  },
-  sto: (f: unknown) => {
-    if (isStore(f)) return getStoreId(f);
   },
   fun: (f: unknown) => {
     if (isFunction(f)) {
@@ -96,22 +82,8 @@ const devalueRevivers: Record<string, (value: any) => any> = {
     assert(registry.has(id), `No values in registry with id '${id}'`);
     return registry.get(id);
   },
-  sia: (id: string) => {
-    return signalAccessorFromId(id);
-  },
-  sis: (id: string) => {
-    return signalSetterFromId(id);
-  },
   clo: ([og_function, values, thisarg]: [ClosureData["og_function"], ClosureData["values"], ClosureData["thisarg"]]) => {
     return og_function.bind(thisarg, ...values);
-  },
-  sto: (id) => {
-    return createLazyProxy(() => {
-      const store = storeFromId(id);
-      if (store === null)
-        throw new Error(`No store with id ${id}`);
-      return store;
-    });
   },
 };
 

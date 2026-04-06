@@ -17,8 +17,8 @@
   },
   "dependencies": {
     "csstype": "^3.2.3",
-    "devalue": "^5.6.4",
     "@lentjs/utils": "workspace:*",
+    "@lentjs/core-serialize": "workspace:*",
     "@lentjs/core-reactivity": "workspace:*"
   }
 }

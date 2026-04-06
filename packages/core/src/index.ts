@@ -3,12 +3,12 @@ export { For } from "./for";
 export { RefFor } from "./ref-for";
 export { Show } from "./show";
 export { startRuntime } from "./runtime";
-export { serialize, deserialize, closure, bind, register } from "./serialize";
+export { register } from "@lentjs/core-serialize";
 export { Fragment } from "./fragment";
 export { type Attributes, type AttributeValue } from "./attributes";
 export { type SSRElement, isSSRElement } from "./ssr-element";
 
-import { register, serialize } from "./serialize";
+import { register, serialize } from "@lentjs/core-serialize";
 import { isFunction, microtaskDebounce } from "./utils";
 import { createCapturingOwner, enterOwner, listenForStoreReads, signals, stores, subscribeToStoreReads, untrack, type CapturedOwnerData, type StoreRead } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName, ATTRIBUTE_PREFIX } from "./runtime";
@@ -17,9 +17,6 @@ import { getHandlerForAttribute, type Attributes } from "./attributes";
 import { global_directive_data_array, sharedSSRSerialize } from "./shared-globals";
 import { type SSRElement, isSSRElement, SSRElementBuilder } from "./ssr-element";
 import { patchElement } from "./patchElement";
-
-register(untrack, "__lentjs_untrack");
-register(h, "__lentjs_h");
 
 export type JSXElementString = number | string;
 export type JSXElementSingular = SSRElement | ChildNode | JSXElementString | null | undefined;

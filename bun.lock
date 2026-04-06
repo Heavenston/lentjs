@@ -38,9 +38,9 @@
       "version": "0.0.0",
       "dependencies": {
         "@lentjs/core-reactivity": "workspace:*",
+        "@lentjs/core-serialize": "workspace:*",
         "@lentjs/utils": "workspace:*",
         "csstype": "^3.2.3",
-        "devalue": "^5.6.4",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -54,6 +54,20 @@
       "version": "0.0.0",
       "dependencies": {
         "@lentjs/utils": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
+    "packages/core-serialize": {
+      "name": "@lentjs/core-serialize",
+      "version": "0.0.0",
+      "dependencies": {
+        "@lentjs/utils": "workspace:*",
+        "devalue": "^5.6.4",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -91,6 +105,8 @@
     "@lentjs/core": ["@lentjs/core@workspace:packages/core"],
 
     "@lentjs/core-reactivity": ["@lentjs/core-reactivity@workspace:packages/core-reactivity"],
+
+    "@lentjs/core-serialize": ["@lentjs/core-serialize@workspace:packages/core-serialize"],
 
     "@lentjs/swc-plugin": ["@lentjs/swc-plugin@workspace:packages/swc-plugin"],
 

@@ -1,5 +1,5 @@
 import type { ComponentFn, JSXElement } from ".";
-import { closure, register } from "./serialize";
+import { closure, register } from "@lentjs/core-serialize";
 
 type Props = {
   when: () => boolean,
