@@ -16,7 +16,10 @@ export type CapturedOwnerData = {
 };
 
 export function createCapturingOwner(parent?: Owner | null): [owner: Owner, capture: () => CapturedOwnerData] {
-  const [root, cleanup] = rootToOwner(createRoot(parent === undefined ? {} : { parent: ownerToRoot(parent) }));
+  const [root, cleanup] = rootToOwner(createRoot({
+    tasks: [],
+    ...(parent === undefined ? {} : { parent: ownerToRoot(parent) }),
+  }));
   const capture = (): CapturedOwnerData => {
     cleanup();
     return {

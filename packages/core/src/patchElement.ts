@@ -1,10 +1,10 @@
 import { isJSXElementString, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular } from ".";
 import { assert, isFunction, microtaskDebounce } from "./utils";
-import { createRoot, listenForStoreReads, subscribeToStoreReads } from "@lentjs/core-reactivity";
+import { createOwner, enterOwner, getOwner, listenForStoreReads, onCleanup, subscribeToStoreReads } from "@lentjs/core-reactivity";
 
 export type JSXStateCommon = { kind: string, element: JSXElement };
 export type JSXStateSingular = JSXStateCommon & { kind: "singular", element: JSXElementSingular, node: ChildNode | null };
-export type JSXStateDynamic = JSXStateCommon & { kind: "dynamic", startAnchor: ChildNode | null, endAnchor: ChildNode | null, element: JSXElementDynamic, changeAnchor: (newAnchor: ChildNode | null) => void, unsubscribe: () => JSXState };
+export type JSXStateDynamic = JSXStateCommon & { kind: "dynamic", startAnchor: ChildNode | null, endAnchor: ChildNode | null, element: JSXElementDynamic, changeAnchor: (newAnchor: ChildNode | null) => void, cleanup: () => JSXState };
 export type JSXStateArray = JSXStateCommon & { kind: "array", element: JSXElementArray, states: JSXState[] }
 export type JSXState = JSXStateSingular | JSXStateArray | JSXStateDynamic;
 
@@ -76,7 +76,7 @@ function removeStateNodes(state: JSXState) {
     state.states.forEach(removeStateNodes);
     break;
   case "dynamic":
-    removeStateNodes(state.unsubscribe());
+    removeStateNodes(state.cleanup());
     break;
   }
 }
@@ -117,17 +117,19 @@ function patchElementSingular(parent: Node, anchorElement: ChildNode | null, pre
 }
 
 function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, previousState: JSXStateSingular | JSXStateArray | null, child: JSXElementDynamic): JSXStateDynamic {
-  let [cleanupRoot, [newChild, storeReads]] = createRoot(() => listenForStoreReads(() => child()));
+  const parentOwner = getOwner();
+  let [owner, cleanupOwner] = createOwner(parentOwner);
+  let [newChild, storeReads] = enterOwner(owner, () => listenForStoreReads(() => child()));
 
   if (storeReads.length === 0) {
-    const resultState = patchElement(parent, anchorElement, previousState, newChild);
+    const resultState = enterOwner(owner, () => patchElement(parent, anchorElement, previousState, newChild));
     return {
       kind: "dynamic",
       startAnchor: getFirstElement(resultState),
       endAnchor: getLastElement(resultState),
       element: child,
-      unsubscribe: () => {
-        cleanupRoot();
+      cleanup: () => {
+        cleanupOwner();
         return resultState;
       },
       changeAnchor: (newAnchor) => {
@@ -141,25 +143,31 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, prev
     parent.insertBefore(dynamicStartAnchor, anchorElement);
     parent.insertBefore(dynamicEndAnchor, anchorElement);
 
-    let lastResultState = patchElement(parent, dynamicEndAnchor, previousState, newChild);
-
     const hh = microtaskDebounce(() => {
-      cleanupRoot();
-      [cleanupRoot, [newChild, storeReads]] = createRoot(() => listenForStoreReads(() => child(newChild)));
-      lastResultState = patchElement(parent, dynamicEndAnchor, lastResultState, newChild);
-    
-      currentUnsubscribe = subscribeToStoreReads(hh, storeReads, { once: true });
+      cleanupOwner();
+      [owner, cleanupOwner] = createOwner(parentOwner);
+      enterOwner(owner, () => {
+        [newChild, storeReads] = listenForStoreReads(() => child(newChild));
+        lastResultState = patchElement(parent, dynamicEndAnchor, lastResultState, newChild);
+        const unsub = subscribeToStoreReads(hh, storeReads, { once: true });
+        onCleanup(unsub, owner);
+      });
     });
-    let currentUnsubscribe = subscribeToStoreReads(hh, storeReads, { once: true });
+
+    let lastResultState = enterOwner(owner, () => {
+      const resultState = patchElement(parent, dynamicEndAnchor, previousState, newChild);
+      const unsub = subscribeToStoreReads(hh, storeReads, { once: true });
+      onCleanup(unsub, owner);
+      return resultState;
+    });
 
     return {
       kind: "dynamic",
       startAnchor: dynamicStartAnchor,
       endAnchor: dynamicEndAnchor,
       element: child,
-      unsubscribe: () => {
-        cleanupRoot();
-        currentUnsubscribe();
+      cleanup: () => {
+        cleanupOwner();
         dynamicStartAnchor.remove();
         dynamicEndAnchor.remove();
         return lastResultState;
@@ -234,7 +242,7 @@ export function patchElement(parent: Node, anchorElement: ChildNode | null, prev
     return previousState;
   }
   if (previousState?.kind === "dynamic") {
-    return patchElement(parent, anchorElement, previousState.unsubscribe(), child);
+    return patchElement(parent, anchorElement, previousState.cleanup(), child);
   }
 
   if (isFunction(child)) {

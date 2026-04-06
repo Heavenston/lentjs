@@ -10,7 +10,7 @@ export { type SSRElement, isSSRElement } from "./ssr-element";
 
 import { register, serialize } from "./serialize";
 import { isFunction, microtaskDebounce } from "./utils";
-import { createCapturingRoot, listenForStoreReads, signals, stores, subscribeToStoreReads, untrack } from "@lentjs/core-reactivity";
+import { createCapturingOwner, enterOwner, listenForStoreReads, signals, stores, subscribeToStoreReads, untrack, type CapturedOwnerData, type StoreRead } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName, ATTRIBUTE_PREFIX } from "./runtime";
 import { escapeHtml } from "./escape-html";
 import { getHandlerForAttribute, type Attributes } from "./attributes";
@@ -61,26 +61,51 @@ function createSSRDirective(name: string, arg: unknown = null, embed: boolean = 
   }
 }
 
-function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): string {
+type ResolvedJSXElementDynamic = { isDynamic: true, storeReads: StoreRead[], ownerData: CapturedOwnerData, el: JSXElementDynamic, resolved: ResolvedJSXElement };
+type ResolvedJSXElement = Exclude<JSXElement, JSXElementDynamic> | ResolvedJSXElementDynamic;
+function resolveDynamicJSXElements(el: JSXElementDynamic): ResolvedJSXElementDynamic;
+function resolveDynamicJSXElements(el: JSXElement): ResolvedJSXElement;
+function resolveDynamicJSXElements(el: JSXElement): ResolvedJSXElement {
+  if (!isFunction(el)) {
+    return el;
+  }
+
+  const [owner, capture] = createCapturingOwner();
+  const [storeReads, resolved] = enterOwner(owner, () => {
+    const [val, storeReads] = listenForStoreReads(() => el());
+    const childEl = resolveDynamicJSXElements(val);
+    return [storeReads, childEl];
+  });
+  const ownerData = capture();
+  return { isDynamic: true, storeReads, ownerData, el, resolved };
+}
+function stringifyJSXElement(el: JSXElement | ResolvedJSXElementDynamic, isInsideDynamic: boolean = false): string {
   if (isSSRElement(el)) {
     return el.t;
   }
   else if (isJSXElementString(el)) {
     return escapeHtml(el.toString());
   }
+  else if (el === null) {
+    return isInsideDynamic ? createSSRDirective("nul", null) : "";
+  }
+  else if (el === undefined) {
+    return isInsideDynamic ? createSSRDirective("und", null) : "";
+  }
   else if (isFunction(el)) {
-    const [rootData, [val, storeReads]] = createCapturingRoot(() => listenForStoreReads(() => el()));
-    rootData.cleanup();
-    if (storeReads.length <= 0 && rootData.tasks.length <= 0 && !isInsideDynamic) {
-      return stringifyJSXElement(val, false);
+    return stringifyJSXElement(resolveDynamicJSXElements(el), isInsideDynamic);
+  }
+  else if ("isDynamic" in el) {
+    if (el.storeReads.length <= 0 && el.ownerData.tasks.length <= 0 && !isInsideDynamic) {
+      return stringifyJSXElement(el.resolved, false);
     }
     const prefix = createSSRDirective("dyn", {
-      storeReads,
-      update: el,
-      tasks: rootData.tasks,
+      update: el.el,
+      storeReads: el.storeReads,
+      tasks: el.ownerData.tasks,
     });
     const suffix = createSSRDirective("dyn/");
-    return `${prefix}${stringifyJSXElement(val, true)}${suffix}`;
+    return `${prefix}${stringifyJSXElement(el.resolved, true)}${suffix}`;
   }
   else if (Array.isArray(el)) {
     if (!isInsideDynamic) {
@@ -91,12 +116,6 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
     const prefix = createSSRDirective("arr");
     const suffix = createSSRDirective("arr/");
     return `${prefix}${t}${suffix}`;
-  }
-  else if (el === null) {
-    return isInsideDynamic ? createSSRDirective("nul", null) : "";
-  }
-  else if (el === undefined) {
-    return isInsideDynamic ? createSSRDirective("und", null) : "";
   }
   else if (el instanceof Node) {
     throw new Error("Unsupported Node");
@@ -114,9 +133,7 @@ export function renderToString(el: ComponentFn<{}>): string {
 
   global_h_config = "ssr";
   try {
-    const [rootData, t] = createCapturingRoot(() => stringifyJSXElement(h(el)));
-    rootData.cleanup();
-    console.log("tasks at root:", rootData.tasks);
+    const t = stringifyJSXElement(() => h(el));
 
     const ser_stores: Directives["stores"] = [];
     for (const [id, { obj }] of stores.entries()) {
