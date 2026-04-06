@@ -1,5 +1,5 @@
 import { definedSerializationSymbol, defineSerialization, register } from "@lentjs/core-serialize";
-import { assert, filterInPlace } from "@lentjs/utils";
+import { assert, filterInPlace, unreachable } from "@lentjs/utils";
 
 function newId(): string {
   return crypto.randomUUID().split("-",1)[0]!;
@@ -228,7 +228,7 @@ export function subscribeToStoreReads(cb: () => void, reads: StoreRead[], option
       signal.callbacks.push(callback);
     }
     else {
-      read satisfies never;
+      unreachable(read);
     }
   }
 

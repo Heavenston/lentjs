@@ -18,6 +18,10 @@ export function assert(value: boolean | (() => boolean), message?: string) {
   }
 }
 
+export function unreachable(value: never): never {
+  throw new Error("Reached unreachabble");
+}
+
 export function microtaskDebounce(cb: () => void): () => void {
   let queued = false;
   return () => {

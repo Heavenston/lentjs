@@ -9,7 +9,7 @@ export { type Attributes, type AttributeValue } from "./attributes";
 export { type SSRElement, isSSRElement } from "./ssr-element";
 
 import { register, serialize } from "@lentjs/core-serialize";
-import { isFunction, microtaskDebounce } from "./utils";
+import { isFunction, microtaskDebounce, unreachable } from "./utils";
 import { createCapturingOwner, createOwner, enterOwner, listenForStoreReads, onCleanup, signals, stores, subscribeToStoreReads, untrack, type CapturedOwnerData, type StoreRead } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName, ATTRIBUTE_PREFIX } from "./runtime";
 import { escapeHtml } from "./escape-html";
@@ -117,17 +117,17 @@ function stringifyJSXElement(el: JSXElement | ResolvedJSXElementDynamic, isInsid
   else if (el instanceof Node) {
     throw new Error("Unsupported Node");
   }
-  else {
-    el satisfies never;
-    throw new Error("Unreachable");
-  }
+  else
+    unreachable(el);
 }
 
 export function renderToDom(parent: Node, el: ComponentFn<{}>) {
   const [owner, cleanup] = createOwner();
   cleanup.detach();
   enterOwner(owner, () => {
-    globalThis.justToNotLeak = patchElement(parent, null, null, h(el));
+    const val = patchElement(parent, null, null, h(el));
+    // @ts-ignore This is useless and just used to prevent val from being gced
+    globalThis[Symbol("gc-prevention")] = val;
   });
 }
 

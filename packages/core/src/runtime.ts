@@ -2,7 +2,7 @@ import type { JSXElement, OwnerCleanup } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
 import { resumeTask, listenForStoreReads, subscribeToStoreReads, type StoreRead, type CapturedTaskData, onCleanup, createOwner, enterOwner } from "@lentjs/core-reactivity";
-import { assert, microtaskDebounce } from "./utils";
+import { assert, microtaskDebounce, unreachable } from "./utils";
 import type { Owner } from "@lentjs/core-reactivity/src/owner-internal";
 import { deserialize } from "@lentjs/core-serialize";
 
@@ -137,7 +137,11 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
           },
         },
       });
-    else
+    // Since we do not make a JSXState, we need to register the cleanup manually
+    else if (parentOwner)
+      onCleanup(() => ownerCleanup(), parentOwner);
+    // The only case where the owner will never be cleaned
+    else if (isStatic)
       ownerCleanup.detach();
 
     break;
@@ -178,7 +182,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     break;
   }
   default:
-    d satisfies never;
+    unreachable(d);
   }
 }
 

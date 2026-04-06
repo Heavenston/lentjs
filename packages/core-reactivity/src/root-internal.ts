@@ -3,13 +3,18 @@ import type { CapturedTaskData } from "./task";
 
 export type RootCleanup = (() => void) & { detach(): void };
 
+export const enum RootState {
+  Live = "live",
+  Detached = "detached",
+  Cleaned = "cleaned",
+}
+
 export type TaskCaptureData = {
   cb: CapturedTaskData[0],
   capture: () => CapturedTaskData[1],
 };
 export type Root = {
-  cleaned: boolean,
-  detached: boolean,
+  state: RootState,
   readonly creationStackTrace: Error,
   readonly parent: Root | null,
   readonly cleanupCallbacks: (() => void)[],
@@ -22,23 +27,39 @@ export type Root = {
 let currentRoot: Root | null = null;
 
 function rootCleanup(this: Root) {
-  if (this.detached) {
-    console.warn("Attempted to clean a detached root");
+  switch (this.state) {
+  case RootState.Detached:
+  case RootState.Cleaned:
+    console.warn(`Cannot clean a ${this.state} root`);
     return;
   }
-  if (this.cleaned) return;
-  this.cleaned = true;
+  this.state = RootState.Cleaned;
   this.cleanupCallbacks.splice(0).forEach(cb => cb());
+}
+
+function rootDetach(this: Root) {
+  switch (this.state) {
+  case RootState.Detached:
+  case RootState.Cleaned:
+    console.warn(`Cannot detach a ${this.state} root`);
+    return;
+  }
+  this.state = RootState.Detached;
+  // Not needed anymore
+  this.cleanupCallbacks.splice(0);
 }
 
 export function getCurrentRoot(): Root | null {
   return currentRoot;
 }
 
+/**
+ * This is a development helper for detecting root leaks
+ */
 const cleanupLeakDetector = new FinalizationRegistry((root: Root) => {
-  if (!root.cleaned && !root.detached) {
-    if (root.detached)
-      console.log("Datached cleanup gced");
+  if (root.state !== RootState.Cleaned) {
+    if (root.state === RootState.Detached)
+      console.log("Detached cleanup gced");
     else
       console.warn("Leaked cleanup of root created at", root.creationStackTrace);
   }
@@ -46,29 +67,22 @@ const cleanupLeakDetector = new FinalizationRegistry((root: Root) => {
 
 export function createRoot(extend: Partial<Root> = {}): [root: Root, cleanup: RootCleanup] {
   const root: Root = {
+    state: RootState.Live,
     creationStackTrace: new Error(),
-    detached: false,
-    cleaned: false,
     parent: getCurrentRoot(),
     cleanupCallbacks: [],
     ...extend,
   };
 
   const cleanup = rootCleanup.bind(root) as RootCleanup;
-  cleanup.detach = () => {
-    if (root.cleaned) {
-      console.warn("Attempted to detach an already cleaned root");
-      return;
-    }
-    root.detached = true;
-  };
+  cleanup.detach = rootDetach.bind(root);
 
   cleanupLeakDetector.register(cleanup, root);
   return [root, cleanup];
 }
 
 export function enterRoot<A extends any[], T>(root: Root, cb: (...args: A) => T, ...args: A): T {
-  assert(!root.cleaned, "Cannot enter an already cleaned root");
+  assert(root.state !== RootState.Cleaned, "Cannot enter an already cleaned root");
   const prev = currentRoot;
   currentRoot = root;
   try {
