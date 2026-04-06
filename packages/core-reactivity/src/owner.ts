@@ -1,4 +1,4 @@
-import { unreachable } from "@lentjs/utils";
+import { filterInPlace, noop, remove, unreachable } from "@lentjs/utils";
 import { ownerToRoot, rootToOwner, type Owner } from "./owner-internal";
 import { createRoot, enterRoot, getCurrentRoot, RootState } from "./root-internal";
 import type { CapturedTaskData } from "./task";
@@ -36,7 +36,7 @@ export function enterOwner<A extends any[], T>(root: Owner, cb: (...args: A) => 
   return enterRoot(ownerToRoot(root), cb, ...args);
 }
 
-export function onCleanup(cb: () => void, owner?: Owner) {
+export function onCleanup(cb: () => void, owner?: Owner): () => void {
   const currentOwner = owner ?? getOwner();
   if (currentOwner === null) {
     throw new Error("Can only call onCleanup with an owner");
@@ -45,13 +45,16 @@ export function onCleanup(cb: () => void, owner?: Owner) {
   switch (currentRoot.state) {
   case RootState.Live:
     currentRoot.cleanupCallbacks.push(cb);
-    break;
+    return () => {
+      if (currentRoot.state === RootState.Live)
+        remove(currentRoot.cleanupCallbacks, cb);
+    };
   case RootState.Detached:
     // We do not bother to store the callback, it will never be called
-    break;
+    return noop;
   case RootState.Cleaned:
     cb();
-    break;
+    return noop;
   default: unreachable(currentRoot.state);
   }
 }

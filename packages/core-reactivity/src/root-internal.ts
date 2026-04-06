@@ -4,8 +4,20 @@ import type { CapturedTaskData } from "./task";
 export type RootCleanup = (() => void) & { detach(): void };
 
 export const enum RootState {
+  /**
+   * State after creation.
+   * Can change to Detached or Cleaned.
+   */
   Live = "live",
+  /**
+   * Set when the detach function is called.
+   * Final state, cannot change after that.
+   */
   Detached = "detached",
+  /**
+   * Set when the cleanup function is called, before calling the cleanup callbacks.
+   * Final state, cannot change after that.
+   */
   Cleaned = "cleaned",
 }
 

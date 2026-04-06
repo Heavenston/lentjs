@@ -18,7 +18,10 @@ function internalCreateOrResumeTask(task: () => void, resumeWithStoreReads?: Sto
   const callAndSub = () => {
     cleanup?.();
     const [newOwner, newCleanup] = createOwner(rootToOwner(ownerRoot));
-    ownerRoot?.cleanupCallbacks.push(newCleanup);
+    // Cleans up the owner when the parent is cleaned, but also unregisters the
+    // cleanup callback from the parent when this one is cleaned
+    if (ownerRoot)
+      onCleanup(onCleanup(newCleanup, rootToOwner(ownerRoot)), newOwner);
     cleanup = newCleanup;
     enterOwner(newOwner, () => {
       const [_val, storeReads] = listenForStoreReads(() => task());
