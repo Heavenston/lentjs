@@ -1,4 +1,4 @@
-import { type ComponentFn, register, createSignal, createTask, type EventHandler, For } from "@lentjs/core";
+import { type ComponentFn, register, createSignal, createTask, type EventHandler, For, onCleanup } from "@lentjs/core";
 
 type CounterButtonProps = {
   min: () => number,
@@ -18,10 +18,15 @@ const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
   };
   const count = () => clamp(rawCount());
 
-  createTask(({ track }) => {
+  createTask(({ track, cleanup }) => {
     console.log("Task!", track(rawCount));
-    if (typeof document !== "undefined")
-      alert(track(rawCount));
+    cleanup(() => {
+      console.log("Count task cleanup");
+    });
+  });
+
+  onCleanup(() => {
+    console.log("Count component onCleanup");
   });
 
   return <div>

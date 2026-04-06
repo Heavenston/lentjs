@@ -18,7 +18,7 @@ const Complex: ComponentFn<{}> = register(() => {
 const ConditionalCounter: ComponentFn<{}> = register(() => {
   "use component";
 
-  const [show, setShow] = createSignal(false);
+  const [show, setShow] = createSignal(true);
   
   return <>
     <button on:click={() => setShow.update(u => !u)}>
@@ -30,7 +30,7 @@ const ConditionalCounter: ComponentFn<{}> = register(() => {
   </>;
 }, "____RANDOM_ID");
 
-const App: ComponentFn<{}> = () => {
+const App: ComponentFn<{}> = register(() => {
   "use component";
 
   return <>
@@ -44,5 +44,5 @@ const App: ComponentFn<{}> = () => {
     <hr />
     <List />
   </>;
-};
+}, "____RANDOM_ID");
 export default App;
