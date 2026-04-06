@@ -1,6 +1,6 @@
 import { isJSXElementString, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular } from ".";
-import { assert, isFunction, microtaskDebounce } from "./utils";
-import { createOwner, enterOwner, getOwner, listenForStoreReads, onCleanup, subscribeToStoreReads } from "@lentjs/core-reactivity";
+import { assert, isFunction } from "./utils";
+import { createOwner, createTask, enterOwner, getOwner } from "@lentjs/core-reactivity";
 
 export type JSXStateCommon = { kind: string, element: JSXElement };
 export type JSXStateSingular = JSXStateCommon & { kind: "singular", element: JSXElementSingular, node: ChildNode | null };
@@ -116,69 +116,37 @@ function patchElementSingular(parent: Node, anchorElement: ChildNode | null, pre
   }
 }
 
-function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, previousState: JSXStateSingular | JSXStateArray | null, child: JSXElementDynamic): JSXStateDynamic {
+function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, child: JSXElementDynamic): JSXStateDynamic {
   const parentOwner = getOwner();
-  let [owner, cleanupOwner] = createOwner(parentOwner);
-  let [newChild, storeReads] = enterOwner(owner, () => listenForStoreReads(() => child()));
+  const [owner, cleanupOwner] = createOwner(parentOwner);
 
-  if (storeReads.length === 0) {
-    const resultState = enterOwner(owner, () => patchElement(parent, anchorElement, previousState, newChild));
-    return {
-      kind: "dynamic",
-      startAnchor: getFirstElement(resultState),
-      endAnchor: getLastElement(resultState),
-      element: child,
-      cleanup: () => {
-        cleanupOwner();
-        return resultState;
-      },
-      changeAnchor: (newAnchor) => {
-        changeStateAnchor(parent, resultState, newAnchor);
-      },
-    };
-  }
-  else {
-    const dynamicStartAnchor = new Comment("runtime-dyn-start");
-    const dynamicEndAnchor = new Comment("runtime-dyn-end");
-    parent.insertBefore(dynamicStartAnchor, anchorElement);
-    parent.insertBefore(dynamicEndAnchor, anchorElement);
+  const dynamicStartAnchor = new Comment("runtime-dyn-start");
+  const dynamicEndAnchor = new Comment("runtime-dyn-end");
+  parent.insertBefore(dynamicStartAnchor, anchorElement);
+  parent.insertBefore(dynamicEndAnchor, anchorElement);
 
-    const hh = microtaskDebounce(() => {
+  let lastResultState: JSXState | null = null;
+  enterOwner(owner, () => createTask(() => {
+    lastResultState = patchElement(parent, dynamicEndAnchor, lastResultState, child(lastResultState?.element));
+  }));
+
+  return {
+    kind: "dynamic",
+    startAnchor: dynamicStartAnchor,
+    endAnchor: dynamicEndAnchor,
+    element: child,
+    cleanup: () => {
       cleanupOwner();
-      [owner, cleanupOwner] = createOwner(parentOwner);
-      enterOwner(owner, () => {
-        [newChild, storeReads] = listenForStoreReads(() => child(newChild));
-        lastResultState = patchElement(parent, dynamicEndAnchor, lastResultState, newChild);
-        const unsub = subscribeToStoreReads(hh, storeReads, { once: true });
-        onCleanup(unsub, owner);
-      });
-    });
-
-    let lastResultState = enterOwner(owner, () => {
-      const resultState = patchElement(parent, dynamicEndAnchor, previousState, newChild);
-      const unsub = subscribeToStoreReads(hh, storeReads, { once: true });
-      onCleanup(unsub, owner);
-      return resultState;
-    });
-
-    return {
-      kind: "dynamic",
-      startAnchor: dynamicStartAnchor,
-      endAnchor: dynamicEndAnchor,
-      element: child,
-      cleanup: () => {
-        cleanupOwner();
-        dynamicStartAnchor.remove();
-        dynamicEndAnchor.remove();
-        return lastResultState;
-      },
-      changeAnchor(newAnchor) {
-        parent.insertBefore(dynamicStartAnchor, newAnchor);
-        parent.insertBefore(dynamicEndAnchor, newAnchor);
-        changeStateAnchor(parent, lastResultState, dynamicEndAnchor);
-      },
-    };
-  }
+      dynamicStartAnchor.remove();
+      dynamicEndAnchor.remove();
+      return lastResultState!;
+    },
+    changeAnchor(newAnchor) {
+      parent.insertBefore(dynamicStartAnchor, newAnchor);
+      parent.insertBefore(dynamicEndAnchor, newAnchor);
+      changeStateAnchor(parent, lastResultState!, dynamicEndAnchor);
+    },
+  };
 }
 
 /// Specialized function for arrays with no previous state (so we just adds the elements)
@@ -246,7 +214,9 @@ export function patchElement(parent: Node, anchorElement: ChildNode | null, prev
   }
 
   if (isFunction(child)) {
-    return patchElementDynamic(parent, anchorElement, previousState, child);
+    if (previousState)
+      removeStateNodes(previousState);
+    return patchElementDynamic(parent, anchorElement, child);
   }
   
   if (Array.isArray(child)) {

@@ -1,4 +1,4 @@
-import { filterInPlace, noop, remove, unreachable } from "@lentjs/utils";
+import { noop, remove, unreachable } from "@lentjs/utils";
 import { ownerToRoot, rootToOwner, type Owner } from "./owner-internal";
 import { createRoot, enterRoot, getCurrentRoot, RootState } from "./root-internal";
 import type { CapturedTaskData } from "./task";
@@ -32,7 +32,7 @@ export function createCapturingOwner(parent?: Owner | null): [owner: Owner, capt
   return [rootToOwner(root), capture];
 }
 
-export function enterOwner<A extends any[], T>(root: Owner, cb: (...args: A) => T, ...args: A): T {
+export function enterOwner<A extends any[], T>(root: Owner | null, cb: (...args: A) => T, ...args: A): T {
   return enterRoot(ownerToRoot(root), cb, ...args);
 }
 

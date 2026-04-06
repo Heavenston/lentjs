@@ -21,7 +21,7 @@
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "erasableSyntaxOnly": true,
+    "erasableSyntaxOnly": false,
     "noFallthroughCasesInSwitch": false,
     "noUncheckedSideEffectImports": true,
     "noImplicitOverride": true

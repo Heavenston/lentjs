@@ -60,3 +60,10 @@ export function filterInPlace<T>(arr: T[], pred: (v: T) => boolean) {
 export function remove<T>(arr: T[], val: T) {
   filterInPlace(arr, val2 => val !== val2);
 }
+
+export function createUid(): string {
+  if (typeof document === "undefined")
+    return crypto.randomUUID().split("-",1)[0]!;
+  else
+    return crypto.randomUUID();
+}

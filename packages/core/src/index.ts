@@ -9,8 +9,8 @@ export { type Attributes, type AttributeValue } from "./attributes";
 export { type SSRElement, isSSRElement } from "./ssr-element";
 
 import { register, serialize } from "@lentjs/core-serialize";
-import { isFunction, microtaskDebounce, unreachable } from "./utils";
-import { createCapturingOwner, createOwner, enterOwner, listenForStoreReads, onCleanup, signals, stores, subscribeToStoreReads, untrack, type CapturedOwnerData, type StoreRead } from "@lentjs/core-reactivity";
+import { isFunction, unreachable } from "./utils";
+import { createCapturingOwner, createOwner, createTask, enterOwner, onCleanup, startTask, untrack, type CapturedOwnerData, type CapturedTaskReactivityData } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName, ATTRIBUTE_PREFIX } from "./runtime";
 import { escapeHtml } from "./escape-html";
 import { getHandlerForAttribute, type Attributes } from "./attributes";
@@ -58,7 +58,7 @@ function createSSRDirective(name: string, arg: unknown = null, embed: boolean = 
   }
 }
 
-type ResolvedJSXElementDynamic = { isDynamic: true, storeReads: StoreRead[], ownerData: CapturedOwnerData, el: JSXElementDynamic, resolved: ResolvedJSXElement };
+type ResolvedJSXElementDynamic = { isDynamic: true, reactivityData: CapturedTaskReactivityData, ownerData: CapturedOwnerData, el: JSXElementDynamic, resolved: ResolvedJSXElement };
 type ResolvedJSXElement = Exclude<JSXElement, JSXElementDynamic> | ResolvedJSXElementDynamic;
 function resolveDynamicJSXElements(el: JSXElementDynamic): ResolvedJSXElementDynamic;
 function resolveDynamicJSXElements(el: JSXElement): ResolvedJSXElement;
@@ -68,13 +68,13 @@ function resolveDynamicJSXElements(el: JSXElement): ResolvedJSXElement {
   }
 
   const [owner, capture] = createCapturingOwner();
-  const [storeReads, resolved] = enterOwner(owner, () => {
-    const [val, storeReads] = listenForStoreReads(() => el());
+  const [reactivityData, resolved] = enterOwner(owner, () => {
+    const [val, reactivityData] = startTask(() => el());
     const childEl = resolveDynamicJSXElements(val);
-    return [storeReads, childEl];
+    return [reactivityData, childEl];
   });
   const ownerData = capture();
-  return { isDynamic: true, storeReads, ownerData, el, resolved };
+  return { isDynamic: true, reactivityData, ownerData, el, resolved };
 }
 function stringifyJSXElement(el: JSXElement | ResolvedJSXElementDynamic, isInsideDynamic: boolean = false): string {
   if (isSSRElement(el)) {
@@ -93,12 +93,12 @@ function stringifyJSXElement(el: JSXElement | ResolvedJSXElementDynamic, isInsid
     return stringifyJSXElement(resolveDynamicJSXElements(el), isInsideDynamic);
   }
   else if ("isDynamic" in el) {
-    if (el.storeReads.length <= 0 && el.ownerData.tasks.length <= 0 && !isInsideDynamic) {
+    if (el.reactivityData.length <= 0 && el.ownerData.tasks.length <= 0 && !isInsideDynamic) {
       return stringifyJSXElement(el.resolved, false);
     }
     const prefix = createSSRDirective("dyn", {
       update: el.el,
-      storeReads: el.storeReads,
+      reactivityData: el.reactivityData,
       tasks: el.ownerData.tasks,
     });
     const suffix = createSSRDirective("dyn/");
@@ -132,8 +132,6 @@ export function renderToDom(parent: Node, el: ComponentFn<{}>) {
 }
 
 export function renderToString(el: ComponentFn<{}>): string {
-  signals.clear();
-  stores.clear();
   global_directive_data_array.length = 0;
 
   global_h_config = "ssr";
@@ -162,17 +160,9 @@ function createHTMLElement(element: string, props: object): HTMLElement {
     const attrHandler = getHandlerForAttribute(propName);
     if (attrHandler === null) continue;
     if (attrHandler.managedDynamic && isFunction(propVal)) {
-      const [val, storeReads] = listenForStoreReads(propVal);
-
-      attrHandler.setOnHTMLElement(el, propName, val);
-
-      const hh = microtaskDebounce(() => {
-        const [newVal, newStoreReads] = listenForStoreReads(propVal);
-        attrHandler.setOnHTMLElement(el, propName, newVal);
-        subscribeToStoreReads(hh, newStoreReads, { once: true });
+      createTask(() => {
+        attrHandler.setOnHTMLElement(el, propName, propVal());
       });
-
-      subscribeToStoreReads(hh, storeReads, { once: true });
     }
     else {
       attrHandler.setOnHTMLElement(el, propName, propVal);
@@ -195,11 +185,11 @@ function createSSRElement(element: string, props: object): SSRElement {
     const attrHandler = getHandlerForAttribute(propName);
     if (attrHandler === null) continue;
     if (attrHandler.managedDynamic && isFunction(propVal)) {
-      const [val, storeReads] = listenForStoreReads(propVal);
+      const [val, reactivityData] = startTask(propVal);
       attrHandler.setOnSSRElement(builder, propName, val);
 
-      if (storeReads.length > 0)
-        dynamicAttributesData.push([storeReads, propName, propVal]);
+      if (reactivityData.length > 0)
+        dynamicAttributesData.push([reactivityData, propName, propVal]);
       if (attrHandler.forceResume)
         attributesResumeData.push([propName, val]);
     }

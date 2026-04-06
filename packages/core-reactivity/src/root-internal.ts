@@ -93,8 +93,8 @@ export function createRoot(extend: Partial<Root> = {}): [root: Root, cleanup: Ro
   return [root, cleanup];
 }
 
-export function enterRoot<A extends any[], T>(root: Root, cb: (...args: A) => T, ...args: A): T {
-  assert(root.state !== RootState.Cleaned, "Cannot enter an already cleaned root");
+export function enterRoot<A extends any[], T>(root: Root | null, cb: (...args: A) => T, ...args: A): T {
+  assert(root === null || root.state !== RootState.Cleaned, "Cannot enter an already cleaned root");
   const prev = currentRoot;
   currentRoot = root;
   try {

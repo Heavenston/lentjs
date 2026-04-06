@@ -1,8 +1,8 @@
-import type { JSXElement, OwnerCleanup } from ".";
+import type { CapturedTaskReactivityData, JSXElement, OwnerCleanup } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
-import { resumeTask, listenForStoreReads, subscribeToStoreReads, type StoreRead, type CapturedTaskData, onCleanup, createOwner, enterOwner } from "@lentjs/core-reactivity";
-import { assert, microtaskDebounce, unreachable } from "./utils";
+import { resumeTask, type CapturedTaskData, onCleanup, createOwner, enterOwner } from "@lentjs/core-reactivity";
+import { assert, unreachable } from "./utils";
 import type { Owner } from "@lentjs/core-reactivity/src/owner-internal";
 import { deserialize } from "@lentjs/core-serialize";
 
@@ -16,7 +16,7 @@ export type Directives = {
 
   "dyn": {
     update: (previous?: JSXElement) => JSXElement,
-    storeReads: StoreRead[],
+    reactivityData: CapturedTaskReactivityData,
     tasks: CapturedTaskData[],
   },
   "dyn/": null,
@@ -36,7 +36,7 @@ type DirectiveHelper<K> = K extends keyof Directives ? { name: K, data: Directiv
 export type Directive = DirectiveHelper<DirectiveName>;
 
 export type ResumeAttributesData = [propName: string, value: unknown][];
-export type DynamicAttributesData = [storeReads: StoreRead[], propName: string, callback: () => unknown][];
+export type DynamicAttributesData = [reactivityData: CapturedTaskReactivityData, propName: string, callback: () => unknown][];
 
 type StateStackElement =
   | { kind: "dynamic-start", startDirective: Comment, data: Directives["dyn"], ownerCleanup: OwnerCleanup }
@@ -78,13 +78,12 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     const dynamic = ctx.dynamicStateStack.pop();
     assert(dynamic?.kind === "dynamic-start");
 
-    const isStatic = dynamic.data.storeReads.length === 0;
+    const isStatic = dynamic.data.reactivityData.length === 0;
     const startAnchor = dynamic.startDirective;
     const endAnchor = directiveNode;
 
     let resultState = stateFromStack.state;
     let ownerCleanup = dynamic.ownerCleanup;
-    const callback = dynamic.data.update;
 
     enterOwner(owner, () => {
       for (const data of dynamic.data.tasks) {
@@ -95,19 +94,14 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
         ctx.nodesToRemove.push(startAnchor, endAnchor);
       }
       else {
-        const hh = microtaskDebounce(() => {
-          ownerCleanup();
-          const [newOwner, newOwnerCleanup] = createOwner(parentOwner);
-          ownerCleanup = newOwnerCleanup;
-          enterOwner(newOwner, () => {
-            const [newJSXElement, newStoreReads] = listenForStoreReads(() => callback(resultState.element));
-            resultState = patchElement(parent, endAnchor, resultState, newJSXElement);
-            const unsub = subscribeToStoreReads(hh, newStoreReads, { once: true });
-            onCleanup(unsub);
-          });
+        resumeTask(() => {
+          const newJSXElement = dynamic.data.update(resultState.element);
+          resultState = patchElement(parent, endAnchor, resultState, newJSXElement);
+        }, dynamic.data.reactivityData, {
+          detachedFromParent: true,
+          initialCleanup: ownerCleanup,
+          parentOwner,
         });
-        const unsub = subscribeToStoreReads(hh, dynamic.data.storeReads, { once: true });
-        onCleanup(unsub);
       }
     });
 
@@ -118,7 +112,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
           kind: "dynamic",
           startAnchor: isStatic ? null : startAnchor,
           endAnchor: isStatic ? null : endAnchor,
-          element: callback,
+          element: dynamic.data.update,
           cleanup: isStatic ? () => {
             ownerCleanup();
             return resultState;
@@ -201,16 +195,13 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
     }
     if (t.name === `${ATTRIBUTE_PREFIX}:dyn-attrs`) {
       const data = ctx.directivesData![parseInt(t.value)] as DynamicAttributesData;
-      for (const [storeReads, propName, callback] of data) {
+      for (const [reactivityData, propName, callback] of data) {
         const handler = getHandlerForAttribute(propName);
         assert(handler !== null);
         assert(handler.managedDynamic);
-        const hh = microtaskDebounce(() => {
-          const [newVal, newStoreReads] = listenForStoreReads(callback);
-          handler.setOnHTMLElement(el, propName, newVal);
-          subscribeToStoreReads(hh, newStoreReads, { once: true });
+        enterOwner(ctx.ownerStack.at(-1) ?? null, () => {
+          resumeTask(() => handler.setOnHTMLElement(el, propName, callback()), reactivityData);
         });
-        subscribeToStoreReads(hh, storeReads, { once: true });
       }
     }
   }

@@ -1,4 +1,4 @@
-import { type ComponentFn, register, createSignal, createTask, type EventHandler, For, onCleanup, getOwner } from "@lentjs/core";
+import { type ComponentFn, register, createSignal, createTask, type EventHandler, For, onCleanup } from "@lentjs/core";
 
 type CounterButtonProps = {
   min: () => number,
