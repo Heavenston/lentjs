@@ -20,7 +20,7 @@ let currentRoot: Root | null = null;
 function rootCleanup(this: Root) {
   if (this.cleaned) return;
   this.cleaned = true;
-  this.cleanupCallbacks.forEach(cb => cb());
+  this.cleanupCallbacks.splice(0).forEach(cb => cb());
 }
 
 function createRootCleanup(root: Root): (() => void) {
