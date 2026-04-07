@@ -41,13 +41,18 @@ export type CapturedOwnerData = {
 
 export function createCapturingOwner(parent: Owner | null = getOwner()): [owner: Owner, capture: () => CapturedOwnerData] {
   const [root, cleanup] = Root.create(convertOwner(parent), true);
+  const owner = convertOwner(root);
+  if (parent) {
+    const unsubCleanup = onCleanup(cleanup, parent);
+    onCleanup(unsubCleanup, owner);
+  }
   const capture = (): CapturedOwnerData => {
     cleanup();
     return {
       tasks: root.tasks!.map<CapturedTaskData>(p => [p.cb, p.capture()]),
     };
   };
-  return [convertOwner(root), capture];
+  return [owner, capture];
 }
 
 export function enterOwner<A extends any[], T>(root: Owner, cb: (...args: A) => T, ...args: A): T {

@@ -44,7 +44,10 @@ const forMapper = register(<T>(props: RefForProps<T>, state: ForState, previous:
         setIndex,
         cleanup: ownerCleanup,
       });
-      newElements.push(enterOwner(owner, () => untrack(() => props.children(val, getIndex))));
+      newElements.push({
+        withOwner: owner,
+        fun: props.children.bind(null, val, getIndex),
+      });
     }
   });
 

@@ -1,6 +1,6 @@
-import { isJSXElementString, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular } from ".";
-import { assert, isFunction } from "./utils";
-import { createReaction, enterOwner, getOwner } from "@lentjs/core-reactivity";
+import { isJSXElementDynamic, isJSXElementString, isJSXElementWithOwner, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular, type JSXElementWithOwner } from ".";
+import { assert, unreachable } from "./utils";
+import { createReaction, enterOwner, getOwner, untrack } from "@lentjs/core-reactivity";
 
 export type JSXStateCommon = { kind: string, element: JSXElement };
 export type JSXStateSingular = JSXStateCommon & { kind: "singular", element: JSXElementSingular, node: ChildNode | null };
@@ -13,8 +13,9 @@ export type JSXStateDynamic = JSXStateCommon & {
   cleanup(): void;
   remove(): void,
 };
+export type JSXStateWithOwner = JSXStateCommon & { kind: "withOwner", element: JSXElementWithOwner, resultState: JSXState };
 export type JSXStateArray = JSXStateCommon & { kind: "array", element: JSXElementArray, states: JSXState[] }
-export type JSXState = JSXStateSingular | JSXStateArray | JSXStateDynamic;
+export type JSXState = JSXStateSingular | JSXStateArray | JSXStateWithOwner | JSXStateDynamic;
 
 export function getFirstElement(state: JSXState): ChildNode | null {
   switch (state.kind) {
@@ -27,6 +28,8 @@ export function getFirstElement(state: JSXState): ChildNode | null {
         return potentialAnchor;
     }
     return null;
+  case "withOwner":
+    return getFirstElement(state.resultState);
   case "dynamic":
     return state.startAnchor;
   }
@@ -43,6 +46,8 @@ export function getLastElement(state: JSXState): ChildNode | null {
         return potentialAnchor;
     }
     return null;
+  case "withOwner":
+    return getLastElement(state.resultState);
   case "dynamic":
     return state.endAnchor;
   }
@@ -68,9 +73,14 @@ export function changeStateAnchor(parent: Node, state: JSXState, newAnchor: Chil
     if (state.node !== null)
       parent.insertBefore(state.node, newAnchor);
     break;
+  case "withOwner":
+    changeStateAnchor(parent, state.resultState, newAnchor);
+    break;
   case "dynamic":
     state.changeAnchor(newAnchor);
     break;
+  default:
+    unreachable(state);
   }
 }
 
@@ -82,9 +92,14 @@ export function removeStateNodes(state: JSXState) {
   case "array":
     state.states.forEach(removeStateNodes);
     break;
+  case "withOwner":
+    removeStateNodes(state.resultState);
+    break;
   case "dynamic":
     state.remove();
     break;
+  default:
+    unreachable(state);
   }
 }
 
@@ -94,9 +109,14 @@ export function cleanupStateNodes(state: JSXState) {
   case "array":
     state.states.forEach(cleanupStateNodes);
     break;
+  case "withOwner":
+    cleanupStateNodes(state.resultState);
+    break;
   case "dynamic":
     state.cleanup();
     break;
+  default:
+    unreachable(state);
   }
 }
 
@@ -145,7 +165,10 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, chil
   const owner = getOwner();
   assert(owner !== null);
   const unsub = createReaction(() => enterOwner(owner, () => {
-    lastResultState = patchElement(parent, dynamicEndAnchor, lastResultState, child(lastResultState?.element));
+    const val = child(lastResultState?.element);
+    untrack(() => {
+      lastResultState = patchElement(parent, dynamicEndAnchor, lastResultState, val);
+    });
   }));
 
   return {
@@ -232,33 +255,36 @@ export function patchElement(parent: Node, anchorElement: ChildNode | null, prev
     return previousState;
   }
 
-  if (previousState?.kind === "dynamic") {
-    removeStateNodes(previousState);
-    previousState = null;
-  }
-
-  if (isFunction(child)) {
-    if (previousState)
-      removeStateNodes(previousState);
-    return patchElementDynamic(parent, anchorElement, child);
-  }
-  
   if (Array.isArray(child)) {
     if (previousState?.kind !== "array") {
-      if (previousState)
-        removeStateNodes(previousState);
+      if (previousState) removeStateNodes(previousState);
       return appendArray(parent, anchorElement, child);
     }
     return patchElementArrayNew(parent, anchorElement, previousState, child);
   }
-  else {
-    child satisfies JSXElementSingular;
 
-    if (previousState === null || previousState.kind === "singular") {
-      return patchElementSingular(parent, anchorElement, previousState, child);
-    }
-    else {
-      throw new Error("todo");
-    }
+  if (isJSXElementDynamic(child)) {
+    if (previousState) removeStateNodes(previousState);
+    return patchElementDynamic(parent, anchorElement, child);
   }
+
+  if (isJSXElementWithOwner(child)) {
+    if (previousState) removeStateNodes(previousState);
+    return enterOwner(child.withOwner, () => {
+      const el = child.fun();
+      const resultState = patchElement(parent, anchorElement, null, el);
+      return {
+        kind: "withOwner",
+        element: child,
+        resultState,
+      };
+    });
+  }
+  
+  child satisfies JSXElementSingular;
+  if (previousState?.kind !== "singular") {
+    if (previousState) removeStateNodes(previousState);
+    previousState = null;
+  }
+  return patchElementSingular(parent, anchorElement, previousState, child);
 }

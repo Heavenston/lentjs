@@ -1,9 +1,8 @@
-import type { JSXElement, OwnerCleanup } from ".";
+import type { JSXElementDynamic, JSXElementWithOwner, Owner } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, cleanupStateNodes, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState } from "./patchElement";
-import { onCleanup, createOwner, enterOwner, type CapturedReactivityData, type CapturedTaskData, resumeTask, resumeReaction } from "@lentjs/core-reactivity";
+import { createOwner, type CapturedReactivityData, resumeReaction } from "@lentjs/core-reactivity";
 import { assert, noop, unreachable } from "./utils";
-import type { Owner } from "@lentjs/core-reactivity/src/owner-internal";
 import { deserialize } from "@lentjs/core-serialize";
 
 const REMOVE_DIRECTIVES = false;
@@ -15,11 +14,13 @@ export type Directives = {
   "directives-data": unknown[],
 
   "dyn": {
-    update: (previous?: JSXElement) => JSXElement,
+    update: JSXElementDynamic,
     reactivityData: CapturedReactivityData,
-    tasks: CapturedTaskData[],
   },
   "dyn/": null,
+
+  "own": JSXElementWithOwner["withOwner"],
+  "own/": null,
 
   "arr": null,
   "arr/": null,
@@ -47,6 +48,7 @@ type RunCtx = {
   directivesData: readonly unknown[] | null,
   nodesToRemove: (ChildNode | Attr)[],
   dynamicStateStack: StateStackElement[],
+  ownerStack: Owner[],
 };
 
 function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Comment, parent: Node, d: D) {
@@ -75,10 +77,6 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     const endAnchor = directiveNode;
 
     let resultState = stateFromStack.state;
-
-    for (const data of dynamic.data.tasks) {
-      resumeTask(...data);
-    }
 
     let unsub: (() => void) = noop;
     if (isStatic) {
@@ -125,6 +123,13 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
         },
       });
 
+    break;
+  }
+  case "own": {
+    ctx.directivesData
+    break;
+  }
+  case "own/": {
     break;
   }
   case "arr": {
@@ -221,20 +226,21 @@ function domVisitor(ctx: RunCtx, node: ChildNode) {
       directivesData: ctx.directivesData,
       nodesToRemove: ctx.nodesToRemove,
       dynamicStateStack: [],
+      ownerStack: ctx.ownerStack,
     }, n);
   });
 }
 
 export function startRuntime(rootElement: HTMLElement) {
   console.time("startRuntime");
+  const rootOwner = createOwner();
   const ctx: RunCtx = {
     directivesData: null,
     nodesToRemove: [],
     dynamicStateStack: [],
+    ownerStack: [rootOwner],
   };
-  enterOwner(createOwner(), () => {
-    domVisitor(ctx, rootElement);
-  });
+  domVisitor(ctx, rootElement);
   assert(ctx.dynamicStateStack.length === 0);
   console.log(ctx.nodesToRemove.length, "total directive nodes and attributes found");
   if (REMOVE_DIRECTIVES)

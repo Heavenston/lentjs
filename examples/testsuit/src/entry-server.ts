@@ -2,7 +2,7 @@ import App from "./app";
 import { renderToString } from "@lentjs/core";
 
 export function render(_req: Request): string {
-  if (false as unknown)
+  if (true as unknown)
     return "";
   try {
     return renderToString(App);

@@ -1,7 +1,7 @@
 import type { ComponentFn, JSXElement, OwnerCleanup } from ".";
 import { closure, register } from "@lentjs/core-serialize";
-import { createControlledOwner, enterOwner } from "@lentjs/core-reactivity";
-import { constant, noop } from "@lentjs/utils";
+import { createControlledOwner, enterOwner, untrack } from "@lentjs/core-reactivity";
+import { constant } from "@lentjs/utils";
 
 type Props = {
   when: () => boolean,
@@ -17,9 +17,9 @@ const conditional = register((props: Props, state: State): JSXElement => {
   state.cleanup?.();
   const [owner, ownerCleanup] = createControlledOwner();
   state.cleanup = ownerCleanup;
-  const fn = props.when() ? props.children : props.fallback;
+  const fn = (props.when() ? props.children : props.fallback) ?? constant(null);
 
-  return (enterOwner<[], JSXElement>).bind(null, owner, fn ?? constant(null));
+  return enterOwner(owner, untrack, fn);
 }, "__lentjs_showConditional");
 export const Show: ComponentFn<Props> = register(props => {
   return closure(conditional, props, {

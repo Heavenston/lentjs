@@ -1,9 +1,10 @@
-import { createSignal, untrack, type JSXElement } from ".";
-import type { SignalSetter } from "@lentjs/core-reactivity";
+import { createControlledOwner, createSignal, enterOwner, untrack, type JSXElement } from ".";
+import type { OwnerCleanup, SignalSetter } from "@lentjs/core-reactivity";
 import { closure, register } from "@lentjs/core-serialize";
 
 type ElementState<T> = {
   setEl: SignalSetter<T>,
+  cleanup: OwnerCleanup,
 };
 type ForState<T> = {
   elements: ElementState<T>[],
@@ -13,34 +14,40 @@ export type ForProps<T> = {
   children: (idx: number, element: () => T) => JSXElement,
 };
 const forMapper = register(<T>(props: ForProps<T>, state: ForState<T>, previous: JSXElement): JSXElement => {
-  const old_jsx_elements = Array.isArray(previous) ? previous : [previous];
-
-  const new_elements: ElementState<T>[] = [];
-  const old_elements: ElementState<T>[] = state.elements;
-  const jsx_elements: JSXElement[] = [];
+  const newState: ElementState<T>[] = [];
+  const oldState: ElementState<T>[] = state.elements;
+  const oldElements = Array.isArray(previous) ? previous : [previous];
+  const newElements: JSXElement[] = [];
 
   const each = props.each();
-  for (let i = 0; i < each.length; i++) {
-    const val: T = each[i]!;
-    const oldel = old_elements[i];
+  for (let idx = 0; idx < each.length; idx++) {
+    const val: T = each[idx]!;
+    const oldel = oldState[idx];
     if (oldel) {
       oldel.setEl(val);
-      new_elements.push(oldel);
-      jsx_elements.push(old_jsx_elements[i]);
+      newState.push(oldel);
+      newElements.push(oldElements[idx]);
     }
     else {
-      const [el, setEl] = createSignal(val);
-      new_elements.push({
+      const [getEl, setEl] = createSignal(val);
+      const [owner, ownerCleanup] = createControlledOwner();
+      newState.push({
         setEl,
+        cleanup: ownerCleanup,
       });
-      const child = (untrack<JSXElement>).bind(null, props.children.bind(null, i, el));
-      jsx_elements.push(child);
+      newElements.push({
+        withOwner: owner,
+        fun: props.children.bind(null, idx, getEl),
+      });
     }
   }
 
-  state.elements = new_elements;
+  for (let i = each.length; i < oldState.length; i++)
+    oldState[i]!.cleanup();
 
-  return jsx_elements;
+  state.elements = newState;
+
+  return newElements;
 }, "__lentjs_forMapper");
 export const For = register(<T>(props: ForProps<T>): JSXElement => {
   return closure(forMapper<T>, props, { elements: [] });

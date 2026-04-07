@@ -9,8 +9,8 @@ export { type Attributes, type AttributeValue } from "./attributes";
 export { type SSRElement, isSSRElement } from "./ssr-element";
 
 import { register, serialize } from "@lentjs/core-serialize";
-import { isFunction, unreachable } from "./utils";
-import { createCapturingOwner, createOwner, createTask, enterOwner, getOwner, onCleanup, startReaction, type CapturedOwnerData, type CapturedReactivityData } from "@lentjs/core-reactivity";
+import { isFunction, isObject } from "./utils";
+import { createOwner, createTask, enterOwner, onCleanup, startReaction, type Owner } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName, ATTRIBUTE_PREFIX } from "./runtime";
 import { escapeHtml } from "./escape-html";
 import { getHandlerForAttribute, type Attributes } from "./attributes";
@@ -22,7 +22,8 @@ export type JSXElementString = number | string;
 export type JSXElementSingular = SSRElement | ChildNode | JSXElementString | null | undefined;
 export type JSXElementArray = JSXElement[];
 export type JSXElementDynamic = (previous?: JSXElement) => JSXElement;
-export type JSXElement = JSXElementSingular | JSXElementArray | JSXElementDynamic;
+export type JSXElementWithOwner = { fun: () => JSXElement, withOwner: Owner };
+export type JSXElement = JSXElementSingular | JSXElementArray | JSXElementWithOwner | JSXElementDynamic;
 export type PropertyValue = string | number | (() => PropertyValue);
 export type ClassList = string | Partial<Record<string, boolean>> | ClassList[];
 
@@ -32,6 +33,14 @@ export type EventHandler<E> = (event: E) => unknown;
 
 export function isJSXElementString(t: unknown): t is JSXElementString {
   return typeof t === "string" || typeof t === "number";
+}
+
+export function isJSXElementDynamic(t: JSXElement): t is JSXElementDynamic {
+  return isFunction(t);
+}
+
+export function isJSXElementWithOwner(t: JSXElement): t is JSXElementWithOwner {
+  return isObject(t) && ("withOwner" in t && "fun" in t);
 }
 
 export function renderClasslist(list: ClassList): string[] {
@@ -58,25 +67,7 @@ function createSSRDirective(name: string, arg: unknown = null, embed: boolean = 
   }
 }
 
-type ResolvedJSXElementDynamic = { isDynamic: true, reactivityData: CapturedReactivityData, ownerData: CapturedOwnerData, el: JSXElementDynamic, resolved: ResolvedJSXElement };
-type ResolvedJSXElement = Exclude<JSXElement, JSXElementDynamic> | ResolvedJSXElementDynamic;
-function resolveDynamicJSXElements(el: JSXElementDynamic): ResolvedJSXElementDynamic;
-function resolveDynamicJSXElements(el: JSXElement): ResolvedJSXElement;
-function resolveDynamicJSXElements(el: JSXElement): ResolvedJSXElement {
-  if (!isFunction(el)) {
-    return el;
-  }
-
-  const [owner, capture] = createCapturingOwner();
-  const [reactivityData, resolved] = enterOwner(owner, () => {
-    const [val, reactivityData] = startReaction(() => el());
-    const childEl = resolveDynamicJSXElements(val);
-    return [reactivityData, childEl];
-  });
-  const ownerData = capture();
-  return { isDynamic: true, reactivityData, ownerData, el, resolved };
-}
-function stringifyJSXElement(el: JSXElement | ResolvedJSXElementDynamic, isInsideDynamic: boolean = false): string {
+function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): string {
   if (isSSRElement(el)) {
     return el.t;
   }
@@ -89,20 +80,24 @@ function stringifyJSXElement(el: JSXElement | ResolvedJSXElementDynamic, isInsid
   else if (el === undefined) {
     return isInsideDynamic ? createSSRDirective("und", null) : "";
   }
-  else if (isFunction(el)) {
-    return stringifyJSXElement(resolveDynamicJSXElements(el), isInsideDynamic);
-  }
-  else if ("isDynamic" in el) {
-    if (el.reactivityData.length <= 0 && el.ownerData.tasks.length <= 0 && !isInsideDynamic) {
-      return stringifyJSXElement(el.resolved, false);
+  else if (isJSXElementDynamic(el)) {
+    const [val, reactivityData] = startReaction(() => el());
+    if (reactivityData.length <= 0 && !isInsideDynamic) {
+      return stringifyJSXElement(val, false);
     }
     const prefix = createSSRDirective("dyn", {
-      update: el.el,
-      reactivityData: el.reactivityData,
-      tasks: el.ownerData.tasks,
+      update: el,
+      reactivityData: reactivityData,
     });
     const suffix = createSSRDirective("dyn/");
-    return `${prefix}${stringifyJSXElement(el.resolved, true)}${suffix}`;
+    return `${prefix}${stringifyJSXElement(val, true)}${suffix}`;
+  }
+  else if (isJSXElementWithOwner(el)) {
+    const prefix = createSSRDirective("own", el.withOwner);
+    const suffix = createSSRDirective("own/");
+    return enterOwner(el.withOwner, () => {
+      return `${prefix}${stringifyJSXElement(el.fun(), true)}${suffix}`;
+    });
   }
   else if (Array.isArray(el)) {
     if (!isInsideDynamic) {
@@ -114,11 +109,10 @@ function stringifyJSXElement(el: JSXElement | ResolvedJSXElementDynamic, isInsid
     const suffix = createSSRDirective("arr/");
     return `${prefix}${t}${suffix}`;
   }
-  else if (el instanceof Node) {
-    throw new Error("Unsupported Node");
+  else {
+    el satisfies Node;
+    throw new Error("Node impossible on the server");
   }
-  else
-    unreachable(el);
 }
 
 export function renderToDom(parent: Node, el: ComponentFn<{}>) {
@@ -134,7 +128,7 @@ export function renderToString(el: ComponentFn<{}>): string {
 
   global_h_config = "ssr";
   try {
-    const t = stringifyJSXElement(() => h(el));
+    const t = enterOwner(createOwner(), () => stringifyJSXElement(h(el)));
     const directives_data = createSSRDirective("directives-data", global_directive_data_array, true);
     return `${directives_data}${t}`;
   }
@@ -224,7 +218,11 @@ export function h<P>(element: string | ComponentFn<P>, props?: P): JSXElement {
     }
   }
   else {
-    return enterOwner(createOwner(), element, props!);
+    return {
+      withOwner: createOwner(),
+      fun: element.bind(null, props!),
+    };
+    // return enterOwner(createOwner(), element, props!);
   }
 }
 register(h, "__lentjs_h");
