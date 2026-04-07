@@ -1,12 +1,12 @@
 import type { CapturedTaskReactivityData, JSXElement, OwnerCleanup } from ".";
 import { getHandlerForAttribute } from "./attributes";
-import { changeStateAnchor, patchElement, removeStateNodes, type JSXState } from "./patchElement";
+import { changeStateAnchor, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState } from "./patchElement";
 import { resumeTask, type CapturedTaskData, onCleanup, createOwner, enterOwner } from "@lentjs/core-reactivity";
 import { assert, unreachable } from "./utils";
 import type { Owner } from "@lentjs/core-reactivity/src/owner-internal";
 import { deserialize } from "@lentjs/core-serialize";
 
-const REMOVE_DIRECTIVES = true;
+const REMOVE_DIRECTIVES = false;
 
 export const DIRECTIVE_PREFIX = "lentjs";
 export const ATTRIBUTE_PREFIX = `data-${DIRECTIVE_PREFIX}`;
@@ -110,8 +110,8 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
         kind: "state",
         state: {
           kind: "dynamic",
-          startAnchor: isStatic ? null : startAnchor,
-          endAnchor: isStatic ? null : endAnchor,
+          startAnchor: isStatic ? getFirstElement(resultState) : startAnchor,
+          endAnchor: isStatic ? getLastElement(resultState) : endAnchor,
           element: dynamic.data.update,
           cleanup() {
             ownerCleanup();
@@ -125,16 +125,20 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
             removeStateNodes(resultState);
           },
           changeAnchor(newAnchor) {
-            if (!isStatic) {
+            console.log("Anchor change")
+            if (isStatic) {
+              changeStateAnchor(parent, resultState, newAnchor);
+            }
+            else {
               parent.insertBefore(startAnchor, newAnchor);
               parent.insertBefore(endAnchor, newAnchor);
+              changeStateAnchor(parent, resultState, endAnchor);
             }
-            changeStateAnchor(parent, resultState, endAnchor);
           },
         },
       });
     // Since we do not make a JSXState, we need to register the cleanup manually
-    else if (parentOwner)
+    else if (parentOwner && !parentOwner.detached)
       onCleanup(() => ownerCleanup(), parentOwner);
     // The only case where the owner will never be cleaned
     else if (isStatic)
@@ -201,7 +205,7 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
         const handler = getHandlerForAttribute(propName);
         assert(handler !== null);
         assert(handler.managedDynamic);
-        enterOwner(ctx.ownerStack.at(-1) ?? null, () => {
+        enterOwner(ctx.ownerStack.at(-1)!, () => {
           resumeTask(() => handler.setOnHTMLElement(el, propName, callback()), reactivityData);
         });
       }
@@ -245,11 +249,13 @@ function domVisitor(ctx: RunCtx, node: ChildNode) {
 
 export function startRuntime(rootElement: HTMLElement) {
   console.time("startRuntime");
+  const [rootOwner, rootOwnerCleanup] = createOwner();
+  rootOwnerCleanup.detach();
   const ctx: RunCtx = {
     directivesData: null,
     nodesToRemove: [],
     dynamicStateStack: [],
-    ownerStack: [],
+    ownerStack: [rootOwner],
   };
   domVisitor(ctx, rootElement);
   assert(ctx.dynamicStateStack.length === 0);

@@ -1,6 +1,6 @@
-import { ownerToRoot, rootToOwner, type Owner } from "./owner-internal";
+import { owner2Root, type Owner } from "./owner-internal";
 import { createOwner, enterOwner, getOwner, onCleanup } from "./owner";
-import { microtaskDebounce, noop } from "@lentjs/utils";
+import { noop } from "@lentjs/utils";
 import { listenForSignalReads, registerSignalCallback, type SignalCallback, type SignalId } from "./signal-internal";
 
 declare const CapturedTaskReactivityData: unique symbol;
@@ -19,17 +19,17 @@ function taskReactivityData<T>(val: T): T extends CapturedTaskReactivityData ? S
 }
 
 function internalCreateOrResumeTask(task: () => void, config: TaskConfig, resumeWithSignalReads?: SignalId[]) {
-  const parentOwner = ownerToRoot(config.parentOwner === undefined ? getOwner() : config.parentOwner);
+  const parentOwner = owner2Root(config.parentOwner === undefined ? getOwner() : config.parentOwner);
   let cleanup: () => void = config.initialCleanup ?? noop;
   let latestSignalReads: SignalId[] = [];
 
   const callAndSub = () => {
     cleanup();
-    const [newOwner, newCleanup] = createOwner(rootToOwner(parentOwner));
+    const [newOwner, newCleanup] = createOwner(owner2Root(parentOwner));
     // Cleans up the owner when the parent is cleaned, but also unregisters the
     // cleanup callback from the parent when this one is cleaned
     if (!config.detachedFromParent && parentOwner)
-      onCleanup(onCleanup(newCleanup, rootToOwner(parentOwner)), newOwner);
+      onCleanup(onCleanup(newCleanup, owner2Root(parentOwner)), newOwner);
     cleanup = newCleanup;
     enterOwner(newOwner, () => {
       const signalReads: SignalId[] = [];

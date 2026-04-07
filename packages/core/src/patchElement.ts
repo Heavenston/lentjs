@@ -8,7 +8,7 @@ export type JSXStateDynamic = JSXStateCommon & { kind: "dynamic", startAnchor: C
 export type JSXStateArray = JSXStateCommon & { kind: "array", element: JSXElementArray, states: JSXState[] }
 export type JSXState = JSXStateSingular | JSXStateArray | JSXStateDynamic;
 
-function getFirstElement(state: JSXState): ChildNode | null {
+export function getFirstElement(state: JSXState): ChildNode | null {
   switch (state.kind) {
   case "singular":
     return state.node;
@@ -24,7 +24,7 @@ function getFirstElement(state: JSXState): ChildNode | null {
   }
 }
 
-function getLastElement(state: JSXState): ChildNode | null {
+export function getLastElement(state: JSXState): ChildNode | null {
   switch (state.kind) {
   case "singular":
     return state.node;
@@ -211,14 +211,14 @@ export function patchElementArrayNew(
 }
 
 export function patchElement(parent: Node, anchorElement: ChildNode | null, previousState: JSXState | null, child: JSXElement): JSXState {
+  assert(anchorElement === null || anchorElement.parentNode === parent);
+  assert(!isSSRElement(child));
+
   if (previousState !== null && previousState.element === child) {
     if (!stateIsAnchoredTo(previousState, anchorElement))
       changeStateAnchor(parent, previousState, anchorElement);
     return previousState;
   }
-
-  assert(anchorElement === null || anchorElement.parentNode === parent);
-  assert(!isSSRElement(child));
 
   if (previousState?.kind === "dynamic") {
     removeStateNodes(previousState);

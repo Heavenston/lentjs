@@ -1,4 +1,4 @@
-import { assert } from "@lentjs/utils";
+import { assert, noop, remove, unreachable } from "@lentjs/utils";
 import type { CapturedTaskData } from "./task";
 
 export type RootCleanup = (() => void) & { detach(): void };
@@ -25,85 +25,119 @@ export type TaskCaptureData = {
   cb: CapturedTaskData[0],
   capture: () => CapturedTaskData[1],
 };
-export type Root = {
-  state: RootState,
-  readonly creationStackTrace: Error,
-  readonly parent: Root | null,
-  readonly cleanupCallbacks: (() => void)[],
+
+export class Root {
+  static #currentRoot: Root | null = null;
+  /**
+   * This is a development helper for detecting root leaks
+   */
+  static #cleanupLeakDetector = new FinalizationRegistry((root: Root) => {
+    if (root.state !== RootState.Cleaned) {
+      if (root.state === RootState.Detached)
+        console.log("Detached cleanup gced");
+      else
+        console.warn("Leaked cleanup of root created at", root.creationStackTrace);
+    }
+  });
+
+  #state: RootState = RootState.Live;
+  readonly #cleanupCallbacks: (() => void)[] = [];
+
+  readonly creationStackTrace = new Error();
+  readonly parent: Root | null;
   /**
    * If present, tasks are captured into this list
    */
-  readonly tasks?: TaskCaptureData[],
-};
+  readonly tasks?: TaskCaptureData[];
 
-let currentRoot: Root | null = null;
-
-function rootCleanup(this: Root) {
-  switch (this.state) {
-  case RootState.Detached:
-    console.warn(`Cannot clean a ${this.state} root`);
-  case RootState.Cleaned:
-    return;
+  public get state(): RootState {
+    return this.#state;
   }
-  this.state = RootState.Cleaned;
-  this.cleanupCallbacks.splice(0).forEach(cb => cb());
-}
 
-function rootDetach(this: Root) {
-  switch (this.state) {
-  case RootState.Detached:
-  case RootState.Cleaned:
-    console.warn(`Cannot detach a ${this.state} root`);
-    return;
+  public get cleaned(): boolean {
+    return this.#state === RootState.Cleaned;
   }
-  this.state = RootState.Detached;
-  // Not needed anymore
-  this.cleanupCallbacks.splice(0);
-}
 
-export function getCurrentRoot(): Root | null {
-  return currentRoot;
-}
-
-/**
- * This is a development helper for detecting root leaks
- */
-const cleanupLeakDetector = new FinalizationRegistry((root: Root) => {
-  if (root.state !== RootState.Cleaned) {
-    if (root.state === RootState.Detached)
-      console.log("Detached cleanup gced");
-    else
-      console.warn("Leaked cleanup of root created at", root.creationStackTrace);
+  public get detached(): boolean {
+    return this.#state === RootState.Detached;
   }
-});
 
-export function createRoot(extend: Partial<Root> = {}): [root: Root, cleanup: RootCleanup] {
-  const root: Root = {
-    state: RootState.Live,
-    creationStackTrace: new Error(),
-    parent: getCurrentRoot(),
-    cleanupCallbacks: [],
-    ...extend,
-  };
-
-  const cleanup = rootCleanup.bind(root) as RootCleanup;
-  cleanup.detach = rootDetach.bind(root);
-
-  cleanupLeakDetector.register(cleanup, root);
-  return [root, cleanup];
-}
-
-export function enterRoot<A extends any[], T>(root: Root | null, cb: (...args: A) => T, ...args: A): T {
-  assert(root === null || root.state !== RootState.Cleaned, "Cannot enter an already cleaned root");
-  const prev = currentRoot;
-  currentRoot = root;
-  try {
-    return cb(...args);
+  private constructor(parent: Root | null, capturing: boolean) {
+    this.parent = parent;
+    if (capturing)
+      this.tasks = [];
   }
-  catch(e) {
-    throw e;
+
+  public static create(parent: Root | null, capturing: boolean): [root: Root, cleanup: RootCleanup] {
+    const root = new Root(parent, capturing);
+    const cleanup = root.#clean.bind(root) as RootCleanup;
+    cleanup.detach = root.#detach.bind(root);
+    Root.#cleanupLeakDetector.register(cleanup, root);
+    return [root, cleanup];
   }
-  finally {
-    currentRoot = prev;
+
+  public static get currentRoot() {
+    return this.#currentRoot;
+  }
+
+  public enter<A extends any[], T>(cb: (...args: A) => T, ...args: A): T {
+    assert(this.state !== RootState.Cleaned, "Cannot enter an already cleaned root");
+    const prev = Root.#currentRoot;
+    Root.#currentRoot = this;
+    try {
+      return cb(...args);
+    }
+    catch(e) {
+      throw e;
+    }
+    finally {
+      Root.#currentRoot = prev;
+    }
+  }
+
+  #clean() {
+    switch (this.#state) {
+    case RootState.Detached:
+      console.warn(`Cannot clean a ${this.state} root`);
+    case RootState.Cleaned:
+      return;
+    case RootState.Live:
+      break;
+    default: unreachable(this.#state);
+    }
+    this.#state = RootState.Cleaned;
+    this.#cleanupCallbacks.splice(0).forEach(cb => cb());
+  }
+
+  #detach(this: Root) {
+    switch (this.#state) {
+    case RootState.Detached:
+    case RootState.Cleaned:
+      console.warn(`Cannot detach a ${this.state} root`);
+      return;
+    case RootState.Live:
+      break;
+    default: unreachable(this.#state);
+    }
+    this.#state = RootState.Detached;
+    this.#cleanupCallbacks.splice(0);
+  }
+
+  public onCleanup(cb: () => void): () => void {
+    switch (this.#state) {
+    case RootState.Live:
+      this.#cleanupCallbacks.push(cb);
+      return () => {
+        if (this.#state === RootState.Live)
+          remove(this.#cleanupCallbacks, cb);
+      };
+    case RootState.Detached:
+      // We do not bother to store the callback, it will never be called
+      return noop;
+    case RootState.Cleaned:
+      cb();
+      return noop;
+    default: unreachable(this.#state);
+    }
   }
 }

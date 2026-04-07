@@ -4,13 +4,17 @@ declare const ownerSymbol: unique symbol;
 /**
  * Opaque type representing a root
  */
-export type Owner = { [ownerSymbol]: "owner" };
+export type Owner = { [ownerSymbol]: "owner", readonly cleaned: boolean, readonly detached: boolean };
 
-export function ownerToRoot<O>(owner: O): O extends Owner ? Root : O {
+// Compile time check that root have the correct additional properties
+declare const P: Root & { [ownerSymbol]: "owner" };
+if (false as true)
+ P satisfies Owner;
+
+/**
+ * Noop function for converting between owner and root
+ */
+export function owner2Root<O>(owner: O): O extends Owner ? Root : O extends Root ? Owner : O {
   // @ts-ignore
   return owner;
-}
-export function rootToOwner<O>(root: O): O extends Root ? Owner : O {
-  // @ts-ignore
-  return root;
 }
