@@ -2,7 +2,6 @@ export type { Owner } from "./owner-internal";
 
 import { convertOwner, type Owner } from "./owner-internal";
 import { Root, RootState } from "./root-internal";
-import type { CapturedTaskData } from "./task";
 
 export type OwnerCleanup = (() => void) & { detach(): void };
 
@@ -11,7 +10,7 @@ export function getOwner(): Owner | null {
 }
 
 export function createOwner(parent: Owner | null = getOwner()): Owner {
-  const [root, cleanup] = Root.create(convertOwner(parent), false);
+  const [root, cleanup] = Root.create(convertOwner(parent));
   const owner = convertOwner(root);
   if (parent) {
     onDetach(cleanup.detach, parent);
@@ -25,7 +24,7 @@ export function createOwner(parent: Owner | null = getOwner()): Owner {
 }
 
 export function createControlledOwner(parent: Owner | null = getOwner()): [owner: Owner, cleanup: OwnerCleanup] {
-  const [root, cleanup] = Root.create(convertOwner(parent), false);
+  const [root, cleanup] = Root.create(convertOwner(parent));
   const owner = convertOwner(root);
   if (parent) {
     const unsubCleanup = onCleanup(cleanup, parent);
@@ -33,26 +32,6 @@ export function createControlledOwner(parent: Owner | null = getOwner()): [owner
     onDetach(unsubCleanup, owner);
   }
   return [owner, cleanup];
-}
-
-export type CapturedOwnerData = {
-  tasks: CapturedTaskData[],
-}
-
-export function createCapturingOwner(parent: Owner | null = getOwner()): [owner: Owner, capture: () => CapturedOwnerData] {
-  const [root, cleanup] = Root.create(convertOwner(parent), true);
-  const owner = convertOwner(root);
-  if (parent) {
-    const unsubCleanup = onCleanup(cleanup, parent);
-    onCleanup(unsubCleanup, owner);
-  }
-  const capture = (): CapturedOwnerData => {
-    cleanup();
-    return {
-      tasks: root.tasks!.map<CapturedTaskData>(p => [p.cb, p.capture()]),
-    };
-  };
-  return [owner, capture];
 }
 
 export function enterOwner<A extends any[], T>(root: Owner, cb: (...args: A) => T, ...args: A): T {

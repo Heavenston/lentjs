@@ -9,7 +9,7 @@ export type Owner = { [ownerSymbol]: "owner", readonly cleaned: boolean, readonl
 // Compile time check that root have the correct additional properties
 declare const P: Root & { [ownerSymbol]: "owner" };
 if (false as true)
- P satisfies Owner;
+  P satisfies Owner;
 
 /**
  * Noop function for converting between owner and root

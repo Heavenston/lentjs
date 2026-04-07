@@ -1,9 +1,6 @@
 import { createControlledOwner, enterOwner, getOwner, onCleanup } from "./owner";
 import { noop } from "@lentjs/utils";
 import { createReaction, resumeReaction, type CapturedReactivityData } from "./reaction";
-import { convertOwner } from "./owner-internal";
-
-export type CapturedTaskData = [cb: () => void, reactivityData: CapturedReactivityData];
 
 export type TaskConfig = {
   initialCleanup?: () => void,
@@ -11,7 +8,6 @@ export type TaskConfig = {
 
 function internalCreateOrResumeTask(task: () => void, config: TaskConfig, resumeWithReactivityData: CapturedReactivityData | null) {
   const parentOwner = getOwner();
-  const parentRoot = convertOwner(parentOwner);
 
   let previousCleanup = config.initialCleanup ?? noop;
   const cb = () => {
@@ -24,13 +20,6 @@ function internalCreateOrResumeTask(task: () => void, config: TaskConfig, resume
 
   if (parentOwner) {
     onCleanup(() => unsub(), parentOwner);
-  }
-
-  if (parentRoot?.tasks) {
-    parentRoot.tasks.push({
-      capture: () => unsub(),
-      cb: task,
-    });
   }
 }
 

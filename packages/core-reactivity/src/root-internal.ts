@@ -1,5 +1,4 @@
 import { assert, noop, remove } from "@lentjs/utils";
-import type { CapturedTaskData } from "./task";
 
 export type RootCleanup = (() => void) & { detach(): void };
 
@@ -21,11 +20,6 @@ export const enum RootState {
   Cleaned = "cleaned",
 }
 
-export type TaskCaptureData = {
-  cb: CapturedTaskData[0],
-  capture: () => CapturedTaskData[1],
-};
-
 export class Root {
   static #currentRoot: Root | null = null;
   /**
@@ -45,10 +39,6 @@ export class Root {
 
   readonly creationStackTrace = new Error();
   readonly parent: Root | null;
-  /**
-   * If present, tasks are captured into this list
-   */
-  readonly tasks?: TaskCaptureData[];
 
   public get state(): RootState {
     return this.#state;
@@ -62,14 +52,12 @@ export class Root {
     return this.#state === RootState.Detached;
   }
 
-  private constructor(parent: Root | null, capturing: boolean) {
+  private constructor(parent: Root | null) {
     this.parent = parent;
-    if (capturing)
-      this.tasks = [];
   }
 
-  public static create(parent: Root | null, capturing: boolean): [root: Root, cleanup: RootCleanup] {
-    const root = new Root(parent, capturing);
+  public static create(parent: Root | null): [root: Root, cleanup: RootCleanup] {
+    const root = new Root(parent);
     const cleanup = root.#switchTo.bind(root, RootState.Cleaned) as RootCleanup;
     cleanup.detach = root.#switchTo.bind(root, RootState.Detached);
     Root.#cleanupLeakDetector.register(cleanup, root);
