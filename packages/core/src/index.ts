@@ -16,7 +16,7 @@ import { escapeHtml } from "./escape-html";
 import { getHandlerForAttribute, type Attributes } from "./attributes";
 import { global_directive_data_array, sharedSSRSerialize } from "./shared-globals";
 import { type SSRElement, isSSRElement, SSRElementBuilder } from "./ssr-element";
-import { patchElement, removeStateNodes } from "./patchElement";
+import { cleanupStateNodes, patchElement } from "./patchElement";
 
 export type JSXElementString = number | string;
 export type JSXElementSingular = SSRElement | ChildNode | JSXElementString | null | undefined;
@@ -153,7 +153,7 @@ function createHTMLElement(element: string, props: object): HTMLElement {
   for (const [propName, propVal] of Object.entries(props)) {
     if (propName === "children") {
       const p = patchElement(el, null, null, propVal);
-      onCleanup(() => removeStateNodes(p));
+      onCleanup(() => cleanupStateNodes(p));
       continue;
     }
 

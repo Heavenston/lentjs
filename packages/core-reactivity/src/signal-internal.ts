@@ -1,3 +1,4 @@
+import { register } from "@lentjs/core-serialize";
 import { assert } from "@lentjs/utils";
 
 export type SignalId = string;
@@ -76,3 +77,4 @@ export function untrack<T>(cb: () => T): T {
     currentSignalListener = old_read_callback;
   }
 }
+register(untrack, "__lentjs_untrack");

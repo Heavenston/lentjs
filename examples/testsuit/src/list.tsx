@@ -7,7 +7,7 @@ function createElement(): Element {
 register(createElement, "____RANDOM_ID");
 
 type Element = { id: string };
-const elementRender = register((setElements: SignalSetter<Element[]>, element: Element, getIdx: SignalAccessor<number>) => {
+const elementRender = register((getElements: SignalAccessor<Element[]>, setElements: SignalSetter<Element[]>, element: Element, getIdx: SignalAccessor<number>) => {
   "use component";
 
   const i = crypto.randomUUID().split("-")[0];
@@ -16,7 +16,7 @@ const elementRender = register((setElements: SignalSetter<Element[]>, element: E
     attr:id={`el-${element.id}`}
     class={c.element}
   >
-    {element.id}:{" "}
+    {element.id} ({()=>getIdx()+1}/{()=>getElements().length}):{" "}
     <button
       on:click={() => {
         const idx = getIdx();
@@ -101,7 +101,7 @@ const List: ComponentFn<{}> = register(() => {
       each={elements}
       key={el => el.id}
     >
-      {elementRender.bind(null, setElements)}
+      {elementRender.bind(null, elements, setElements)}
     </RefFor>,
   ];
 }, "____RANDOM_ID");

@@ -36,13 +36,12 @@ function internalCreateOrResumeTask(task: () => void, config: TaskConfig, resume
       listenForSignalReads(task, signalReads);
       latestSignalReads = signalReads;
 
-      const cb: SignalCallback = { onUpdate: debounceRun };
+      const cb: SignalCallback = { onUpdate: callAndSub };
       for (const signalId of signalReads)
         registerSignalCallback(cb, signalId);
       onCleanup(() => { cb.onUpdate = null; });
     });
   };
-  const debounceRun = microtaskDebounce(callAndSub);
 
   if (parentOwner?.tasks != null) {
     parentOwner.tasks.push({
@@ -55,7 +54,7 @@ function internalCreateOrResumeTask(task: () => void, config: TaskConfig, resume
   }
   
   if (resumeWithSignalReads) {
-    const cb: SignalCallback = { onUpdate: debounceRun };
+    const cb: SignalCallback = { onUpdate: callAndSub };
     for (const signalId of resumeWithSignalReads)
       registerSignalCallback(cb, signalId);
     if (parentOwner)

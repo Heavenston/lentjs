@@ -33,7 +33,7 @@ const forMapper = register(<T>(props: ForProps<T>, state: ForState<T>, previous:
       new_elements.push({
         setEl,
       });
-      const child = untrack(() => props.children(i, el));
+      const child = (untrack<JSXElement>).bind(null, props.children.bind(null, i, el));
       jsx_elements.push(child);
     }
   }

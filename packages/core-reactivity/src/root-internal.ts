@@ -41,8 +41,8 @@ let currentRoot: Root | null = null;
 function rootCleanup(this: Root) {
   switch (this.state) {
   case RootState.Detached:
-  case RootState.Cleaned:
     console.warn(`Cannot clean a ${this.state} root`);
+  case RootState.Cleaned:
     return;
   }
   this.state = RootState.Cleaned;

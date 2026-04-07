@@ -4,7 +4,7 @@ import { createOwner, createTask, enterOwner, getOwner } from "@lentjs/core-reac
 
 export type JSXStateCommon = { kind: string, element: JSXElement };
 export type JSXStateSingular = JSXStateCommon & { kind: "singular", element: JSXElementSingular, node: ChildNode | null };
-export type JSXStateDynamic = JSXStateCommon & { kind: "dynamic", startAnchor: ChildNode | null, endAnchor: ChildNode | null, element: JSXElementDynamic, changeAnchor: (newAnchor: ChildNode | null) => void, cleanup: () => JSXState };
+export type JSXStateDynamic = JSXStateCommon & { kind: "dynamic", startAnchor: ChildNode | null, endAnchor: ChildNode | null, element: JSXElementDynamic, changeAnchor: (newAnchor: ChildNode | null) => void, cleanup: () => void, remove: () => void };
 export type JSXStateArray = JSXStateCommon & { kind: "array", element: JSXElementArray, states: JSXState[] }
 export type JSXState = JSXStateSingular | JSXStateArray | JSXStateDynamic;
 
@@ -48,7 +48,6 @@ function stateIsAnchoredTo(state: JSXState, anchor: ChildNode | null): boolean {
 }
 
 export function changeStateAnchor(parent: Node, state: JSXState, newAnchor: ChildNode | null) {
-  console.log("Moving", state, "to", newAnchor);
   switch (state.kind) {
   case "array":
     let currentAnchor = newAnchor;
@@ -76,8 +75,16 @@ export function removeStateNodes(state: JSXState) {
     state.states.forEach(removeStateNodes);
     break;
   case "dynamic":
-    removeStateNodes(state.cleanup());
+    state.remove();
     break;
+  }
+}
+
+export function cleanupStateNodes(state: JSXState) {
+  switch (state.kind) {
+  case "singular": break;
+  case "array": state.states.forEach(cleanupStateNodes); break;
+  case "dynamic": state.cleanup(); break;
   }
 }
 
@@ -135,11 +142,14 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, chil
     startAnchor: dynamicStartAnchor,
     endAnchor: dynamicEndAnchor,
     element: child,
-    cleanup: () => {
+    cleanup() {
       cleanupOwner();
       dynamicStartAnchor.remove();
       dynamicEndAnchor.remove();
-      return lastResultState!;
+    },
+    remove() {
+      removeStateNodes(lastResultState!);
+      this.cleanup();
     },
     changeAnchor(newAnchor) {
       parent.insertBefore(dynamicStartAnchor, newAnchor);
@@ -201,16 +211,18 @@ export function patchElementArrayNew(
 }
 
 export function patchElement(parent: Node, anchorElement: ChildNode | null, previousState: JSXState | null, child: JSXElement): JSXState {
-  if (previousState !== null && previousState.element === child && stateIsAnchoredTo(previousState, anchorElement)) return previousState;
+  if (previousState !== null && previousState.element === child) {
+    if (!stateIsAnchoredTo(previousState, anchorElement))
+      changeStateAnchor(parent, previousState, anchorElement);
+    return previousState;
+  }
 
   assert(anchorElement === null || anchorElement.parentNode === parent);
   assert(!isSSRElement(child));
 
-  if (previousState?.kind === "dynamic" && previousState.element === child) {
-    return previousState;
-  }
   if (previousState?.kind === "dynamic") {
-    return patchElement(parent, anchorElement, previousState.cleanup(), child);
+    removeStateNodes(previousState);
+    previousState = null;
   }
 
   if (isFunction(child)) {

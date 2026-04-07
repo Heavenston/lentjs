@@ -1,6 +1,6 @@
 import type { CapturedTaskReactivityData, JSXElement, OwnerCleanup } from ".";
 import { getHandlerForAttribute } from "./attributes";
-import { changeStateAnchor, patchElement, type JSXState } from "./patchElement";
+import { changeStateAnchor, patchElement, removeStateNodes, type JSXState } from "./patchElement";
 import { resumeTask, type CapturedTaskData, onCleanup, createOwner, enterOwner } from "@lentjs/core-reactivity";
 import { assert, unreachable } from "./utils";
 import type { Owner } from "@lentjs/core-reactivity/src/owner-internal";
@@ -113,20 +113,22 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
           startAnchor: isStatic ? null : startAnchor,
           endAnchor: isStatic ? null : endAnchor,
           element: dynamic.data.update,
-          cleanup: isStatic ? () => {
+          cleanup() {
             ownerCleanup();
-            return resultState;
-          } : () => {
-            startAnchor.remove();
-            endAnchor.remove();
-            ownerCleanup();
-            return resultState;
           },
-          changeAnchor: isStatic ? (newAnchor) => {
-            changeStateAnchor(parent, resultState, newAnchor);
-          } : (newAnchor) => {
-            parent.insertBefore(startAnchor, newAnchor);
-            parent.insertBefore(endAnchor, newAnchor);
+          remove() {
+            this.cleanup();
+            if (!isStatic) {
+              startAnchor.remove();
+              endAnchor.remove();
+            }
+            removeStateNodes(resultState);
+          },
+          changeAnchor(newAnchor) {
+            if (!isStatic) {
+              parent.insertBefore(startAnchor, newAnchor);
+              parent.insertBefore(endAnchor, newAnchor);
+            }
             changeStateAnchor(parent, resultState, endAnchor);
           },
         },

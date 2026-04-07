@@ -33,7 +33,7 @@ const forMapper = register(<T>(props: RefForProps<T>, state: ForState, previous:
     else {
       const [getIndex, setIndex] = createSignal(idx);
       newState.set(key, { index: idx, setIndex });
-      newElements.push(untrack(() => props.children(val, getIndex)));
+      newElements.push((untrack<JSXElement>).bind(null, props.children.bind(null, val, getIndex)));
     }
   });
 
@@ -42,5 +42,5 @@ const forMapper = register(<T>(props: RefForProps<T>, state: ForState, previous:
   return newElements;
 }, "__lentjs_refForMapper");
 export const RefFor = register(<T>(props: RefForProps<T>): JSXElement => {
-  return closure(forMapper, props, { currentState: new Map<unknown, ElementState> });
+  return closure(forMapper, props, { currentState: new Map });
 }, "__lentjs_refFor");
