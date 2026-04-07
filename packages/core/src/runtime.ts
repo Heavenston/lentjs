@@ -1,8 +1,8 @@
-import type { CapturedTaskReactivityData, JSXElement, OwnerCleanup } from ".";
+import type { JSXElement, OwnerCleanup } from ".";
 import { getHandlerForAttribute } from "./attributes";
-import { changeStateAnchor, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState } from "./patchElement";
-import { resumeTask, type CapturedTaskData, onCleanup, createOwner, enterOwner } from "@lentjs/core-reactivity";
-import { assert, unreachable } from "./utils";
+import { changeStateAnchor, cleanupStateNodes, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState } from "./patchElement";
+import { onCleanup, createOwner, enterOwner, type CapturedReactivityData, type CapturedTaskData, resumeTask, resumeReaction } from "@lentjs/core-reactivity";
+import { assert, noop, unreachable } from "./utils";
 import type { Owner } from "@lentjs/core-reactivity/src/owner-internal";
 import { deserialize } from "@lentjs/core-serialize";
 
@@ -16,7 +16,7 @@ export type Directives = {
 
   "dyn": {
     update: (previous?: JSXElement) => JSXElement,
-    reactivityData: CapturedTaskReactivityData,
+    reactivityData: CapturedReactivityData,
     tasks: CapturedTaskData[],
   },
   "dyn/": null,
@@ -36,10 +36,10 @@ type DirectiveHelper<K> = K extends keyof Directives ? { name: K, data: Directiv
 export type Directive = DirectiveHelper<DirectiveName>;
 
 export type ResumeAttributesData = [propName: string, value: unknown][];
-export type DynamicAttributesData = [reactivityData: CapturedTaskReactivityData, propName: string, callback: () => unknown][];
+export type DynamicAttributesData = [reactivityData: CapturedReactivityData, propName: string, callback: () => unknown][];
 
 type StateStackElement =
-  | { kind: "dynamic-start", startDirective: Comment, data: Directives["dyn"], ownerCleanup: OwnerCleanup }
+  | { kind: "dynamic-start", startDirective: Comment, data: Directives["dyn"] }
   | { kind: "array-start" }
   | { kind: "state", state: JSXState }
 ;
@@ -47,7 +47,6 @@ type RunCtx = {
   directivesData: readonly unknown[] | null,
   nodesToRemove: (ChildNode | Attr)[],
   dynamicStateStack: StateStackElement[],
-  ownerStack: Owner[],
 };
 
 function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Comment, parent: Node, d: D) {
@@ -57,22 +56,15 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     ctx.directivesData = d.data;
     break;
   case "dyn": {
-    const [owner, cleanup] = createOwner(ctx.ownerStack.at(-1) ?? null);
     ctx.dynamicStateStack.push({
       kind: "dynamic-start",
       startDirective: directiveNode,
       data: d.data,
-      ownerCleanup: cleanup,
     });
-    ctx.ownerStack.push(owner);
 
     break;
   }
   case "dyn/": {
-    const owner = ctx.ownerStack.pop();
-    assert(owner != null);
-    const parentOwner = ctx.ownerStack.at(-1) ?? null;
-
     const stateFromStack = ctx.dynamicStateStack.pop();
     assert(stateFromStack?.kind === "state");
     const dynamic = ctx.dynamicStateStack.pop();
@@ -83,27 +75,21 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     const endAnchor = directiveNode;
 
     let resultState = stateFromStack.state;
-    let ownerCleanup = dynamic.ownerCleanup;
 
-    enterOwner(owner, () => {
-      for (const data of dynamic.data.tasks) {
-        resumeTask(...data);
-      }
+    for (const data of dynamic.data.tasks) {
+      resumeTask(...data);
+    }
 
-      if (isStatic) {
-        ctx.nodesToRemove.push(startAnchor, endAnchor);
-      }
-      else {
-        resumeTask(() => {
-          const newJSXElement = dynamic.data.update(resultState.element);
-          resultState = patchElement(parent, endAnchor, resultState, newJSXElement);
-        }, dynamic.data.reactivityData, {
-          detachedFromParent: true,
-          initialCleanup: ownerCleanup,
-          parentOwner,
-        });
-      }
-    });
+    let unsub: (() => void) = noop;
+    if (isStatic) {
+      ctx.nodesToRemove.push(startAnchor, endAnchor);
+    }
+    else {
+      unsub = resumeReaction(() => {
+        const newJSXElement = dynamic.data.update(resultState.element);
+        resultState = patchElement(parent, endAnchor, resultState, newJSXElement);
+      }, dynamic.data.reactivityData);
+    }
 
     if (ctx.dynamicStateStack.length > 0)
       ctx.dynamicStateStack.push({
@@ -114,7 +100,8 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
           endAnchor: isStatic ? getLastElement(resultState) : endAnchor,
           element: dynamic.data.update,
           cleanup() {
-            ownerCleanup();
+            unsub();
+            cleanupStateNodes(resultState);
           },
           remove() {
             this.cleanup();
@@ -137,12 +124,6 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
           },
         },
       });
-    // Since we do not make a JSXState, we need to register the cleanup manually
-    else if (parentOwner && !parentOwner.detached)
-      onCleanup(() => ownerCleanup(), parentOwner);
-    // The only case where the owner will never be cleaned
-    else if (isStatic)
-      ownerCleanup.detach();
 
     break;
   }
@@ -205,9 +186,7 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
         const handler = getHandlerForAttribute(propName);
         assert(handler !== null);
         assert(handler.managedDynamic);
-        enterOwner(ctx.ownerStack.at(-1)!, () => {
-          resumeTask(() => handler.setOnHTMLElement(el, propName, callback()), reactivityData);
-        });
+        resumeReaction(() => handler.setOnHTMLElement(el, propName, callback()), reactivityData);
       }
     }
   }
@@ -242,22 +221,20 @@ function domVisitor(ctx: RunCtx, node: ChildNode) {
       directivesData: ctx.directivesData,
       nodesToRemove: ctx.nodesToRemove,
       dynamicStateStack: [],
-      ownerStack: ctx.ownerStack,
     }, n);
   });
 }
 
 export function startRuntime(rootElement: HTMLElement) {
   console.time("startRuntime");
-  const [rootOwner, rootOwnerCleanup] = createOwner();
-  rootOwnerCleanup.detach();
   const ctx: RunCtx = {
     directivesData: null,
     nodesToRemove: [],
     dynamicStateStack: [],
-    ownerStack: [rootOwner],
   };
-  domVisitor(ctx, rootElement);
+  enterOwner(createOwner(), () => {
+    domVisitor(ctx, rootElement);
+  });
   assert(ctx.dynamicStateStack.length === 0);
   console.log(ctx.nodesToRemove.length, "total directive nodes and attributes found");
   if (REMOVE_DIRECTIVES)

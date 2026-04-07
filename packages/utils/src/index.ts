@@ -23,6 +23,8 @@ export function unreachable(_value: never): never {
 }
 
 export function noop(): void {}
+export function identity<T>(val: T): T { return val }
+export function constant<T>(val: T): (() => T) { return (identity<T>).bind(null, val); }
 
 export function microtaskDebounce(cb: () => void): () => void {
   let queued = false;

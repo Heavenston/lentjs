@@ -14,7 +14,7 @@ if (false as true)
 /**
  * Noop function for converting between owner and root
  */
-export function owner2Root<O>(owner: O): O extends Owner ? Root : O extends Root ? Owner : O {
+export function convertOwner<O>(owner: O): O extends Owner ? Root : O extends Root ? Owner : O {
   // @ts-ignore
   return owner;
 }

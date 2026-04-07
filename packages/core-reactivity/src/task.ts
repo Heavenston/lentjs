@@ -1,80 +1,43 @@
-import { owner2Root, type Owner } from "./owner-internal";
-import { createOwner, enterOwner, getOwner, onCleanup } from "./owner";
+import { createControlledOwner, enterOwner, getOwner, onCleanup } from "./owner";
 import { noop } from "@lentjs/utils";
-import { listenForSignalReads, registerSignalCallback, type SignalCallback, type SignalId } from "./signal-internal";
+import { createReaction, resumeReaction, type CapturedReactivityData } from "./reaction";
+import { convertOwner } from "./owner-internal";
 
-declare const CapturedTaskReactivityData: unique symbol;
-export type CapturedTaskReactivityData = Readonly<{ [CapturedTaskReactivityData]: "capturedTaskReactivityData", length: number }>;
-export type CapturedTaskData = [cb: () => void, signalReads: CapturedTaskReactivityData];
+export type CapturedTaskData = [cb: () => void, reactivityData: CapturedReactivityData];
 
 export type TaskConfig = {
   initialCleanup?: () => void,
-  parentOwner?: Owner | null,
-  detachedFromParent?: boolean,
 };
 
-function taskReactivityData<T>(val: T): T extends CapturedTaskReactivityData ? SignalId[] : T extends SignalId[] ? CapturedTaskReactivityData : T {
-  // @ts-ignore
-  return val;
-}
+function internalCreateOrResumeTask(task: () => void, config: TaskConfig, resumeWithReactivityData: CapturedReactivityData | null) {
+  const parentOwner = getOwner();
+  const parentRoot = convertOwner(parentOwner);
 
-function internalCreateOrResumeTask(task: () => void, config: TaskConfig, resumeWithSignalReads?: SignalId[]) {
-  const parentOwner = owner2Root(config.parentOwner === undefined ? getOwner() : config.parentOwner);
-  let cleanup: () => void = config.initialCleanup ?? noop;
-  let latestSignalReads: SignalId[] = [];
-
-  const callAndSub = () => {
-    cleanup();
-    const [newOwner, newCleanup] = createOwner(owner2Root(parentOwner));
-    // Cleans up the owner when the parent is cleaned, but also unregisters the
-    // cleanup callback from the parent when this one is cleaned
-    if (!config.detachedFromParent && parentOwner)
-      onCleanup(onCleanup(newCleanup, owner2Root(parentOwner)), newOwner);
-    cleanup = newCleanup;
-    enterOwner(newOwner, () => {
-      const signalReads: SignalId[] = [];
-      listenForSignalReads(task, signalReads);
-      latestSignalReads = signalReads;
-
-      const cb: SignalCallback = { onUpdate: callAndSub };
-      for (const signalId of signalReads)
-        registerSignalCallback(cb, signalId);
-      onCleanup(() => { cb.onUpdate = null; });
-    });
+  let previousCleanup = config.initialCleanup ?? noop;
+  const cb = () => {
+    previousCleanup();
+    const [owner, cleanupOwner] = createControlledOwner(parentOwner);
+    previousCleanup = cleanupOwner;
+    enterOwner(owner, task);
   };
+  const unsub = resumeWithReactivityData ? resumeReaction(cb, resumeWithReactivityData) : createReaction(cb);
 
-  if (parentOwner?.tasks != null) {
-    parentOwner.tasks.push({
+  if (parentOwner) {
+    onCleanup(() => unsub(), parentOwner);
+  }
+
+  if (parentRoot?.tasks) {
+    parentRoot.tasks.push({
+      capture: () => unsub(),
       cb: task,
-      capture() {
-        cleanup();
-        return taskReactivityData(latestSignalReads);
-      },
     });
-  }
-  
-  if (resumeWithSignalReads) {
-    const cb: SignalCallback = { onUpdate: callAndSub };
-    for (const signalId of resumeWithSignalReads)
-      registerSignalCallback(cb, signalId);
-    if (parentOwner)
-      onCleanup(() => { cb.onUpdate = null; });
-  }
-  else {
-    callAndSub();
   }
 }
 
 export function createTask(task: () => void, config: TaskConfig = {}) {
-  internalCreateOrResumeTask(task, config);
+  internalCreateOrResumeTask(task, config, null);
 }
 
-export function resumeTask(task: () => void, reactivityData: CapturedTaskReactivityData, config: TaskConfig = {}) {
-  internalCreateOrResumeTask(task, config, taskReactivityData(reactivityData));
-}
-
-export function startTask<T>(task: () => T): [T, CapturedTaskReactivityData] {
-  const signalReads: SignalId[] = [];
-  const val = listenForSignalReads(task, signalReads);
-  return [val, taskReactivityData(signalReads)];
+export function resumeTask(task: () => void, reactivityData: CapturedReactivityData, config: TaskConfig = {}) {
+  internalCreateOrResumeTask(task, config, reactivityData);
 }

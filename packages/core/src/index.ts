@@ -10,7 +10,7 @@ export { type SSRElement, isSSRElement } from "./ssr-element";
 
 import { register, serialize } from "@lentjs/core-serialize";
 import { isFunction, unreachable } from "./utils";
-import { createCapturingOwner, createOwner, createTask, enterOwner, onCleanup, startTask, untrack, type CapturedOwnerData, type CapturedTaskReactivityData } from "@lentjs/core-reactivity";
+import { createCapturingOwner, createOwner, createTask, enterOwner, getOwner, onCleanup, startReaction, type CapturedOwnerData, type CapturedReactivityData } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName, ATTRIBUTE_PREFIX } from "./runtime";
 import { escapeHtml } from "./escape-html";
 import { getHandlerForAttribute, type Attributes } from "./attributes";
@@ -58,7 +58,7 @@ function createSSRDirective(name: string, arg: unknown = null, embed: boolean = 
   }
 }
 
-type ResolvedJSXElementDynamic = { isDynamic: true, reactivityData: CapturedTaskReactivityData, ownerData: CapturedOwnerData, el: JSXElementDynamic, resolved: ResolvedJSXElement };
+type ResolvedJSXElementDynamic = { isDynamic: true, reactivityData: CapturedReactivityData, ownerData: CapturedOwnerData, el: JSXElementDynamic, resolved: ResolvedJSXElement };
 type ResolvedJSXElement = Exclude<JSXElement, JSXElementDynamic> | ResolvedJSXElementDynamic;
 function resolveDynamicJSXElements(el: JSXElementDynamic): ResolvedJSXElementDynamic;
 function resolveDynamicJSXElements(el: JSXElement): ResolvedJSXElement;
@@ -69,7 +69,7 @@ function resolveDynamicJSXElements(el: JSXElement): ResolvedJSXElement {
 
   const [owner, capture] = createCapturingOwner();
   const [reactivityData, resolved] = enterOwner(owner, () => {
-    const [val, reactivityData] = startTask(() => el());
+    const [val, reactivityData] = startReaction(() => el());
     const childEl = resolveDynamicJSXElements(val);
     return [reactivityData, childEl];
   });
@@ -122,9 +122,7 @@ function stringifyJSXElement(el: JSXElement | ResolvedJSXElementDynamic, isInsid
 }
 
 export function renderToDom(parent: Node, el: ComponentFn<{}>) {
-  const [owner, cleanup] = createOwner();
-  cleanup.detach();
-  enterOwner(owner, () => {
+  enterOwner(createOwner(), () => {
     const val = patchElement(parent, null, null, h(el));
     // @ts-ignore This is useless and just used to prevent val from being gced
     globalThis[Symbol("gc-prevention")] = val;
@@ -152,8 +150,8 @@ function createHTMLElement(element: string, props: object): HTMLElement {
   const el = document.createElement(element);
   for (const [propName, propVal] of Object.entries(props)) {
     if (propName === "children") {
-      const p = patchElement(el, null, null, propVal);
-      onCleanup(() => cleanupStateNodes(p));
+      const state = patchElement(el, null, null, propVal);
+      onCleanup(() => cleanupStateNodes(state));
       continue;
     }
 
@@ -185,7 +183,7 @@ function createSSRElement(element: string, props: object): SSRElement {
     const attrHandler = getHandlerForAttribute(propName);
     if (attrHandler === null) continue;
     if (attrHandler.managedDynamic && isFunction(propVal)) {
-      const [val, reactivityData] = startTask(propVal);
+      const [val, reactivityData] = startReaction(propVal);
       attrHandler.setOnSSRElement(builder, propName, val);
 
       if (reactivityData.length > 0)
@@ -210,10 +208,6 @@ function createSSRElement(element: string, props: object): SSRElement {
   return builder.build();
 }
 
-const hComponent = register(<P>(component: ComponentFn<P>, props: P): JSXElement => {
-  return untrack(() => component(props));
-}, "__lentjs_hcomponent");
-
 export function h(element: string, props?: Attributes): JSXElement;
 export function h(element: ComponentFn<{}>): JSXElement;
 export function h<P>(element: ComponentFn<P>, props: P): JSXElement;
@@ -230,7 +224,7 @@ export function h<P>(element: string | ComponentFn<P>, props?: P): JSXElement {
     }
   }
   else {
-    return (hComponent<P>).bind(null, element, props!);
+    return enterOwner(createOwner(), element, props!);
   }
 }
 register(h, "__lentjs_h");

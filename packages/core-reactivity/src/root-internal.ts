@@ -1,4 +1,4 @@
-import { assert, noop, remove, unreachable } from "@lentjs/utils";
+import { assert, noop, remove } from "@lentjs/utils";
 import type { CapturedTaskData } from "./task";
 
 export type RootCleanup = (() => void) & { detach(): void };
@@ -32,16 +32,16 @@ export class Root {
    * This is a development helper for detecting root leaks
    */
   static #cleanupLeakDetector = new FinalizationRegistry((root: Root) => {
-    if (root.state !== RootState.Cleaned) {
-      if (root.state === RootState.Detached)
-        console.log("Detached cleanup gced");
-      else
-        console.warn("Leaked cleanup of root created at", root.creationStackTrace);
+    if (root.state === RootState.Live) {
+      console.warn("Leaked cleanup of root created at", root.creationStackTrace);
     }
   });
 
   #state: RootState = RootState.Live;
-  readonly #cleanupCallbacks: (() => void)[] = [];
+  readonly #callbacks: Readonly<Record<RootState.Cleaned | RootState.Detached, (() => void)[]>> = {
+    [RootState.Cleaned]: [],
+    [RootState.Detached]: [],
+  };
 
   readonly creationStackTrace = new Error();
   readonly parent: Root | null;
@@ -70,8 +70,8 @@ export class Root {
 
   public static create(parent: Root | null, capturing: boolean): [root: Root, cleanup: RootCleanup] {
     const root = new Root(parent, capturing);
-    const cleanup = root.#clean.bind(root) as RootCleanup;
-    cleanup.detach = root.#detach.bind(root);
+    const cleanup = root.#switchTo.bind(root, RootState.Cleaned) as RootCleanup;
+    cleanup.detach = root.#switchTo.bind(root, RootState.Detached);
     Root.#cleanupLeakDetector.register(cleanup, root);
     return [root, cleanup];
   }
@@ -95,49 +95,31 @@ export class Root {
     }
   }
 
-  #clean() {
-    switch (this.#state) {
-    case RootState.Detached:
-      console.warn(`Cannot clean a ${this.state} root`);
-    case RootState.Cleaned:
+  #switchTo(newState: RootState.Cleaned | RootState.Detached): void {
+    if (this.#state !== RootState.Live) {
+      if (this.#state !== newState)
+        console.warn(`Cannot switch to ${newState} from ${this.#state}`);
       return;
-    case RootState.Live:
-      break;
-    default: unreachable(this.#state);
     }
-    this.#state = RootState.Cleaned;
-    this.#cleanupCallbacks.splice(0).forEach(cb => cb());
+    this.#state = newState;
+    this.#callbacks[newState].forEach(cb => cb());
+    this.#callbacks[RootState.Cleaned].splice(0);
+    this.#callbacks[RootState.Detached].splice(0);
   }
 
-  #detach(this: Root) {
-    switch (this.#state) {
-    case RootState.Detached:
-    case RootState.Cleaned:
-      console.warn(`Cannot detach a ${this.state} root`);
-      return;
-    case RootState.Live:
-      break;
-    default: unreachable(this.#state);
+  public on(state: RootState.Cleaned | RootState.Detached, cb: () => void): () => void {
+    if (this.#state !== RootState.Live) {
+      if (this.#state === state) {
+        cb();
+        return noop;
+      }
+      else {
+        return noop;
+      }
     }
-    this.#state = RootState.Detached;
-    this.#cleanupCallbacks.splice(0);
-  }
-
-  public onCleanup(cb: () => void): () => void {
-    switch (this.#state) {
-    case RootState.Live:
-      this.#cleanupCallbacks.push(cb);
-      return () => {
-        if (this.#state === RootState.Live)
-          remove(this.#cleanupCallbacks, cb);
-      };
-    case RootState.Detached:
-      // We do not bother to store the callback, it will never be called
-      return noop;
-    case RootState.Cleaned:
-      cb();
-      return noop;
-    default: unreachable(this.#state);
-    }
+    this.#callbacks[state].push(cb);
+    return () => {
+      remove(this.#callbacks[state], cb);
+    };
   }
 }

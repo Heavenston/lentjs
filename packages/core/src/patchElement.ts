@@ -1,10 +1,18 @@
 import { isJSXElementString, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular } from ".";
 import { assert, isFunction } from "./utils";
-import { createOwner, createTask, enterOwner, getOwner } from "@lentjs/core-reactivity";
+import { createReaction, enterOwner, getOwner } from "@lentjs/core-reactivity";
 
 export type JSXStateCommon = { kind: string, element: JSXElement };
 export type JSXStateSingular = JSXStateCommon & { kind: "singular", element: JSXElementSingular, node: ChildNode | null };
-export type JSXStateDynamic = JSXStateCommon & { kind: "dynamic", startAnchor: ChildNode | null, endAnchor: ChildNode | null, element: JSXElementDynamic, changeAnchor: (newAnchor: ChildNode | null) => void, cleanup: () => void, remove: () => void };
+export type JSXStateDynamic = JSXStateCommon & {
+  kind: "dynamic",
+  startAnchor: ChildNode | null,
+  endAnchor: ChildNode | null,
+  element: JSXElementDynamic,
+  changeAnchor(newAnchor: ChildNode | null): void,
+  cleanup(): void;
+  remove(): void,
+};
 export type JSXStateArray = JSXStateCommon & { kind: "array", element: JSXElementArray, states: JSXState[] }
 export type JSXState = JSXStateSingular | JSXStateArray | JSXStateDynamic;
 
@@ -83,8 +91,12 @@ export function removeStateNodes(state: JSXState) {
 export function cleanupStateNodes(state: JSXState) {
   switch (state.kind) {
   case "singular": break;
-  case "array": state.states.forEach(cleanupStateNodes); break;
-  case "dynamic": state.cleanup(); break;
+  case "array":
+    state.states.forEach(cleanupStateNodes);
+    break;
+  case "dynamic":
+    state.cleanup();
+    break;
   }
 }
 
@@ -124,16 +136,15 @@ function patchElementSingular(parent: Node, anchorElement: ChildNode | null, pre
 }
 
 function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, child: JSXElementDynamic): JSXStateDynamic {
-  const parentOwner = getOwner();
-  const [owner, cleanupOwner] = createOwner(parentOwner);
-
   const dynamicStartAnchor = new Comment("runtime-dyn-start");
   const dynamicEndAnchor = new Comment("runtime-dyn-end");
   parent.insertBefore(dynamicStartAnchor, anchorElement);
   parent.insertBefore(dynamicEndAnchor, anchorElement);
 
   let lastResultState: JSXState | null = null;
-  enterOwner(owner, () => createTask(() => {
+  const owner = getOwner();
+  assert(owner !== null);
+  const unsub = createReaction(() => enterOwner(owner, () => {
     lastResultState = patchElement(parent, dynamicEndAnchor, lastResultState, child(lastResultState?.element));
   }));
 
@@ -143,13 +154,14 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, chil
     endAnchor: dynamicEndAnchor,
     element: child,
     cleanup() {
-      cleanupOwner();
-      dynamicStartAnchor.remove();
-      dynamicEndAnchor.remove();
+      unsub();
+      cleanupStateNodes(lastResultState!);
     },
     remove() {
-      removeStateNodes(lastResultState!);
       this.cleanup();
+      dynamicStartAnchor.remove();
+      dynamicEndAnchor.remove();
+      removeStateNodes(lastResultState!);
     },
     changeAnchor(newAnchor) {
       parent.insertBefore(dynamicStartAnchor, newAnchor);

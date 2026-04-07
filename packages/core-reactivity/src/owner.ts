@@ -1,35 +1,57 @@
-import { owner2Root, type Owner } from "./owner-internal";
-import { Root } from "./root-internal";
+export type { Owner } from "./owner-internal";
+
+import { convertOwner, type Owner } from "./owner-internal";
+import { Root, RootState } from "./root-internal";
 import type { CapturedTaskData } from "./task";
 
 export type OwnerCleanup = (() => void) & { detach(): void };
 
 export function getOwner(): Owner | null {
-  return owner2Root(Root.currentRoot);
+  return convertOwner(Root.currentRoot);
 }
 
-export function createOwner(parent?: Owner | null): [owner: Owner, cleanup: OwnerCleanup] {
-  const [root, cleanup] = Root.create(parent === undefined ? Root.currentRoot : owner2Root(parent), false);
-  return [owner2Root(root), cleanup];
+export function createOwner(parent: Owner | null = getOwner()): Owner {
+  const [root, cleanup] = Root.create(convertOwner(parent), false);
+  const owner = convertOwner(root);
+  if (parent) {
+    onDetach(cleanup.detach, parent);
+    onCleanup(cleanup, parent);
+  }
+  else {
+    // No parent, never cleaned
+    cleanup.detach();
+  }
+  return owner;
+}
+
+export function createControlledOwner(parent: Owner | null = getOwner()): [owner: Owner, cleanup: OwnerCleanup] {
+  const [root, cleanup] = Root.create(convertOwner(parent), false);
+  const owner = convertOwner(root);
+  if (parent) {
+    const unsubCleanup = onCleanup(cleanup, parent);
+    onCleanup(unsubCleanup, owner);
+    onDetach(unsubCleanup, owner);
+  }
+  return [owner, cleanup];
 }
 
 export type CapturedOwnerData = {
   tasks: CapturedTaskData[],
-};
+}
 
-export function createCapturingOwner(parent?: Owner | null): [owner: Owner, capture: () => CapturedOwnerData] {
-  const [root, cleanup] = Root.create(parent === undefined ? Root.currentRoot : owner2Root(parent), true);
+export function createCapturingOwner(parent: Owner | null = getOwner()): [owner: Owner, capture: () => CapturedOwnerData] {
+  const [root, cleanup] = Root.create(convertOwner(parent), true);
   const capture = (): CapturedOwnerData => {
     cleanup();
     return {
       tasks: root.tasks!.map<CapturedTaskData>(p => [p.cb, p.capture()]),
     };
   };
-  return [owner2Root(root), capture];
+  return [convertOwner(root), capture];
 }
 
 export function enterOwner<A extends any[], T>(root: Owner, cb: (...args: A) => T, ...args: A): T {
-  return owner2Root(root).enter(cb, ...args);
+  return convertOwner(root).enter(cb, ...args);
 }
 
 export function onCleanup(cb: () => void, inOwner?: Owner): () => void {
@@ -37,5 +59,13 @@ export function onCleanup(cb: () => void, inOwner?: Owner): () => void {
   if (currentOwner === null) {
     throw new Error("Can only call onCleanup with an owner");
   }
-  return owner2Root(currentOwner).onCleanup(cb);
+  return convertOwner(currentOwner).on(RootState.Cleaned, cb);
+}
+
+export function onDetach(cb: () => void, inOwner?: Owner): () => void {
+  const currentOwner = inOwner ?? getOwner();
+  if (currentOwner === null) {
+    throw new Error("Can only call onDetach with an owner");
+  }
+  return convertOwner(currentOwner).on(RootState.Detached, cb);
 }

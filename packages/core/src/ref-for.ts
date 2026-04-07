@@ -1,10 +1,11 @@
-import { createSignal, untrack, type JSXElement } from ".";
-import type { SignalAccessor, SignalSetter } from "@lentjs/core-reactivity";
+import { createControlledOwner, createSignal, enterOwner, untrack, type JSXElement } from ".";
+import type { OwnerCleanup, SignalAccessor, SignalSetter } from "@lentjs/core-reactivity";
 import { closure, register } from "@lentjs/core-serialize";
 
 type ElementState = {
   index: number,
   setIndex: SignalSetter<number>,
+  cleanup: OwnerCleanup,
 };
 type ForState = {
   currentState: Map<unknown, ElementState>,
@@ -25,17 +26,31 @@ const forMapper = register(<T>(props: RefForProps<T>, state: ForState, previous:
   each.forEach((val, idx) => {
     const key = props.key(val);
     const previousElementState = previousState.get(key);
+    previousState.delete(key);
     if (previousElementState) {
       newElements.push(previousElements[previousElementState.index]);
       previousElementState.setIndex(idx);
-      newState.set(key, { index: idx, setIndex: previousElementState.setIndex });
+      newState.set(key, {
+        index: idx,
+        setIndex: previousElementState.setIndex,
+        cleanup: previousElementState.cleanup,
+      });
     }
     else {
       const [getIndex, setIndex] = createSignal(idx);
-      newState.set(key, { index: idx, setIndex });
-      newElements.push((untrack<JSXElement>).bind(null, props.children.bind(null, val, getIndex)));
+      const [owner, ownerCleanup] = createControlledOwner();
+      newState.set(key, {
+        index: idx,
+        setIndex,
+        cleanup: ownerCleanup,
+      });
+      newElements.push(enterOwner(owner, () => untrack(() => props.children(val, getIndex))));
     }
   });
+
+  for (const removedElement of previousState.values()) {
+    removedElement.cleanup();
+  }
 
   state.currentState = newState;
 

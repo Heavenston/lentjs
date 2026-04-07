@@ -1,4 +1,4 @@
-import { type ComponentFn, createStore, RefFor, register } from "@lentjs/core";
+import { type ComponentFn, createStore, RefFor, register, onCleanup, getOwner } from "@lentjs/core";
 import c from "./todo.module.scss";
 
 type TaskData = {
@@ -17,6 +17,11 @@ type TaskProps = {
 };
 const Task: ComponentFn<TaskProps> = register((props) => {
   "use component";
+
+  console.log("Start of task:", props.task.text);
+  onCleanup(() => {
+    console.log("Cleanup of component:", props.task.text);
+  });
 
   return <div class={() => [c["task"], { [c["task-completed"]]: props.task.done }]}>
     <span>{() => props.task.text}</span>
@@ -48,6 +53,8 @@ const Todo: ComponentFn<{}> = register(() => {
 
   const areAllDone = () => state.tasks.every(t => t.done);
 
+  console.log("Todo owner:", getOwner());
+
   return <>
     <form on:submit={e => {
       e.preventDefault();
@@ -78,8 +85,8 @@ const Todo: ComponentFn<{}> = register(() => {
     <RefFor<TaskData>
       each={() => state.tasks}
       key={task => task.id}
-      children={task => <Task task={task} onDelete={() => { state.tasks = state.tasks.filter(p => p.id !== task.id) }} />}
     >
+      {task => <Task task={task} onDelete={() => { state.tasks = state.tasks.filter(p => p.id !== task.id) }} />}
     </RefFor>
   </>;
 }, "____RANDOM_ID");
