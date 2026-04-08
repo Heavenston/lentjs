@@ -5,7 +5,10 @@ import type { CapturedReactivityData } from "./reaction";
 import { Root, RootState } from "./root-internal";
 import type { TaskCallback } from "./task";
 
-export type OwnerCleanup = (() => void) & { detach(): void };
+export type OwnerCleanup = {
+  (): void;
+  detach(): void,
+};
 
 export type CapturedOwnerTaskData = {
   owner: Owner,
@@ -25,8 +28,8 @@ export function createOwner(parent: Owner | null = getOwner()): Owner {
   const [root, cleanup] = Root.create(convertOwner(parent), false);
   const owner = convertOwner(root);
   if (parent) {
-    onDetach(cleanup.detach, parent);
-    onCleanup(cleanup, parent);
+    cleanup.detachWithParent();
+    cleanup.cleanupWithParent();
   }
   else {
     // No parent, never cleaned
@@ -39,9 +42,7 @@ export function createControlledOwner(parent: Owner | null = getOwner()): [owner
   const [root, cleanup] = Root.create(convertOwner(parent), false);
   const owner = convertOwner(root);
   if (parent) {
-    const unsubCleanup = onCleanup(cleanup, parent);
-    onCleanup(unsubCleanup, owner);
-    onDetach(unsubCleanup, owner);
+    cleanup.cleanupWithParent();
   }
   return [owner, cleanup];
 }

@@ -3,7 +3,27 @@ import { assert, noop, remove } from "@lentjs/utils";
 import type { TaskCallback } from "./task";
 import type { CapturedReactivityData } from "./reaction";
 
-export type RootCleanup = (() => void) & { detach(): void, root: Root };
+const rootcleanupDataSymbol = Symbol("rootCleanupData");
+type RootCleanupData = {
+  root: Root,
+  cleanupWithParent: boolean,
+  detachWithParent: boolean,
+};
+export type RootCleanup = {
+  (): void;
+  detach(): void,
+  /**
+   * Register this root cleanup to be called when the given root gets cleaned.
+   * This is maintained across serialization.
+   */
+  cleanupWithParent(): void,
+  /**
+   * Register this root detach to be called when the given root gets detached.
+   * This is maintained across serialization.
+   */
+  detachWithParent(): void,
+  [rootcleanupDataSymbol]: RootCleanupData,
+};
 
 export const enum RootState {
   /**
@@ -92,15 +112,15 @@ export class Root {
   }
   static { register(this.reviver, "__lentjs_rootReviver") }
 
-  private static cleanupReducer(cleanup: RootCleanup): Root {
-    return cleanup.root;
+  private static cleanupReducer(cleanup: RootCleanup): RootCleanupData  {
+    return cleanup[rootcleanupDataSymbol];
   }
-  private static cleaunpReviver(root: Root): RootCleanup {
-    const cleanup = root.#switchTo.bind(root, RootState.Cleaned) as RootCleanup;
-    cleanup.root = root;
-    cleanup.detach = root.#switchTo.bind(root, RootState.Detached);
-    Root.#cleanupLeakDetector.register(cleanup, root);
-    defineSerialization(cleanup, Root.cleanupReducer, Root.cleaunpReviver);
+  private static cleaunpReviver(data: RootCleanupData): RootCleanup {
+    const cleanup = data.root.#createCleanup();
+    if (data.cleanupWithParent)
+      cleanup.cleanupWithParent();
+    if (data.detachWithParent)
+      cleanup.detachWithParent();
     return cleanup;
   }
   static { register(this.cleaunpReviver, "__lentjs_rootCleanupReviver"); }
@@ -108,8 +128,7 @@ export class Root {
   public static create(parent: Root | null, capturing: boolean): [root: Root, cleanup: RootCleanup] {
     assert(!capturing || parent === null, "Capturing roots must have no parent");
     const root = new Root(RootState.Live, parent, capturing ? { tasks: [] } : parent?.captureData);
-    const cleanup = Root.cleaunpReviver(root);
-    return [root, cleanup];
+    return [root, root.#createCleanup()];
   }
 
   public static get currentRoot() {
@@ -131,6 +150,47 @@ export class Root {
     }
   }
 
+  #createCleanup(): RootCleanup {
+    const root = this;
+    const data: RootCleanupData = { root, cleanupWithParent: false, detachWithParent: false };
+
+    const cleanup: RootCleanup = () => root.#switchTo(RootState.Cleaned);
+    cleanup[rootcleanupDataSymbol] = data;
+    cleanup.detach = () => this.#switchTo(RootState.Detached);
+    cleanup.detachWithParent = () => {
+      if (data.detachWithParent) {
+        console.warn("Called detachWithParent multiple times");
+        return;
+      }
+      if (!root.parent) {
+        console.warn("Called detachWithParent but has no parent");
+        return;
+      }
+      data.detachWithParent = true;
+      const unsub = root.parent.on(RootState.Detached, cleanup.detach);
+      root.on(RootState.Detached, unsub);
+      root.on(RootState.Cleaned, unsub);
+    };
+    cleanup.cleanupWithParent = () => {
+      if (data.cleanupWithParent) {
+        console.warn("Called cleanupWithParent multiple times");
+        return;
+      }
+      if (!root.parent) {
+        console.warn("Called cleanupWithParent but has no parent");
+        return;
+      }
+      data.cleanupWithParent = true;
+      const unsub = root.parent.on(RootState.Cleaned, cleanup);
+      root.on(RootState.Detached, unsub);
+      root.on(RootState.Cleaned, unsub);
+    };
+    defineSerialization(cleanup, Root.cleanupReducer, Root.cleaunpReviver);
+
+    Root.#cleanupLeakDetector.register(cleanup, root);
+    return cleanup;
+  }
+  
   #switchTo(newState: RootState.Cleaned | RootState.Detached): void {
     if (this.#state !== RootState.Live) {
       if (this.#state !== newState)
