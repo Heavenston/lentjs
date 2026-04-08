@@ -1,6 +1,7 @@
+import { defineSerialization, register } from "@lentjs/core-serialize";
 import { assert, noop, remove } from "@lentjs/utils";
 
-export type RootCleanup = (() => void) & { detach(): void };
+export type RootCleanup = (() => void) & { detach(): void, root: Root };
 
 export const enum RootState {
   /**
@@ -20,6 +21,11 @@ export const enum RootState {
   Cleaned = "cleaned",
 }
 
+type ReducedRoot = {
+  state: RootState,
+  parent: Root | null,
+};
+
 export class Root {
   static #currentRoot: Root | null = null;
   /**
@@ -31,7 +37,7 @@ export class Root {
     }
   });
 
-  #state: RootState = RootState.Live;
+  #state: RootState;
   readonly #callbacks: Readonly<Record<RootState.Cleaned | RootState.Detached, (() => void)[]>> = {
     [RootState.Cleaned]: [],
     [RootState.Detached]: [],
@@ -52,15 +58,39 @@ export class Root {
     return this.#state === RootState.Detached;
   }
 
-  private constructor(parent: Root | null) {
+  private constructor(state: RootState, parent: Root | null) {
     this.parent = parent;
+    this.#state = state;
   }
 
-  public static create(parent: Root | null): [root: Root, cleanup: RootCleanup] {
-    const root = new Root(parent);
+  private static reducer(root: Root): ReducedRoot {
+    return {
+      state: root.state,
+      parent: root.parent,
+    };
+  }
+  private static reviver(reduced: ReducedRoot): Root {
+    return new Root(reduced.state, reduced.parent);
+  }
+  static { register(this.reviver, "__lentjs_rootReviver") }
+
+  private static cleanupReducer(cleanup: RootCleanup): Root {
+    return cleanup.root;
+  }
+  private static cleaunpReviver(root: Root): RootCleanup {
     const cleanup = root.#switchTo.bind(root, RootState.Cleaned) as RootCleanup;
+    cleanup.root = root;
     cleanup.detach = root.#switchTo.bind(root, RootState.Detached);
     Root.#cleanupLeakDetector.register(cleanup, root);
+    defineSerialization(cleanup, Root.cleanupReducer, Root.cleaunpReviver);
+    return cleanup;
+  }
+  static { register(this.cleaunpReviver, "__lentjs_rootCleanupReviver"); }
+
+  public static create(parent: Root | null): [root: Root, cleanup: RootCleanup] {
+    const root = new Root(RootState.Live, parent);
+    defineSerialization(root, Root.reducer, Root.reviver);
+    const cleanup = Root.cleaunpReviver(root);
     return [root, cleanup];
   }
 
