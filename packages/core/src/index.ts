@@ -129,7 +129,10 @@ export function renderToString(el: ComponentFn<{}>): string {
   global_h_config = "ssr";
   try {
     const [owner, cleanup, capture] = createCapturingOwner();
-    const t = enterOwner(owner, () => stringifyJSXElement(h(el)));
+    const t = stringifyJSXElement({
+      withOwner: owner,
+      fun: () => h(el),
+    });
     const captureData = capture();
     const tasksDirective = createSSRDirective("tasks", captureData.tasks);
     const directivesData = createSSRDirective("directives-data", global_directive_data_array, true);

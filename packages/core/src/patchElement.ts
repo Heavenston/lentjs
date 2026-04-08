@@ -1,5 +1,5 @@
 import { isJSXElementDynamic, isJSXElementString, isJSXElementWithOwner, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular, type JSXElementWithOwner } from ".";
-import { assert, unreachable } from "./utils";
+import { assert, notNull, unreachable } from "./utils";
 import { createReaction, enterOwner, getOwner, untrack } from "@lentjs/core-reactivity";
 
 export type JSXStateCommon = { kind: string, element: JSXElement };
@@ -162,8 +162,7 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, chil
   parent.insertBefore(dynamicEndAnchor, anchorElement);
 
   let lastResultState: JSXState | null = null;
-  const owner = getOwner();
-  assert(owner !== null);
+  const owner = notNull(getOwner());
   const unsub = createReaction(() => enterOwner(owner, () => {
     const val = child(lastResultState?.element);
     untrack(() => {

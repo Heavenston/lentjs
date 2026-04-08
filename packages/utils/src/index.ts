@@ -26,6 +26,11 @@ export function noop(): void {}
 export function identity<T>(val: T): T { return val }
 export function constant<T>(val: T): (() => T) { return (identity<T>).bind(null, val); }
 
+export function notNull<T>(val: T): NonNullable<T> {
+  assert(val != null);
+  return val;
+}
+
 export function microtaskDebounce(cb: () => void): () => void {
   let queued = false;
   return () => {

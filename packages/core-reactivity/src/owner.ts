@@ -26,7 +26,9 @@ export function getOwner(): Owner | null {
 
 export function createOwner(parent: Owner | null = getOwner()): Owner {
   return convertOwner(Root.create(parent ? {
-    parent: convertOwner(parent), cleanupWithParent: true, detachWithParent: true,
+    parent: convertOwner(parent),
+    cleanupWithParent: true,
+    detachWithParent: true,
   } : {
     startDetached: true,
   }));

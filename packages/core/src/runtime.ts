@@ -2,7 +2,7 @@ import type { CapturedOwnerData, JSXElementDynamic, JSXElementWithOwner, Owner }
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, cleanupStateNodes, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState } from "./patchElement";
 import { createOwner, type CapturedReactivityData, resumeReaction, enterOwner, resumeTask, untrack } from "@lentjs/core-reactivity";
-import { assert, noop, unreachable } from "./utils";
+import { assert, noop, notNull, unreachable } from "./utils";
 import { deserialize } from "@lentjs/core-serialize";
 
 const REMOVE_DIRECTIVES = false;
@@ -92,7 +92,8 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
       ctx.nodesToRemove.push(startAnchor, endAnchor);
     }
     else {
-      unsub = resumeReaction(() => enterOwner(ctx.ownerStack.at(-1)!, () => {
+      const owner = notNull(ctx.ownerStack.at(-1));
+      unsub = resumeReaction(() => enterOwner(owner, () => {
         const newJSXElement = dynamic.data.update(resultState.element);
         untrack(() => {
           resultState = patchElement(parent, endAnchor, resultState, newJSXElement);
@@ -192,16 +193,14 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
     if (t.name === `${ATTRIBUTE_PREFIX}:res-attrs`) {
       const data = ctx.directivesData![parseInt(t.value)] as ResumeAttributesData;
       for (const [k, v] of data) {
-        const handler = getHandlerForAttribute(k);
-        assert(handler !== null);
+        const handler = notNull(getHandlerForAttribute(k));
         handler.setOnHTMLElement(el, k, v);
       }
     }
     if (t.name === `${ATTRIBUTE_PREFIX}:dyn-attrs`) {
       const data = ctx.directivesData![parseInt(t.value)] as DynamicAttributesData;
       for (const [reactivityData, propName, callback] of data) {
-        const handler = getHandlerForAttribute(propName);
-        assert(handler !== null);
+        const handler = notNull(getHandlerForAttribute(propName));
         assert(handler.managedDynamic);
         resumeReaction(() => handler.setOnHTMLElement(el, propName, callback()), reactivityData);
       }
@@ -245,12 +244,11 @@ function domVisitor(ctx: RunCtx, node: ChildNode) {
 
 export function startRuntime(rootElement: HTMLElement) {
   console.time("startRuntime");
-  const rootOwner = createOwner();
   const ctx: RunCtx = {
     directivesData: null,
     nodesToRemove: [],
     dynamicStateStack: [],
-    ownerStack: [rootOwner],
+    ownerStack: [],
   };
   domVisitor(ctx, rootElement);
   assert(ctx.dynamicStateStack.length === 0);

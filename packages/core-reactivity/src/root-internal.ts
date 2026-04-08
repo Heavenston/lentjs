@@ -33,6 +33,7 @@ type ReducedRoot = {
   parent: Root | null,
   cleanupWithParent: boolean,
   detachWithParent: boolean,
+  contextValues: Map<unknown, unknown>,
 };
 export type RootCaptureTaskData = {
   root: Root,
@@ -47,9 +48,10 @@ type RootConstructorConfig = {
   id?: string,
   state: RootState,
   parent: Root | null,
-  captureData?: RootCaptureData,
   cleanupWithParent?: boolean,
   detachWithParent?: boolean,
+  captureData?: RootCaptureData,
+  contextValues?: Map<unknown, unknown>,
 };
 export type CreateRootConfig = {
   parent?: null,
@@ -70,6 +72,10 @@ export type CreateRootConfig = {
 export class Root {
   static #currentRoot: Root | null = null;
 
+  public static get currentRoot() {
+    return this.#currentRoot;
+  }
+
   readonly #id;
   #state: RootState;
   readonly #callbacks: Readonly<Record<RootState.Cleaned | RootState.Detached, (() => void)[]>> = {
@@ -77,22 +83,18 @@ export class Root {
     [RootState.Detached]: [],
   };
 
-  readonly cleanupWithParent: boolean = false;
-  readonly detachWithParent: boolean = false;
+  public readonly creationStackTrace = new Error();
+  public readonly parent: Root | null;
 
-  readonly creationStackTrace = new Error();
-  readonly parent: Root | null;
+  private readonly cleanupWithParent: boolean = false;
+  private readonly detachWithParent: boolean = false;
+
   /**
    * If present this stores created tasks.
    * This is inherited from the parent, and only created for roots without a parent.
    */
-  readonly captureData?: RootCaptureData;
-
-  public toString(): string {
-    if (this.parent)
-      return `${this.parent.toString()}->${this.#id}`;
-    return this.#id;
-  }
+  public  readonly captureData?: RootCaptureData;
+  private readonly contextValues: Map<unknown, unknown>;
 
   public get state(): RootState {
     return this.#state;
@@ -110,6 +112,7 @@ export class Root {
     this.#id = config.id ?? createUid();
     this.parent = config.parent;
     this.#state = config.state;
+    this.contextValues = config.contextValues ?? new Map;
     if (config.captureData != null)
       this.captureData = config.captureData;
     defineSerialization(this, Root.reducer, Root.reviver);
@@ -130,6 +133,12 @@ export class Root {
     }
   }
 
+  public toString(): string {
+    if (this.parent)
+      return `${this.parent.toString()}->${this.#id}`;
+    return this.#id;
+  }
+
   private static reducer(root: Root): ReducedRoot {
     return {
       id: root.#id,
@@ -137,6 +146,7 @@ export class Root {
       parent: root.parent,
       cleanupWithParent: root.cleanupWithParent,
       detachWithParent: root.detachWithParent,
+      contextValues: root.contextValues,
     };
   }
   private static reviver(reduced: ReducedRoot): Root {
@@ -146,6 +156,7 @@ export class Root {
       parent: reduced.parent,
       cleanupWithParent: reduced.cleanupWithParent,
       detachWithParent: reduced.detachWithParent,
+      contextValues: reduced.contextValues,
     });
   }
   static { register(this.reviver, "__lentjs_rootReviver") }
@@ -179,8 +190,16 @@ export class Root {
     return root;
   }
 
-  public static get currentRoot() {
-    return this.#currentRoot;
+  #switchTo(newState: RootState.Cleaned | RootState.Detached): void {
+    if (this.#state !== RootState.Live) {
+      if (this.#state !== newState)
+        console.warn(`Cannot switch to ${newState} from ${this.#state}`);
+      return;
+    }
+    this.#state = newState;
+    this.#callbacks[newState].forEach(cb => cb());
+    this.#callbacks[RootState.Cleaned].splice(0);
+    this.#callbacks[RootState.Detached].splice(0);
   }
 
   public enter<A extends any[], T>(cb: (...args: A) => T, ...args: A): T {
@@ -206,18 +225,6 @@ export class Root {
     return cleanup;
   }
   
-  #switchTo(newState: RootState.Cleaned | RootState.Detached): void {
-    if (this.#state !== RootState.Live) {
-      if (this.#state !== newState)
-        console.warn(`Cannot switch to ${newState} from ${this.#state}`);
-      return;
-    }
-    this.#state = newState;
-    this.#callbacks[newState].forEach(cb => cb());
-    this.#callbacks[RootState.Cleaned].splice(0);
-    this.#callbacks[RootState.Detached].splice(0);
-  }
-
   public on(state: RootState.Cleaned | RootState.Detached, cb: () => void): () => void {
     if (this.#state !== RootState.Live) {
       if (this.#state === state) {
@@ -231,5 +238,15 @@ export class Root {
     this.#callbacks[state].push(cb);
     const unsub = () => remove(this.#callbacks[state], cb);
     return unsub;
+  }
+
+  public setContextValue(key: unknown, value: unknown) {
+    this.contextValues.set(key, value);
+  }
+
+  public getContextValue(key: unknown): unknown | undefined {
+    if (!this.contextValues.has(key))
+      return this.parent?.getContextValue(key);
+    return this.contextValues.get(key);
   }
 }

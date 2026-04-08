@@ -1,4 +1,5 @@
-import { type ComponentFn, register, createSignal, createTask, type EventHandler, For, onCleanup, getOwner } from "@lentjs/core";
+import { type ComponentFn, register, createSignal, createTask, type EventHandler, For, onCleanup, getOwner, getContext } from "@lentjs/core";
+import { AppContextId } from "./app";
 
 type CounterButtonProps = {
   min: () => number,
@@ -75,6 +76,9 @@ const Counter: ComponentFn<{}> = register(() => {
   };
 
   return <div class={["a", "b b"]}>
+    <div>
+      App context id: {getContext(AppContextId)}
+    </div>
     <div>
       Min: <input attr:type="number" attr:value={min()} attr:max={max} on:change={onChangeMin} />
     </div>
