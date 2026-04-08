@@ -1,7 +1,7 @@
 import type { CapturedOwnerData, JSXElementDynamic, JSXElementWithOwner, Owner } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, cleanupStateNodes, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState } from "./patchElement";
-import { createOwner, type CapturedReactivityData, resumeReaction, enterOwner, resumeTask } from "@lentjs/core-reactivity";
+import { createOwner, type CapturedReactivityData, resumeReaction, enterOwner, resumeTask, untrack } from "@lentjs/core-reactivity";
 import { assert, noop, unreachable } from "./utils";
 import { deserialize } from "@lentjs/core-serialize";
 
@@ -92,10 +92,12 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
       ctx.nodesToRemove.push(startAnchor, endAnchor);
     }
     else {
-      unsub = resumeReaction(() => {
+      unsub = resumeReaction(() => enterOwner(ctx.ownerStack.at(-1)!, () => {
         const newJSXElement = dynamic.data.update(resultState.element);
-        resultState = patchElement(parent, endAnchor, resultState, newJSXElement);
-      }, dynamic.data.reactivityData);
+        untrack(() => {
+          resultState = patchElement(parent, endAnchor, resultState, newJSXElement);
+        });
+      }), dynamic.data.reactivityData);
     }
 
     if (ctx.dynamicStateStack.length > 0)
@@ -135,10 +137,11 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     break;
   }
   case "own": {
-    ctx.directivesData
+    ctx.ownerStack.push(d.data);
     break;
   }
   case "own/": {
+    ctx.ownerStack.pop();
     break;
   }
   case "arr": {
