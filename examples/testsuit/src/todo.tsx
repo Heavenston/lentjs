@@ -53,8 +53,6 @@ const Todo: ComponentFn<{}> = register(() => {
 
   const areAllDone = () => state.tasks.every(t => t.done);
 
-  console.log("Todo owner:", getOwner());
-
   return <>
     <form on:submit={e => {
       e.preventDefault();

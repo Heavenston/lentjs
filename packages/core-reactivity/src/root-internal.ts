@@ -1,5 +1,7 @@
 import { defineSerialization, register } from "@lentjs/core-serialize";
 import { assert, noop, remove } from "@lentjs/utils";
+import type { TaskCallback } from "./task";
+import type { CapturedReactivityData } from "./reaction";
 
 export type RootCleanup = (() => void) & { detach(): void, root: Root };
 
@@ -25,6 +27,14 @@ type ReducedRoot = {
   state: RootState,
   parent: Root | null,
 };
+export type RootCaptureTaskData = {
+  root: Root,
+  task: TaskCallback,
+  capture(): CapturedReactivityData,
+};
+export type RootCaptureData = {
+  tasks: RootCaptureTaskData[],
+};
 
 export class Root {
   static #currentRoot: Root | null = null;
@@ -45,6 +55,11 @@ export class Root {
 
   readonly creationStackTrace = new Error();
   readonly parent: Root | null;
+  /**
+   * If present this stores created tasks.
+   * This is inherited from the parent, and only created for roots without a parent.
+   */
+  readonly captureData?: RootCaptureData;
 
   public get state(): RootState {
     return this.#state;
@@ -58,9 +73,12 @@ export class Root {
     return this.#state === RootState.Detached;
   }
 
-  private constructor(state: RootState, parent: Root | null) {
+  private constructor(state: RootState, parent: Root | null, captureData: RootCaptureData | null | undefined) {
     this.parent = parent;
     this.#state = state;
+    if (captureData != null)
+      this.captureData = captureData;
+    defineSerialization(this, Root.reducer, Root.reviver);
   }
 
   private static reducer(root: Root): ReducedRoot {
@@ -70,7 +88,7 @@ export class Root {
     };
   }
   private static reviver(reduced: ReducedRoot): Root {
-    return new Root(reduced.state, reduced.parent);
+    return new Root(reduced.state, reduced.parent, null);
   }
   static { register(this.reviver, "__lentjs_rootReviver") }
 
@@ -87,9 +105,9 @@ export class Root {
   }
   static { register(this.cleaunpReviver, "__lentjs_rootCleanupReviver"); }
 
-  public static create(parent: Root | null): [root: Root, cleanup: RootCleanup] {
-    const root = new Root(RootState.Live, parent);
-    defineSerialization(root, Root.reducer, Root.reviver);
+  public static create(parent: Root | null, capturing: boolean): [root: Root, cleanup: RootCleanup] {
+    assert(!capturing || parent === null, "Capturing roots must have no parent");
+    const root = new Root(RootState.Live, parent, capturing ? { tasks: [] } : parent?.captureData);
     const cleanup = Root.cleaunpReviver(root);
     return [root, cleanup];
   }

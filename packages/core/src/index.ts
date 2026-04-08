@@ -10,7 +10,7 @@ export { type SSRElement, isSSRElement } from "./ssr-element";
 
 import { register, serialize } from "@lentjs/core-serialize";
 import { isFunction, isObject } from "./utils";
-import { createOwner, createTask, enterOwner, onCleanup, startReaction, type Owner } from "@lentjs/core-reactivity";
+import { createCapturingOwner, createOwner, createTask, enterOwner, onCleanup, startReaction, type Owner } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName, ATTRIBUTE_PREFIX } from "./runtime";
 import { escapeHtml } from "./escape-html";
 import { getHandlerForAttribute, type Attributes } from "./attributes";
@@ -128,10 +128,14 @@ export function renderToString(el: ComponentFn<{}>): string {
 
   global_h_config = "ssr";
   try {
-    const t = enterOwner(createOwner(), () => stringifyJSXElement(h(el)));
-    const directives_data = createSSRDirective("directives-data", global_directive_data_array, true);
-    console.log("Size of directive data:", directives_data.length);
-    return `${directives_data}${t}`;
+    const [owner, cleanup, capture] = createCapturingOwner();
+    const t = enterOwner(owner, () => stringifyJSXElement(h(el)));
+    const captureData = capture();
+    const tasksDirective = createSSRDirective("tasks", captureData.tasks);
+    const directivesData = createSSRDirective("directives-data", global_directive_data_array, true);
+    // We need to cleanp after serialization otherwise we serialize the cleaned owners
+    cleanup();
+    return `${directivesData}${t}${tasksDirective}`;
   }
   catch(e) {
     throw e;
@@ -223,7 +227,6 @@ export function h<P>(element: string | ComponentFn<P>, props?: P): JSXElement {
       withOwner: createOwner(),
       fun: element.bind(null, props!),
     };
-    // return enterOwner(createOwner(), element, props!);
   }
 }
 register(h, "__lentjs_h");

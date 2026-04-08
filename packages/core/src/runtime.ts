@@ -1,7 +1,7 @@
-import type { JSXElementDynamic, JSXElementWithOwner, Owner } from ".";
+import type { CapturedOwnerData, JSXElementDynamic, JSXElementWithOwner, Owner } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, cleanupStateNodes, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState } from "./patchElement";
-import { createOwner, type CapturedReactivityData, resumeReaction } from "@lentjs/core-reactivity";
+import { createOwner, type CapturedReactivityData, resumeReaction, enterOwner, resumeTask } from "@lentjs/core-reactivity";
 import { assert, noop, unreachable } from "./utils";
 import { deserialize } from "@lentjs/core-serialize";
 
@@ -12,6 +12,8 @@ export const ATTRIBUTE_PREFIX = `data-${DIRECTIVE_PREFIX}`;
 
 export type Directives = {
   "directives-data": unknown[],
+
+  "tasks": CapturedOwnerData["tasks"],
 
   "dyn": {
     update: JSXElementDynamic,
@@ -56,6 +58,13 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
   case "directives-data":
     ctx.nodesToRemove.push(directiveNode);
     ctx.directivesData = d.data;
+    break;
+  case "tasks":
+    for (const task of d.data) {
+      enterOwner(task.owner, () => {
+        resumeTask(task.task, task.reactivityData);
+      });
+    }
     break;
   case "dyn": {
     ctx.dynamicStateStack.push({

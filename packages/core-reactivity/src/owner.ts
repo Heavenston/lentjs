@@ -1,16 +1,28 @@
 export type { Owner } from "./owner-internal";
 
 import { convertOwner, type Owner } from "./owner-internal";
+import type { CapturedReactivityData } from "./reaction";
 import { Root, RootState } from "./root-internal";
+import type { TaskCallback } from "./task";
 
 export type OwnerCleanup = (() => void) & { detach(): void };
+
+export type CapturedOwnerTaskData = {
+  owner: Owner,
+  task: TaskCallback,
+  reactivityData: CapturedReactivityData,
+};
+export type CapturedOwnerData = {
+  tasks: CapturedOwnerTaskData[],
+};
+export type OwnerCapture = () => CapturedOwnerData;
 
 export function getOwner(): Owner | null {
   return convertOwner(Root.currentRoot);
 }
 
 export function createOwner(parent: Owner | null = getOwner()): Owner {
-  const [root, cleanup] = Root.create(convertOwner(parent));
+  const [root, cleanup] = Root.create(convertOwner(parent), false);
   const owner = convertOwner(root);
   if (parent) {
     onDetach(cleanup.detach, parent);
@@ -24,7 +36,7 @@ export function createOwner(parent: Owner | null = getOwner()): Owner {
 }
 
 export function createControlledOwner(parent: Owner | null = getOwner()): [owner: Owner, cleanup: OwnerCleanup] {
-  const [root, cleanup] = Root.create(convertOwner(parent));
+  const [root, cleanup] = Root.create(convertOwner(parent), false);
   const owner = convertOwner(root);
   if (parent) {
     const unsubCleanup = onCleanup(cleanup, parent);
@@ -32,6 +44,20 @@ export function createControlledOwner(parent: Owner | null = getOwner()): [owner
     onDetach(unsubCleanup, owner);
   }
   return [owner, cleanup];
+}
+
+export function createCapturingOwner(): [owner: Owner, clean: OwnerCleanup, capture: OwnerCapture] {
+  const [root, cleanup] = Root.create(null, true);
+  return [convertOwner(root), cleanup, () => {
+    const data = {
+      tasks: root.captureData!.tasks.map(({ capture, root, task }) => ({
+        owner: convertOwner(root),
+        task,
+        reactivityData: capture(),
+      })),
+    };
+    return data;
+  }]
 }
 
 export function enterOwner<A extends any[], T>(root: Owner, cb: (...args: A) => T, ...args: A): T {
