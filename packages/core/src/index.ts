@@ -96,7 +96,7 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
     const prefix = createSSRDirective("own", el.withOwner);
     const suffix = createSSRDirective("own/");
     return enterOwner(el.withOwner, () => {
-      return `${prefix}${stringifyJSXElement(el.fun(), true)}${suffix}`;
+      return `${prefix}${stringifyJSXElement(el.fun(), false)}${suffix}`;
     });
   }
   else if (Array.isArray(el)) {
@@ -130,6 +130,7 @@ export function renderToString(el: ComponentFn<{}>): string {
   try {
     const t = enterOwner(createOwner(), () => stringifyJSXElement(h(el)));
     const directives_data = createSSRDirective("directives-data", global_directive_data_array, true);
+    console.log("Size of directive data:", directives_data.length);
     return `${directives_data}${t}`;
   }
   catch(e) {
