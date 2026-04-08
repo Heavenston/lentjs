@@ -1,28 +1,12 @@
 import { defineSerialization, register } from "@lentjs/core-serialize";
-import { assert, noop, remove } from "@lentjs/utils";
+import { assert, createUid, noop, remove } from "@lentjs/utils";
 import type { TaskCallback } from "./task";
 import type { CapturedReactivityData } from "./reaction";
 
-const rootcleanupDataSymbol = Symbol("rootCleanupData");
-type RootCleanupData = {
-  root: Root,
-  cleanupWithParent: boolean,
-  detachWithParent: boolean,
-};
 export type RootCleanup = {
   (): void;
   detach(): void,
-  /**
-   * Register this root cleanup to be called when the given root gets cleaned.
-   * This is maintained across serialization.
-   */
-  cleanupWithParent(): void,
-  /**
-   * Register this root detach to be called when the given root gets detached.
-   * This is maintained across serialization.
-   */
-  detachWithParent(): void,
-  [rootcleanupDataSymbol]: RootCleanupData,
+  root: Root,
 };
 
 export const enum RootState {
@@ -44,8 +28,11 @@ export const enum RootState {
 }
 
 type ReducedRoot = {
+  id: string,
   state: RootState,
   parent: Root | null,
+  cleanupWithParent: boolean,
+  detachWithParent: boolean,
 };
 export type RootCaptureTaskData = {
   root: Root,
@@ -56,22 +43,42 @@ export type RootCaptureData = {
   tasks: RootCaptureTaskData[],
 };
 
+type RootConstructorConfig = {
+  id?: string,
+  state: RootState,
+  parent: Root | null,
+  captureData?: RootCaptureData,
+  cleanupWithParent?: boolean,
+  detachWithParent?: boolean,
+};
+export type CreateRootConfig = {
+  parent?: null,
+  capturing?: boolean,
+  startDetached?: boolean,
+} | {
+  parent: Root,
+  cleanupWithParent?: boolean,
+  detachWithParent?: boolean,
+  startDetached?: false,
+} | {
+  parent: Root,
+  cleanupWithParent?: false,
+  detachWithParent?: false,
+  startDetached: true,
+};
+
 export class Root {
   static #currentRoot: Root | null = null;
-  /**
-   * This is a development helper for detecting root leaks
-   */
-  static #cleanupLeakDetector = new FinalizationRegistry((root: Root) => {
-    if (root.state === RootState.Live) {
-      console.warn("Leaked cleanup of root created at", root.creationStackTrace);
-    }
-  });
 
+  readonly #id;
   #state: RootState;
   readonly #callbacks: Readonly<Record<RootState.Cleaned | RootState.Detached, (() => void)[]>> = {
     [RootState.Cleaned]: [],
     [RootState.Detached]: [],
   };
+
+  readonly cleanupWithParent: boolean = false;
+  readonly detachWithParent: boolean = false;
 
   readonly creationStackTrace = new Error();
   readonly parent: Root | null;
@@ -80,6 +87,12 @@ export class Root {
    * This is inherited from the parent, and only created for roots without a parent.
    */
   readonly captureData?: RootCaptureData;
+
+  public toString(): string {
+    if (this.parent)
+      return `${this.parent.toString()}->${this.#id}`;
+    return this.#id;
+  }
 
   public get state(): RootState {
     return this.#state;
@@ -93,42 +106,77 @@ export class Root {
     return this.#state === RootState.Detached;
   }
 
-  private constructor(state: RootState, parent: Root | null, captureData: RootCaptureData | null | undefined) {
-    this.parent = parent;
-    this.#state = state;
-    if (captureData != null)
-      this.captureData = captureData;
+  private constructor(config: RootConstructorConfig) {
+    this.#id = config.id ?? createUid();
+    this.parent = config.parent;
+    this.#state = config.state;
+    if (config.captureData != null)
+      this.captureData = config.captureData;
     defineSerialization(this, Root.reducer, Root.reviver);
+
+    if (config.cleanupWithParent) {
+      const parent = this.parent!;
+      this.cleanupWithParent = true;
+      const unsub = parent.on(RootState.Cleaned, () => this.#switchTo(RootState.Cleaned));
+      this.on(RootState.Cleaned, unsub);
+      this.on(RootState.Detached, unsub);
+    }
+    if (config.detachWithParent) {
+      const parent = this.parent!;
+      this.detachWithParent = true;
+      const unsub = parent.on(RootState.Detached, () => this.#switchTo(RootState.Detached));
+      this.on(RootState.Cleaned, unsub);
+      this.on(RootState.Detached, unsub);
+    }
   }
 
   private static reducer(root: Root): ReducedRoot {
     return {
+      id: root.#id,
       state: root.state,
       parent: root.parent,
+      cleanupWithParent: root.cleanupWithParent,
+      detachWithParent: root.detachWithParent,
     };
   }
   private static reviver(reduced: ReducedRoot): Root {
-    return new Root(reduced.state, reduced.parent, null);
+    return new Root({
+      id: reduced.id,
+      state: reduced.state,
+      parent: reduced.parent,
+      cleanupWithParent: reduced.cleanupWithParent,
+      detachWithParent: reduced.detachWithParent,
+    });
   }
   static { register(this.reviver, "__lentjs_rootReviver") }
 
-  private static cleanupReducer(cleanup: RootCleanup): RootCleanupData  {
-    return cleanup[rootcleanupDataSymbol];
+  private static cleanupReducer(cleanup: RootCleanup): Root  {
+    return cleanup.root;
   }
-  private static cleaunpReviver(data: RootCleanupData): RootCleanup {
-    const cleanup = data.root.#createCleanup();
-    if (data.cleanupWithParent)
-      cleanup.cleanupWithParent();
-    if (data.detachWithParent)
-      cleanup.detachWithParent();
-    return cleanup;
+  private static cleaunpReviver(root: Root): RootCleanup {
+    return root.createCleanup();
   }
   static { register(this.cleaunpReviver, "__lentjs_rootCleanupReviver"); }
 
-  public static create(parent: Root | null, capturing: boolean): [root: Root, cleanup: RootCleanup] {
-    assert(!capturing || parent === null, "Capturing roots must have no parent");
-    const root = new Root(RootState.Live, parent, capturing ? { tasks: [] } : parent?.captureData);
-    return [root, root.#createCleanup()];
+  public static create(config: CreateRootConfig): Root {
+    let root: Root;
+    if (config.parent) {
+      root = new Root({
+        state: config.startDetached ? RootState.Detached : RootState.Live,
+        parent: config.parent,
+        cleanupWithParent: config.cleanupWithParent ?? false,
+        detachWithParent: config.detachWithParent ?? false,
+        captureData: config.parent.captureData,
+      });
+    }
+    else {
+      root = new Root({
+        state: config.startDetached ? RootState.Detached : RootState.Live,
+        parent: null,
+        captureData: config.capturing ? { tasks: [] } : undefined,
+      });
+    }
+    return root;
   }
 
   public static get currentRoot() {
@@ -150,44 +198,11 @@ export class Root {
     }
   }
 
-  #createCleanup(): RootCleanup {
-    const root = this;
-    const data: RootCleanupData = { root, cleanupWithParent: false, detachWithParent: false };
-
-    const cleanup: RootCleanup = () => root.#switchTo(RootState.Cleaned);
-    cleanup[rootcleanupDataSymbol] = data;
+  public createCleanup(): RootCleanup {
+    const cleanup: RootCleanup = () => this.#switchTo(RootState.Cleaned);
     cleanup.detach = () => this.#switchTo(RootState.Detached);
-    cleanup.detachWithParent = () => {
-      if (data.detachWithParent) {
-        console.warn("Called detachWithParent multiple times");
-        return;
-      }
-      if (!root.parent) {
-        console.warn("Called detachWithParent but has no parent");
-        return;
-      }
-      data.detachWithParent = true;
-      const unsub = root.parent.on(RootState.Detached, cleanup.detach);
-      root.on(RootState.Detached, unsub);
-      root.on(RootState.Cleaned, unsub);
-    };
-    cleanup.cleanupWithParent = () => {
-      if (data.cleanupWithParent) {
-        console.warn("Called cleanupWithParent multiple times");
-        return;
-      }
-      if (!root.parent) {
-        console.warn("Called cleanupWithParent but has no parent");
-        return;
-      }
-      data.cleanupWithParent = true;
-      const unsub = root.parent.on(RootState.Cleaned, cleanup);
-      root.on(RootState.Detached, unsub);
-      root.on(RootState.Cleaned, unsub);
-    };
+    cleanup.root = this;
     defineSerialization(cleanup, Root.cleanupReducer, Root.cleaunpReviver);
-
-    Root.#cleanupLeakDetector.register(cleanup, root);
     return cleanup;
   }
   
@@ -214,8 +229,7 @@ export class Root {
       }
     }
     this.#callbacks[state].push(cb);
-    return () => {
-      remove(this.#callbacks[state], cb);
-    };
+    const unsub = () => remove(this.#callbacks[state], cb);
+    return unsub;
   }
 }

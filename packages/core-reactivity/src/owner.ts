@@ -25,31 +25,26 @@ export function getOwner(): Owner | null {
 }
 
 export function createOwner(parent: Owner | null = getOwner()): Owner {
-  const [root, cleanup] = Root.create(convertOwner(parent), false);
-  const owner = convertOwner(root);
-  if (parent) {
-    cleanup.detachWithParent();
-    cleanup.cleanupWithParent();
-  }
-  else {
-    // No parent, never cleaned
-    cleanup.detach();
-  }
-  return owner;
+  return convertOwner(Root.create(parent ? {
+    parent: convertOwner(parent), cleanupWithParent: true, detachWithParent: true,
+  } : {
+    startDetached: true,
+  }));
 }
 
 export function createControlledOwner(parent: Owner | null = getOwner()): [owner: Owner, cleanup: OwnerCleanup] {
-  const [root, cleanup] = Root.create(convertOwner(parent), false);
-  const owner = convertOwner(root);
-  if (parent) {
-    cleanup.cleanupWithParent();
-  }
-  return [owner, cleanup];
+  const root = Root.create(parent ? {
+    parent: convertOwner(parent),
+    cleanupWithParent: true,
+  } : { });
+  return [convertOwner(root), root.createCleanup()];
 }
 
 export function createCapturingOwner(): [owner: Owner, clean: OwnerCleanup, capture: OwnerCapture] {
-  const [root, cleanup] = Root.create(null, true);
-  return [convertOwner(root), cleanup, () => {
+  const root = Root.create({
+    capturing: true,
+  });
+  return [convertOwner(root), root.createCleanup(), () => {
     const data = {
       tasks: root.captureData!.tasks.map(({ capture, root, task }) => ({
         owner: convertOwner(root),

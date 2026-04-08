@@ -63,9 +63,15 @@ export function remove<T>(arr: T[], val: T) {
   filterInPlace(arr, val2 => val !== val2);
 }
 
+const alphabet = "acdefghijklmnoqrstuvwxyz";
+let currentAlphabet = 0;
 export function createUid(): string {
-  if (typeof document === "undefined")
+  if (typeof document !== "undefined")
     return crypto.randomUUID().split("-",1)[0]!;
-  else
-    return crypto.randomUUID();
+  let result = "";
+  for (let i = 0; currentAlphabet+1 >= alphabet.length**i; i++) {
+    result += alphabet.charAt(Math.trunc(currentAlphabet / (alphabet.length ** i)) % alphabet.length);
+  }
+  currentAlphabet += 1;
+  return result;
 }
