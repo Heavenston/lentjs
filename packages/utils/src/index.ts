@@ -25,6 +25,7 @@ export function unreachable(_value: never): never {
 export function noop(): void {}
 export function identity<T>(val: T): T { return val }
 export function constant<T>(val: T): (() => T) { return (identity<T>).bind(null, val); }
+export function getProperty<T, K extends keyof T>(val: T, key: K): T[K] { return val[key]; }
 
 export function notNull<T>(val: T): NonNullable<T> {
   assert(val != null);

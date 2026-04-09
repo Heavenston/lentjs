@@ -160,56 +160,61 @@ export function renderToString(el: ComponentFn<{}>): string {
   }
 }
 
-function createHTMLElement(element: string, props: object): HTMLElement {
+function createHTMLElement(element: string, props: any): HTMLElement {
   const el = document.createElement(element);
-  for (const [propName, propVal] of Object.entries(props)) {
+  for (const propName of Object.keys(props)) {
+    // TODO: Children may be reactive too!(?)
     if (propName === "children") {
-      const state = patchElement(el, null, null, propVal);
+      const state = patchElement(el, null, null, () => props[propName]);
       onCleanup(() => cleanupStateNodes(state));
       continue;
     }
 
     const attrHandler = getHandlerForAttribute(propName);
     if (attrHandler === null) continue;
-    if (attrHandler.managedDynamic && isFunction(propVal)) {
-      createTask(() => {
-        attrHandler.setOnHTMLElement(el, propName, propVal());
+    createTask(() => {
+      const val = props[propName];
+      untrack(() => {
+        attrHandler.setOnHTMLElement(el, propName, val);
       });
-    }
-    else {
-      attrHandler.setOnHTMLElement(el, propName, propVal);
-    }
+    });
   }
   return el;
 }
-function createSSRElement(element: string, props: object): SSRElement {
+function createSSRElement(element: string, props: any): SSRElement {
   const builder = new SSRElementBuilder(element);
 
   const attributesResumeData: ResumeAttributesData = [];
   const dynamicAttributesData: DynamicAttributesData = [];
 
-  for (const [propName, propVal] of Object.entries(props)) {
+  for (const propName of Object.keys(props)) {
+    // TODO: Children may be reactive too!(?)
     if (propName === "children") {
-      builder.appendInnerHTML(stringifyJSXElement(propVal, false));
+      builder.appendInnerHTML(stringifyJSXElement(props[propName], false));
       continue;
     }
 
     const attrHandler = getHandlerForAttribute(propName);
     if (attrHandler === null) continue;
-    if (attrHandler.managedDynamic && isFunction(propVal)) {
-      const [val, reactivityData] = startReaction(propVal);
-      attrHandler.setOnSSRElement(builder, propName, val);
+    // if (attrHandler.managedDynamic && isFunction(propVal)) {
+    //   const [val, reactivityData] = startReaction(propVal);
+    //   attrHandler.setOnSSRElement(builder, propName, val);
 
-      if (reactivityData.length > 0)
-        dynamicAttributesData.push([reactivityData, propName, propVal]);
-      if (attrHandler.forceResume)
-        attributesResumeData.push([propName, val]);
-    }
-    else {
-      if (attrHandler.forceResume)
-        attributesResumeData.push([propName, propVal]);
-      attrHandler.setOnSSRElement(builder, propName, propVal);
-    }
+    //   if (reactivityData.length > 0)
+    //     dynamicAttributesData.push([reactivityData, propName, propVal]);
+    //   if (attrHandler.forceResume)
+    //     attributesResumeData.push([propName, val]);
+    // }
+    // else {
+    //   if (attrHandler.forceResume)
+    //     attributesResumeData.push([propName, propVal]);
+    //   attrHandler.setOnSSRElement(builder, propName, propVal);
+    // }
+    // const [val, reactivityData] = startReaction(() => props[propName]);
+    // attrHandler.setOnSSRElement(builder, propName, val);
+    // if (reactivityData.length > 0)
+    // const desc = Object.getOwnPropertyDescriptor(props, propName);
+    // TODO
   }
 
   if (attributesResumeData.length !== 0) {

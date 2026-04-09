@@ -1,5 +1,5 @@
 import * as devalue from "devalue";
-import { assert, identity, isFunction, isObject, noop } from "@lentjs/utils";
+import { assert, constant, getProperty, identity, isFunction, isObject, noop } from "@lentjs/utils";
 
 const isClassMethodSymbol = Symbol("is-class-method-symbol");
 
@@ -57,6 +57,8 @@ register(bind, "__lentjs_bind");
 register(closure, "__lentjs_closure");
 register(noop, "__lentjs_noop");
 register(identity, "__lentjs_identity");
+register(constant, "__lentjs_constant");
+register(getProperty, "__lentjs_getProperty");
 
 export function getValueRegistryId(value: unknown): string | null {
   if (isObject(value) && registryIdSymbol in value)

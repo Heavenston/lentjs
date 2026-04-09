@@ -4,32 +4,25 @@ import type { SSRElementBuilder } from "./ssr-element";
 export type AttributeValue = string | boolean | number | undefined;
 export type Attributes = {
   children?: JSXElement,
-  class?: ClassList | (() => ClassList),
-  value?: string | (() => string),
-  checked?: boolean | (() => boolean),
-  disabled?: boolean | (() => boolean),
+  class?: ClassList,
+  value?: string,
+  checked?: boolean,
+  disabled?: boolean,
 } & {
   [key in `on:${string}`]?: EventHandler<Event>
 } & {
-  [key in `attr:${string}`]?: AttributeValue | (() => AttributeValue)
+  [key in `attr:${string}`]?: AttributeValue
 } & {
-  [key in `prop:${string}`]?: () => any
+  [key in `prop:${string}`]?: any
 };
 
 export type AttributeHandler<V> = {
   filter: string | RegExp,
 
   /**
-   * If set to true, dynamic values (function) will be handled before calling
-   * the set* functions defined here.
-   * So setOnHTMLElement will be called automatically when the value changes
-   */
-  managedDynamic: boolean,
-  /**
    * If set to true, as soon as the runtime finds it, setOnHTMLElement
    * will be called with the deserialized value.
    * Used when you cannot represent this attribute's action in html. (event handlers)
-   * This doesn't affect subsequent updates for managed dynamics.
    */
   forceResume: boolean,
   setOnHTMLElement(element: HTMLElement, propName: string, value: V): void;
@@ -41,7 +34,6 @@ function handler<V>(v: AttributeHandler<V>): AttributeHandler<V> { return v }
 const handlers: AttributeHandler<any>[] = [
   handler<ClassList>({
     filter: "class",
-    managedDynamic: true,
     forceResume: false,
     setOnHTMLElement(element, _, value) {
       element.className = renderClasslist(value).join(" ");
@@ -53,7 +45,6 @@ const handlers: AttributeHandler<any>[] = [
 
   handler<EventHandler<Event>>({
     filter: /^on:/,
-    managedDynamic: false,
     forceResume: true,
     setOnHTMLElement(el, propName, value) {
       const tk = propName.slice(3);
@@ -66,7 +57,6 @@ const handlers: AttributeHandler<any>[] = [
   }),
   handler<AttributeValue>({
     filter: /^attr:/,
-    managedDynamic: true,
     forceResume: false,
     setOnHTMLElement(el, propName, value) {
       const tk = propName.slice(5);
@@ -92,7 +82,6 @@ const handlers: AttributeHandler<any>[] = [
   }),
   handler<unknown>({
     filter: /^prop:/,
-    managedDynamic: true,
     forceResume: false,
     setOnHTMLElement(el, propName, value) {
       const tk = propName.slice(5);
@@ -104,7 +93,6 @@ const handlers: AttributeHandler<any>[] = [
 
   handler<unknown>({
     filter: /^(?:checked|value|disabled)$/,
-    managedDynamic: true,
     forceResume: false,
     setOnHTMLElement(element, propName, value) {
       if (propName in element)

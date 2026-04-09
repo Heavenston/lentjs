@@ -41,6 +41,14 @@ const App: ComponentFn<{}> = register(() => {
 
   return <>
     <Counter />
+    <hr />
+    <ConditionalCounter />
+    <hr />
+    <Todo />
+    <hr />
+    <Complex />
+    <hr />
+    <List />
   </>;
 }, "____RANDOM_ID");
 export default App;
