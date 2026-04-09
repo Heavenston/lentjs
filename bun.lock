@@ -15,22 +15,10 @@
         "@lentjs/core": "workspace:*",
       },
       "devDependencies": {
-        "@lentjs/compiler": "workspace:*",
+        "@lentjs/vitejs-plugin": "workspace:*",
         "sass-embedded": "^1.98.0",
         "typescript": "~5.9.3",
         "vite": "^8.0.1",
-      },
-    },
-    "packages/compiler": {
-      "name": "@lentjs/compiler",
-      "version": "0.0.0",
-      "dependencies": {
-        "@lentjs/swc-plugin": "workspace:*",
-        "@swc/core": "^1.15.24",
-        "vite": "^8.0.3",
-      },
-      "peerDependencies": {
-        "typescript": "^5",
       },
     },
     "packages/core": {
@@ -91,6 +79,18 @@
         "typescript": "^5",
       },
     },
+    "packages/vitejs-plugin": {
+      "name": "@lentjs/vitejs-plugin",
+      "version": "0.0.0",
+      "dependencies": {
+        "@lentjs/swc-plugin": "workspace:*",
+        "@swc/core": "^1.15.24",
+        "vite": "^8.0.3",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
   },
   "packages": {
     "@bufbuild/protobuf": ["@bufbuild/protobuf@2.11.0", "", {}, "sha512-sBXGT13cpmPR5BMgHE6UEEfEaShh5Ror6rfN3yEK5si7QVrtZg8LEPQb0VVhiLRUslD2yLnXtnRzG035J/mZXQ=="],
@@ -101,8 +101,6 @@
 
     "@emnapi/wasi-threads": ["@emnapi/wasi-threads@1.2.0", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-N10dEJNSsUx41Z6pZsXU8FjPjpBEplgH24sfkmITrBED1/U2Esum9F3lfLrMjKHHjmi557zQn7kR9R+XWXu5Rg=="],
 
-    "@lentjs/compiler": ["@lentjs/compiler@workspace:packages/compiler"],
-
     "@lentjs/core": ["@lentjs/core@workspace:packages/core"],
 
     "@lentjs/core-reactivity": ["@lentjs/core-reactivity@workspace:packages/core-reactivity"],
@@ -112,6 +110,8 @@
     "@lentjs/swc-plugin": ["@lentjs/swc-plugin@workspace:packages/swc-plugin"],
 
     "@lentjs/utils": ["@lentjs/utils@workspace:packages/utils"],
+
+    "@lentjs/vitejs-plugin": ["@lentjs/vitejs-plugin@workspace:packages/vitejs-plugin"],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.1.1", "", { "dependencies": { "@emnapi/core": "^1.7.1", "@emnapi/runtime": "^1.7.1", "@tybys/wasm-util": "^0.10.1" } }, "sha512-p64ah1M1ld8xjWv3qbvFwHiFVWrq1yFvV4f7w+mzaqiR4IlSgkqhcRdHwsGgomwzBH51sRY4NEowLxnaBjcW/A=="],
 

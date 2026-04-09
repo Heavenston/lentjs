@@ -1,6 +1,6 @@
 import { type Plugin, defineConfig, type Connect } from 'vite'
 import * as fs from "fs/promises";
-import { lentjsCompilerPlugin } from "@lentjs/compiler";
+import LentJS from "@lentjs/vitejs-plugin";
 
 const shouldSsrRender = (req: Connect.IncomingMessage) => {
   const pathname = req.url ?? "";
@@ -50,7 +50,7 @@ export default defineConfig({
   oxc: false,
 
   plugins: [
-    lentjsCompilerPlugin(),
+    LentJS(),
     (() => ({
       name: "lent-id",
       transform: {

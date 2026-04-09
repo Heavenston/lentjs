@@ -1,5 +1,5 @@
 {
-  "name": "@lentjs/compiler",
+  "name": "@lentjs/vitejs-plugin",
   "version": "0.0.0",
 
   "type": "module",

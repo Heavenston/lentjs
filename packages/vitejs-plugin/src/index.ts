@@ -2,9 +2,9 @@ import { type Plugin } from "vite";
 import { transform } from "@swc/core";
 import { fileURLToPath } from "node:url";
 
-export const lentjsCompilerPlugin = (): Plugin => {
+export default function LentjsVitejsPlugin(): Plugin {
   return {
-    name: "lentjs-compiler",
+    name: "lentjs-vitejs",
 
     transform: {
       filter: {
