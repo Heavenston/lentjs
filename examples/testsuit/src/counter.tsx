@@ -1,4 +1,4 @@
-import { type ComponentFn, register, createSignal, createTask, type EventHandler, For, onCleanup, getOwner, getContext } from "@lentjs/core";
+import { type ComponentFn, register, createSignal, createTask, type EventHandler, For, onCleanup, getContext } from "@lentjs/core";
 import { AppContextId } from "./app";
 
 type CounterButtonProps = {
@@ -22,7 +22,6 @@ const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
   createTask(() => {
     const val = rawCount();
     console.log("Task!", val);
-    console.log(getOwner()?.toString());
     onCleanup(() => {
       console.log("Count task cleanup", val);
     });

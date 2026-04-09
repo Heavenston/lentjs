@@ -1,9 +1,10 @@
 import type { CapturedOwnerData, JSXElementDynamic, JSXElementWithOwner, Owner } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, cleanupStateNodes, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState } from "./patchElement";
-import { createOwner, type CapturedReactivityData, resumeReaction, enterOwner, resumeTask, untrack } from "@lentjs/core-reactivity";
+import { type CapturedReactivityData, resumeReaction, enterOwner, resumeTask, untrack } from "@lentjs/core-reactivity";
 import { assert, noop, notNull, unreachable } from "./utils";
 import { deserialize } from "@lentjs/core-serialize";
+import { setResumed } from "./global-signals";
 
 const REMOVE_DIRECTIVES = false;
 
@@ -260,6 +261,11 @@ export function startRuntime(rootElement: HTMLElement) {
       else
         n.remove();
     }
+
+  enterOwner(notNull(ctx.ownerStack[0]), () => {
+    setResumed();
+  });
+
   console.timeEnd("startRuntime");
 }
 

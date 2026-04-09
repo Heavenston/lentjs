@@ -7,16 +7,18 @@ export { register } from "@lentjs/core-serialize";
 export { Fragment } from "./fragment";
 export { type Attributes, type AttributeValue } from "./attributes";
 export { type SSRElement, isSSRElement } from "./ssr-element";
+export { resumed } from "./global-signals";
 
 import { register, serialize } from "@lentjs/core-serialize";
 import { isFunction, isObject } from "./utils";
-import { createCapturingOwner, createOwner, createTask, enterOwner, onCleanup, startReaction, type Owner } from "@lentjs/core-reactivity";
+import { createCapturingOwner, createOwner, createTask, enterOwner, onCleanup, startReaction, untrack, type Owner } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName, ATTRIBUTE_PREFIX } from "./runtime";
 import { escapeHtml } from "./escape-html";
 import { getHandlerForAttribute, type Attributes } from "./attributes";
 import { global_directive_data_array, sharedSSRSerialize } from "./shared-globals";
 import { type SSRElement, isSSRElement, SSRElementBuilder } from "./ssr-element";
 import { cleanupStateNodes, patchElement } from "./patchElement";
+import { resumed } from "./global-signals";
 
 export type JSXElementString = number | string;
 export type JSXElementSingular = SSRElement | ChildNode | JSXElementString | null | undefined;
@@ -30,6 +32,18 @@ export type ClassList = string | Partial<Record<string, boolean>> | ClassList[];
 export type ComponentFn<P> = (props: P) => JSXElement;
 
 export type EventHandler<E> = (event: E) => unknown;
+
+const resumeTaskFn = register((cb: () => void) => {
+  if (!resumed()) return;
+  untrack(cb);
+}, "__lentjs_onResumeTaskFn");
+export function onResume(cb: () => void) {
+  createTask(resumeTaskFn.bind(null, cb));
+}
+
+export function onUnmount(cb: () => void) {
+  onResume(onCleanup.bind(null, cb));
+}
 
 export function isJSXElementString(t: unknown): t is JSXElementString {
   return typeof t === "string" || typeof t === "number";
@@ -129,16 +143,14 @@ export function renderToString(el: ComponentFn<{}>): string {
   global_h_config = "ssr";
   try {
     const [owner, cleanup, capture] = createCapturingOwner();
-    const t = stringifyJSXElement({
-      withOwner: owner,
-      fun: () => h(el),
-    });
+    const rootOwnerDirective = createSSRDirective("own", owner);
+    const t = enterOwner(owner, () => stringifyJSXElement(h(el)));
     const captureData = capture();
     const tasksDirective = createSSRDirective("tasks", captureData.tasks);
     const directivesData = createSSRDirective("directives-data", global_directive_data_array, true);
     // We need to cleanp after serialization otherwise we serialize the cleaned owners
     cleanup();
-    return `${directivesData}${t}${tasksDirective}`;
+    return `${directivesData}${rootOwnerDirective}${t}${tasksDirective}`;
   }
   catch(e) {
     throw e;

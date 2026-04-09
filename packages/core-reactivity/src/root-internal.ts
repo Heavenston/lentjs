@@ -93,8 +93,8 @@ export class Root {
    * If present this stores created tasks.
    * This is inherited from the parent, and only created for roots without a parent.
    */
-  public  readonly captureData?: RootCaptureData;
-  private readonly contextValues: Map<unknown, unknown>;
+  public readonly captureData?: RootCaptureData;
+  public readonly contextValues: Map<unknown, unknown>;
 
   public get state(): RootState {
     return this.#state;
@@ -134,9 +134,10 @@ export class Root {
   }
 
   public toString(): string {
+    const t = `${this.#id}(${this.state})`;
     if (this.parent)
-      return `${this.parent.toString()}->${this.#id}`;
-    return this.#id;
+      return `${this.parent.toString()}${this.detachWithParent ? "-->" : "-/>"}${t}`;
+    return t;
   }
 
   private static reducer(root: Root): ReducedRoot {
@@ -197,13 +198,15 @@ export class Root {
       return;
     }
     this.#state = newState;
-    this.#callbacks[newState].forEach(cb => cb());
-    this.#callbacks[RootState.Cleaned].splice(0);
-    this.#callbacks[RootState.Detached].splice(0);
+    this.enter(() => {
+      // Needs to splice before calling because the array *may* be modified during iteration
+      this.#callbacks[newState].splice(0).forEach(cb => cb());
+    });
+    // Avoid leaking now useless callbacks
+    this.#callbacks[newState === RootState.Cleaned ? RootState.Detached : RootState.Cleaned].splice(0);
   }
 
   public enter<A extends any[], T>(cb: (...args: A) => T, ...args: A): T {
-    assert(this.state !== RootState.Cleaned, "Cannot enter an already cleaned root");
     const prev = Root.#currentRoot;
     Root.#currentRoot = this;
     try {
@@ -238,15 +241,5 @@ export class Root {
     this.#callbacks[state].push(cb);
     const unsub = () => remove(this.#callbacks[state], cb);
     return unsub;
-  }
-
-  public setContextValue(key: unknown, value: unknown) {
-    this.contextValues.set(key, value);
-  }
-
-  public getContextValue(key: unknown): unknown | undefined {
-    if (!this.contextValues.has(key))
-      return this.parent?.getContextValue(key);
-    return this.contextValues.get(key);
   }
 }

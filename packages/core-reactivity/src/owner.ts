@@ -1,9 +1,11 @@
 export type { Owner } from "./owner-internal";
 
+import { register } from "@lentjs/core-serialize";
 import { convertOwner, type Owner } from "./owner-internal";
 import type { CapturedReactivityData } from "./reaction";
 import { Root, RootState } from "./root-internal";
 import type { TaskCallback } from "./task";
+import { assert } from "@lentjs/utils";
 
 export type OwnerCleanup = {
   (): void;
@@ -59,6 +61,7 @@ export function createCapturingOwner(): [owner: Owner, clean: OwnerCleanup, capt
 }
 
 export function enterOwner<A extends any[], T>(root: Owner, cb: (...args: A) => T, ...args: A): T {
+  assert(!root.cleaned, "Cannot enter a cleaned owner");
   return convertOwner(root).enter(cb, ...args);
 }
 
@@ -69,6 +72,7 @@ export function onCleanup(cb: () => void, inOwner?: Owner): () => void {
   }
   return convertOwner(currentOwner).on(RootState.Cleaned, cb);
 }
+register(onCleanup, "__lentjs_onCleanup");
 
 export function onDetach(cb: () => void, inOwner?: Owner): () => void {
   const currentOwner = inOwner ?? getOwner();
@@ -77,3 +81,4 @@ export function onDetach(cb: () => void, inOwner?: Owner): () => void {
   }
   return convertOwner(currentOwner).on(RootState.Detached, cb);
 }
+register(onDetach, "__lentjs_onDetach");
