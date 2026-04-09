@@ -1,3 +1,6 @@
+// False positive
+#![allow(unreachable_patterns)]
+
 mod jsx;
 mod jsx_whitespace;
 
@@ -201,6 +204,6 @@ impl VisitMut for TransformVisitor {
 #[plugin_transform]
 pub fn process_transform(mut program: Program, _metadata: TransformPluginProgramMetadata) -> Program {
     program.visit_mut_with(&mut jsx::JsxTransform::default());
-    program.visit_mut_with(&mut TransformVisitor::default());
+    // program.visit_mut_with(&mut TransformVisitor::default());
     program
 }

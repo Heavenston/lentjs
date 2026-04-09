@@ -1,8 +1,8 @@
 ///! Code in this module is largely AI-Generated but with a few tweaks
 
 use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ Span, util::take::Take }, ecma::{
-    ast::{Bool, CallExpr, Callee, Expr, ExprOrSpread, Ident, ImportDecl, ImportNamedSpecifier, ImportSpecifier, JSXAttrName, JSXAttrOrSpread, JSXAttrValue, JSXElement, JSXElementChild, JSXElementName, JSXExpr, JSXFragment, JSXMemberExpr, JSXObject, KeyValueProp, Lit, MemberExpr, MemberProp, Module, ModuleDecl, ModuleItem, Null, ObjectLit, Prop, PropName, PropOrSpread, Str},
-    visit::{ VisitMut, VisitMutWith },
+    ast::{Bool, CallExpr, Callee, Expr, ExprOrSpread, Ident, ImportDecl, ImportNamedSpecifier, ImportSpecifier, JSXAttrName, JSXAttrOrSpread, JSXAttrValue, JSXElement, JSXElementChild, JSXElementName, JSXExpr, JSXFragment, JSXMemberExpr, JSXObject, KeyValueProp, Lit, MemberExpr, MemberProp, Module, ModuleDecl, ModuleItem, ObjectLit, Prop, PropName, PropOrSpread, Stmt, Str},
+    visit::{ Visit, VisitMut, VisitMutWith, VisitWith },
 }};
 
 use crate::jsx_whitespace::collapse_jsx_whitespace;
@@ -10,6 +10,46 @@ use crate::jsx_whitespace::collapse_jsx_whitespace;
 const IMPORT_SOURCE: &str = "@lentjs/core";
 const FACTORY_NAME: &str = "h";
 const FRAGMENT_NAME: &str = "Fragment";
+
+/// Tries to chose wether or not an expression may invoke any reactive code.
+/// This may happen because of signals, or stores, so we detect function calls
+/// and member expression.
+#[derive(Default)]
+struct ExpressionNeedsWrapping {
+    found_dynamic: bool,
+}
+
+impl Visit for ExpressionNeedsWrapping {
+    fn visit_arrow_expr(&mut self, _node: &swc_core::ecma::ast::ArrowExpr) {
+        // We do not visit function bodies
+    }
+
+    fn visit_function(&mut self, _node: &swc_core::ecma::ast::Function) {
+        // We do not visit function bodies
+    }
+
+    fn visit_fn_expr(&mut self, _node: &swc_core::ecma::ast::FnExpr) {
+        // We do not visit function bodies
+    }
+
+    fn visit_fn_decl(&mut self, _node: &swc_core::ecma::ast::FnDecl) {
+        // We do not visit function bodies
+    }
+
+    fn visit_call_expr(&mut self, _node: &CallExpr) {
+        self.found_dynamic = true;
+    }
+
+    fn visit_member_expr(&mut self, _node: &MemberExpr) {
+        self.found_dynamic = true;
+    }
+}
+
+fn expr_needs_wrapping(expr: &Expr) -> bool {
+    let mut e = ExpressionNeedsWrapping::default();
+    expr.visit_with(&mut e);
+    e.found_dynamic
+}
 
 #[derive(Default)]
 pub struct JsxTransform {
@@ -175,10 +215,25 @@ impl JsxTransform {
                         _ => unimplemented!(),
                     };
                     let value = self.jsx_attr_value_to_expr(a.value);
-                    PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                        key,
-                        value: Box::new(value),
-                    })))
+                    if expr_needs_wrapping(&value) {
+                       PropOrSpread::Prop(Box::new(Prop::Getter(swc_core::ecma::ast::GetterProp {
+                            key,
+                            body: Some(swc_core::ecma::ast::BlockStmt {
+                                stmts: vec![Stmt::Return(swc_core::ecma::ast::ReturnStmt {
+                                    arg: Some(Box::new(value)),
+                                    ..Default::default()
+                                })],
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        })))     
+                    }
+                    else {
+                        PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                            key,
+                            value: Box::new(value),
+                        })))
+                    }
                 }
                 JSXAttrOrSpread::SpreadElement(s) => PropOrSpread::Spread(s),
                 _ => unimplemented!(),
@@ -186,14 +241,31 @@ impl JsxTransform {
             .collect();
 
         if !children.is_empty() {
-            if children.len() == 1 {
-                props.push(PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp { key: PropName::Str("children".into()), value: children.remove(0) }))));
+            let children_list_expr = if children.len() == 1 {
+                children.remove(0)
             }
             else {
-                props.push(PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp { key: PropName::Str("children".into()), value: Box::new(Expr::Array(swc_core::ecma::ast::ArrayLit {
+                Box::new(Expr::Array(swc_core::ecma::ast::ArrayLit {
                     span: Span::dummy(),
                     elems: children.into_iter().map(ExprOrSpread::from).map(Some).collect(),
-                })) }))));
+                }))
+            };
+
+            if expr_needs_wrapping(&children_list_expr) {
+                props.push(PropOrSpread::Prop(Box::new(Prop::Getter(swc_core::ecma::ast::GetterProp {
+                    key: PropName::Str("children".into()),
+                    body: Some(swc_core::ecma::ast::BlockStmt {
+                        stmts: vec![Stmt::Return(swc_core::ecma::ast::ReturnStmt {
+                            arg: Some(children_list_expr),
+                            ..Default::default()
+                        })],
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }))));
+            }
+            else {
+                props.push(PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp { key: PropName::Str("children".into()), value: children_list_expr }))));
             }
         }
 
@@ -256,5 +328,17 @@ impl JsxTransform {
                 Some(Box::new(expr))
             })
             .collect()
+    }
+
+    fn wrap_in_arrow_fn(&mut self, expr: Expr) -> Expr {
+        Expr::Arrow(swc_core::ecma::ast::ArrowExpr {
+            body: Box::new(swc_core::ecma::ast::BlockStmtOrExpr::Expr(Box::new(expr))),
+            ..Default::default()
+        })
+    }
+
+    fn wrap_expr_if_needed(&mut self, expr: Expr) -> Expr {
+        if !expr_needs_wrapping(&expr) { return expr }
+        self.wrap_in_arrow_fn(expr)
     }
 }

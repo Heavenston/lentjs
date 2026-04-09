@@ -26,7 +26,7 @@ const ConditionalCounter: ComponentFn<{}> = register(() => {
   
   return <>
     <button on:click={() => setShow.update(u => !u)}>
-      {() => show() ? "Hide" : "Show"}
+      {show() ? "Hide" : "Show"}
     </button>
     <Show when={show}>
       {() => <Counter />}
@@ -41,14 +41,6 @@ const App: ComponentFn<{}> = register(() => {
 
   return <>
     <Counter />
-    <hr />
-    <ConditionalCounter />
-    <hr />
-    <Todo />
-    <hr />
-    <Complex />
-    <hr />
-    <List />
   </>;
 }, "____RANDOM_ID");
 export default App;
