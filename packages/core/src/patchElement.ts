@@ -1,4 +1,4 @@
-import { isJSXElementDynamic, isJSXElementString, isJSXElementWithOwner, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular, type JSXElementWithOwner } from ".";
+import { ChildernArray, isJSXElementDynamic, isJSXElementString, isJSXElementWithOwner, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular, type JSXElementWithOwner } from ".";
 import { assert, notNull, unreachable } from "./utils";
 import { createReaction, enterOwner, getOwner, untrack } from "@lentjs/core-reactivity";
 
@@ -198,7 +198,8 @@ function appendArray(parent: Node, anchorElement: ChildNode | null, child: JSXEl
   let currentAnchor = anchorElement;
   let states: JSXState[] = [];
   for (let i = child.length-1; i>=0;i--) {
-    const state = patchElement(parent, currentAnchor, null, child[i]!);
+    const childEl = child instanceof ChildernArray ? child.getOrComputed(i) : child[i];
+    const state = patchElement(parent, currentAnchor, null, childEl);
     states.push(state);
     currentAnchor = getFirstElement(state) ?? currentAnchor;
   }
@@ -225,9 +226,11 @@ export function patchElementArrayNew(
   const states = Array<JSXState>();
   let currentAnchor = anchorElement;
   for (let i = child.length-1; i>=0; i--) {
-    const prev = toKeepMap.get(child[i]);
-    toKeepMap.delete(child[i]);
-    const newState = patchElement(parent, currentAnchor, prev ?? null, child[i]);
+    const childEl = child instanceof ChildernArray ? child.getOrComputed(i) : child[i];
+
+    const prev = toKeepMap.get(childEl);
+    toKeepMap.delete(childEl);
+    const newState = patchElement(parent, currentAnchor, prev ?? null, childEl);
     currentAnchor = getFirstElement(newState) ?? currentAnchor;
     states.push(newState);
   }

@@ -22,6 +22,15 @@ export class ChildernArray<T> extends Array<T> {
     return this;
   }
 
+  public getOrComputed(idx: number): T | (() => T) {
+    const desc = Object.getOwnPropertyDescriptor(this, idx);
+    if (!desc) throw new Error("Out of bound access");
+    if (desc.get)
+      return desc.get;
+    else
+      return desc.value;
+  }
+
   private reducer(): K<T>[] {
     let result: K<T>[] = [];
     for (let i = 0; i < this.length; i++) {
