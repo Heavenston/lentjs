@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 ///! Code in this module is largely AI-Generated but with a few tweaks
 
@@ -54,9 +54,7 @@ impl Visit for ExpressionNeedsWrapping {
 
 #[derive(Default)]
 pub struct JsxTransform {
-    factory_ident: Option<Ident>,
-    fragment_ident: Option<Ident>,
-    children_array_ident: Option<Ident>,
+    idents: HashMap<String, Ident>,
 }
 
 impl VisitMut for JsxTransform {
@@ -64,27 +62,11 @@ impl VisitMut for JsxTransform {
         module.visit_mut_children_with(self);
 
         let mut specifiers = Vec::new();
-        if let Some(factory_ident) = self.factory_ident.clone() {
+        for (name, ident) in &self.idents {
             specifiers.push(ImportSpecifier::Named(ImportNamedSpecifier {
                 span: Span::dummy(),
-                local: factory_ident.clone(),
-                imported: Some(swc_core::ecma::ast::ModuleExportName::Ident(Ident::from(FACTORY_NAME))),
-                is_type_only: false,
-            }));
-        }
-        if let Some(fragment_ident) = self.fragment_ident.clone() {
-            specifiers.push(ImportSpecifier::Named(ImportNamedSpecifier {
-                span: Span::dummy(),
-                local: fragment_ident.clone(),
-                imported: Some(swc_core::ecma::ast::ModuleExportName::Ident(Ident::from(FRAGMENT_NAME))),
-                is_type_only: false,
-            }));
-        }
-        if let Some(children_array_ident) = self.children_array_ident.clone() {
-            specifiers.push(ImportSpecifier::Named(ImportNamedSpecifier {
-                span: Span::dummy(),
-                local: children_array_ident.clone(),
-                imported: Some(swc_core::ecma::ast::ModuleExportName::Ident(Ident::from(CHILDREN_ARRAY_NAME))),
+                local: ident.clone(),
+                imported: Some(swc_core::ecma::ast::ModuleExportName::Ident(Ident::from(name.as_str()))),
                 is_type_only: false,
             }));
         }
@@ -123,16 +105,15 @@ impl VisitMut for JsxTransform {
 }
 
 impl JsxTransform {
-    fn get_factory_ident(&mut self) -> Ident {
-        self.factory_ident.get_or_insert_with(|| Ident::new_private(Atom::new(FACTORY_NAME), Span::dummy())).clone()
-    }
-
-    fn get_fragment_ident(&mut self) -> Ident {
-        self.fragment_ident.get_or_insert_with(|| Ident::new_private(Atom::new(FRAGMENT_NAME), Span::dummy())).clone()
-    }
-
-    fn get_children_array_ident(&mut self) -> Ident {
-        self.children_array_ident.get_or_insert_with(|| Ident::new_private(Atom::new(CHILDREN_ARRAY_NAME), Span::dummy())).clone()
+    fn get_lentjs_ident(&mut self, name: &str) -> Ident {
+        if let Some(v) = self.idents.get(name) {
+            v.clone()
+        }
+        else {
+            let ident = Ident::new_private(Atom::new(FACTORY_NAME), Span::dummy());
+            self.idents.insert(name.to_string(), ident.clone());
+            ident
+        }
     }
 
     /// `<Foo bar="baz">child</Foo>`
@@ -148,7 +129,7 @@ impl JsxTransform {
     /// `<>child</>`
     /// → `createElement(Fragment, null, "child")`
     fn transform_fragment(&mut self, frag: JSXFragment) -> Expr {
-        let tag = Expr::Ident(self.get_fragment_ident());
+        let tag = Expr::Ident(self.get_lentjs_ident(FRAGMENT_NAME));
         let children = self.build_children(frag.children);
         let props = self.build_props(vec![], children, frag.opening.span);
 
@@ -175,7 +156,7 @@ impl JsxTransform {
 
         Expr::Call(CallExpr {
             span,
-            callee: Callee::Expr(Box::new(Expr::Ident(self.get_factory_ident()))),
+            callee: Callee::Expr(Box::new(Expr::Ident(self.get_lentjs_ident(FACTORY_NAME)))),
             args,
             ..Default::default()
         })
@@ -289,7 +270,7 @@ impl JsxTransform {
 
     fn build_children_array(&mut self, children: Vec<Box<Expr>>) -> Expr {
         let mut current = Expr::New(swc_core::ecma::ast::NewExpr {
-            callee: Box::new(Expr::Ident(self.get_children_array_ident())),
+            callee: Box::new(Expr::Ident(self.get_lentjs_ident(CHILDREN_ARRAY_NAME))),
             ..Default::default()
         });
 
@@ -372,10 +353,7 @@ impl JsxTransform {
 
     fn expr_needs_wrapping(&mut self, expr: &Expr) -> bool {
         let mut e = ExpressionNeedsWrapping {
-            filter_list: [&self.factory_ident, &self.fragment_ident, &self.children_array_ident].into_iter()
-                .filter_map(|p| p.clone())
-                .map(Into::into)
-                .collect(),
+            filter_list: self.idents.values().cloned().map(Into::into).collect(),
             found_dynamic: false,
         };
         expr.visit_with(&mut e);
