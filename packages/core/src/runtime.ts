@@ -1,7 +1,7 @@
 import type { CapturedOwnerData, JSXElementDynamic, JSXElementWithOwner, Owner } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, cleanupStateNodes, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState } from "./patchElement";
-import { type CapturedReactivityData, resumeReaction, enterOwner, resumeTask, untrack } from "@lentjs/core-reactivity";
+import { type CapturedReactivityData, resumeReaction, enterOwner, resumeTask, untrack, onCleanup } from "@lentjs/core-reactivity";
 import { assert, noop, notNull, unreachable } from "./utils";
 import { deserialize } from "@lentjs/core-serialize";
 import { setResumed } from "./global-signals";
@@ -12,8 +12,6 @@ export const DIRECTIVE_PREFIX = "lentjs";
 export const ATTRIBUTE_PREFIX = `data-${DIRECTIVE_PREFIX}`;
 
 export type Directives = {
-  "directives-data": unknown[],
-
   "tasks": CapturedOwnerData["tasks"],
 
   "dyn": {
@@ -48,7 +46,7 @@ type StateStackElement =
   | { kind: "state", state: JSXState }
 ;
 type RunCtx = {
-  directivesData: readonly unknown[] | null,
+  directivesData: readonly unknown[],
   nodesToRemove: (ChildNode | Attr)[],
   dynamicStateStack: StateStackElement[],
   ownerStack: Owner[],
@@ -56,10 +54,6 @@ type RunCtx = {
 
 function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Comment, parent: Node, d: D) {
   switch (d.name) {
-  case "directives-data":
-    ctx.nodesToRemove.push(directiveNode);
-    ctx.directivesData = d.data;
-    break;
   case "tasks":
     for (const task of d.data) {
       enterOwner(task.owner, () => {
@@ -192,18 +186,21 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
       ctx.nodesToRemove.push(t);
 
     if (t.name === `${ATTRIBUTE_PREFIX}:res-attrs`) {
-      const data = ctx.directivesData![parseInt(t.value)] as ResumeAttributesData;
+      const data = ctx.directivesData[parseInt(t.value)] as ResumeAttributesData;
       for (const [k, v] of data) {
         const handler = notNull(getHandlerForAttribute(k));
         handler.setOnHTMLElement(el, k, v);
       }
     }
     if (t.name === `${ATTRIBUTE_PREFIX}:dyn-attrs`) {
-      const data = ctx.directivesData![parseInt(t.value)] as DynamicAttributesData;
+      const data = ctx.directivesData[parseInt(t.value)] as DynamicAttributesData;
       for (const [reactivityData, propName, callback] of data) {
         const handler = notNull(getHandlerForAttribute(propName));
-        assert(handler.managedDynamic);
-        resumeReaction(() => handler.setOnHTMLElement(el, propName, callback()), reactivityData);
+        const unsub = resumeReaction(() => {
+          const val = callback();
+          untrack(() => handler.setOnHTMLElement(el, propName, val));
+        }, reactivityData);
+        onCleanup(unsub, ctx.ownerStack.at(-1)!);
       }
     }
   }
@@ -215,16 +212,11 @@ function domVisitor(ctx: RunCtx, node: ChildNode) {
 
   node.childNodes.forEach(n => {
     if (n instanceof Comment) {
-      const parts = n.textContent.split(" ", 2);
+      const parts = n.textContent.split(" ", 3);
       if (parts[0] !== DIRECTIVE_PREFIX) return;
-      const parts_rest = n.textContent.replace(/^([^ ]+ +){2}/, "");
       const directive = {
         name: parts[1],
-          data: parts_rest !== n.textContent
-          ? /^[0-9]+$/.test(parts_rest)
-          ? ctx.directivesData![parseInt(parts_rest)]
-          : deserialize(parts_rest)
-          : null,
+        data: parts.length > 2 ? ctx.directivesData[parseInt(parts[2]!)] : null,
       } as unknown as Directive;
       handleDirective(ctx, n, node, directive);
       return;
@@ -245,8 +237,11 @@ function domVisitor(ctx: RunCtx, node: ChildNode) {
 
 export function startRuntime(rootElement: HTMLElement) {
   console.time("startRuntime");
+  const dataElement = rootElement.querySelector(`*[${ATTRIBUTE_PREFIX}\\:data]`);
+  assert(dataElement !== null, "Could not find the data script element");
+  assert(dataElement instanceof HTMLScriptElement && dataElement.lang === "application/json");
   const ctx: RunCtx = {
-    directivesData: null,
+    directivesData: deserialize(dataElement.innerText) as any,
     nodesToRemove: [],
     dynamicStateStack: [],
     ownerStack: [],

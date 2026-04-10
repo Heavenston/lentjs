@@ -78,3 +78,10 @@ export function untrack<T>(cb: () => T): T {
   }
 }
 register(untrack, "__lentjs_untrack");
+
+/**
+ * Returns true when there is a listener for signal reads currently in scope
+ */
+export function isInTrackingContext(): boolean {
+  return currentSignalListener !== null;
+}

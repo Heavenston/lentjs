@@ -1,3 +1,4 @@
+import { defineSerialization, register } from "@lentjs/core-serialize";
 import { escapeHtml } from "./escape-html";
 import { assert } from "./utils";
 
@@ -5,8 +6,12 @@ const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
 
 export function newSSRElement(t: string): SSRElement {
-  return { [SSRElementMarker]: true, t };
+  console.log({t});
+  const obj: SSRElement = { [SSRElementMarker]: true, t };
+  defineSerialization(obj, o => o.t, newSSRElement);
+  return obj;
 }
+register(newSSRElement, "__lentjs_newSSRElement");
 
 export function isSSRElement(t: unknown): t is SSRElement {
   return typeof t === "object" && t !== null && SSRElementMarker in t && t[SSRElementMarker] === true;
@@ -51,10 +56,10 @@ export class SSRElementBuilder {
 
   public appendAttribute(name: string, value: string | null = null): this {
     if (value == null) {
-      this.#attributes += `${name} `;
+      this.#attributes += ` ${name}`;
     }
     else {
-      this.#attributes += `${name}="${escapeHtml(value)}" `;
+      this.#attributes += ` ${name}="${escapeHtml(value)}"`;
     }
     return this;
   }
@@ -71,10 +76,10 @@ export class SSRElementBuilder {
 
   public build(): SSRElement {
     if (this.#selfClosing) {
-      return newSSRElement(`<${this.#tag} ${this.#attributes}>`);
+      return newSSRElement(`<${this.#tag}${this.#attributes}>`);
     }
     else {
-      return newSSRElement(`<${this.#tag} ${this.#attributes}>${this.#innerHTML}</${this.tag}>`);
+      return newSSRElement(`<${this.#tag}${this.#attributes}>${this.#innerHTML}</${this.tag}>`);
     }
   }
 }

@@ -11,7 +11,7 @@ export { resumed } from "./global-signals";
 export * from "./children-array";
 
 import { register, serialize } from "@lentjs/core-serialize";
-import { isFunction, isObject } from "./utils";
+import { getProperty, isFunction, isObject } from "./utils";
 import { createCapturingOwner, createOwner, createTask, enterOwner, onCleanup, startReaction, untrack, type Owner } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName, ATTRIBUTE_PREFIX } from "./runtime";
 import { escapeHtml } from "./escape-html";
@@ -148,7 +148,7 @@ export function renderToString(el: ComponentFn<{}>): string {
     const t = enterOwner(owner, () => stringifyJSXElement(h(el)));
     const captureData = capture();
     const tasksDirective = createSSRDirective("tasks", captureData.tasks);
-    const directivesData = createSSRDirective("directives-data", global_directive_data_array, true);
+    const directivesData = `<script lang="application/json" ${ATTRIBUTE_PREFIX}:data>${serialize(global_directive_data_array)}</script>`;
     // We need to cleanp after serialization otherwise we serialize the cleaned owners
     cleanup();
     return `${directivesData}${rootOwnerDirective}${t}${tasksDirective}`;
@@ -197,25 +197,13 @@ function createSSRElement(element: string, props: any): SSRElement {
 
     const attrHandler = getHandlerForAttribute(propName);
     if (attrHandler === null) continue;
-    // if (attrHandler.managedDynamic && isFunction(propVal)) {
-    //   const [val, reactivityData] = startReaction(propVal);
-    //   attrHandler.setOnSSRElement(builder, propName, val);
-
-    //   if (reactivityData.length > 0)
-    //     dynamicAttributesData.push([reactivityData, propName, propVal]);
-    //   if (attrHandler.forceResume)
-    //     attributesResumeData.push([propName, val]);
-    // }
-    // else {
-    //   if (attrHandler.forceResume)
-    //     attributesResumeData.push([propName, propVal]);
-    //   attrHandler.setOnSSRElement(builder, propName, propVal);
-    // }
-    // const [val, reactivityData] = startReaction(() => props[propName]);
-    // attrHandler.setOnSSRElement(builder, propName, val);
-    // if (reactivityData.length > 0)
-    // const desc = Object.getOwnPropertyDescriptor(props, propName);
-    // TODO
+    const [val, reactivityData] = startReaction(() => props[propName]);
+    attrHandler.setOnSSRElement(builder, propName, val);
+    if (reactivityData.length > 0)
+      dynamicAttributesData.push([reactivityData, propName, (getProperty<any, any>).bind(null, props, propName)])
+    if (attrHandler.forceResume)
+      attributesResumeData.push([propName, val]);
+    attrHandler.setOnSSRElement(builder, propName, val);
   }
 
   if (attributesResumeData.length !== 0) {
@@ -234,10 +222,10 @@ export function h<P>(element: ComponentFn<P>, props: P): JSXElement;
 export function h<P>(element: string | ComponentFn<P>, props?: P): JSXElement {
   if (typeof element === "string") {
     if (global_h_config === "ssr") {
-      return createSSRElement(element, props ?? {});
+      return untrack(()=>createSSRElement(element, props ?? {}));
     }
     else if (global_h_config === "dom") {
-      return createHTMLElement(element, props ?? {});
+      return untrack(()=>createHTMLElement(element, props ?? {}));
     }
     else {
       throw new Error("Invalid global_h_config value");

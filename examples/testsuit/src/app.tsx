@@ -29,7 +29,7 @@ const ConditionalCounter: ComponentFn<{}> = register(() => {
       {show() ? "Hide" : "Show"}
     </button>
     <Show when={show}>
-      {() => <Counter />}
+      {/* () => <Counter /> */() => <div>{crypto.randomUUID()} HI!</div>}
     </Show>
   </>;
 }, "____RANDOM_ID");
@@ -39,16 +39,19 @@ const App: ComponentFn<{}> = register(() => {
 
   provideContext(AppContextId, "Within app");
 
+  // return <>
+  //   <Counter />
+  //   <hr />
+  //   <ConditionalCounter />
+  //   <hr />
+  //   <Todo />
+  //   <hr />
+  //   <Complex />
+  //   <hr />
+  //   <List />
+  // </>;
   return <>
-    <Counter />
-    <hr />
     <ConditionalCounter />
-    <hr />
-    <Todo />
-    <hr />
-    <Complex />
-    <hr />
-    <List />
   </>;
 }, "____RANDOM_ID");
 export default App;

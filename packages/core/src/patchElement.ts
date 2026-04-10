@@ -1,6 +1,6 @@
 import { ChildernArray, isJSXElementDynamic, isJSXElementString, isJSXElementWithOwner, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular, type JSXElementWithOwner } from ".";
 import { assert, notNull, unreachable } from "./utils";
-import { createReaction, enterOwner, getOwner, untrack } from "@lentjs/core-reactivity";
+import { createReaction, enterOwner, getOwner, isInTrackingContext, untrack } from "@lentjs/core-reactivity";
 
 export type JSXStateCommon = { kind: string, element: JSXElement };
 export type JSXStateSingular = JSXStateCommon & { kind: "singular", element: JSXElementSingular, node: ChildNode | null };
@@ -248,6 +248,8 @@ export function patchElementArrayNew(
 }
 
 export function patchElement(parent: Node, anchorElement: ChildNode | null, previousState: JSXState | null, child: JSXElement): JSXState {
+  assert(!isInTrackingContext(), "You should not call patchElement within a tracking context, wrap in untrack()");
+
   assert(anchorElement === null || anchorElement.parentNode === parent);
   assert(!isSSRElement(child));
 
