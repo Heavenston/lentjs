@@ -7,8 +7,8 @@ mod jsx_whitespace;
 use std::collections::{HashMap, HashSet};
 
 use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ Span, util::take::Take }, ecma::{
-    ast::{ArrowExpr, CallExpr, Expr, ExprOrSpread, Id, Ident, MemberExpr, MemberProp, Null, Pat, Program, VarDecl, VarDeclarator},
-    visit::{ VisitMut, VisitMutWith },
+    ast::{ArrowExpr, CallExpr, Expr, ExprOrSpread, Id, Ident, ImportSpecifier, MemberExpr, MemberProp, ModuleDecl, Null, Pat, Program, Stmt, VarDecl, VarDeclarator},
+    visit::{ Visit, VisitMut, VisitMutWith, VisitWith },
 }};
 use swc_core::plugin::{plugin_transform, proxies::TransformPluginProgramMetadata};
 
@@ -72,6 +72,119 @@ impl VisitMut for IdentReplacer {
     }
 }
 
+/// Finds and store a list of all idents that are defined at the top-level of a module
+#[derive(Default)]
+struct FindTopLevelIdents {
+    idens: HashSet<Id>,
+}
+
+impl FindTopLevelIdents {
+    fn collect_pat_idents(&mut self, pat: &Pat) {
+        match pat {
+            Pat::Ident(bind) => {
+                self.idens.insert(bind.id.to_id());
+            }
+            Pat::Array(arr) => {
+                for elem in arr.elems.iter().flatten() {
+                    self.collect_pat_idents(elem);
+                }
+            }
+            Pat::Object(obj) => {
+                for prop in &obj.props {
+                    match prop {
+                        swc_core::ecma::ast::ObjectPatProp::KeyValue(kv) => {
+                            self.collect_pat_idents(&kv.value);
+                        }
+                        swc_core::ecma::ast::ObjectPatProp::Assign(assign) => {
+                            self.idens.insert(assign.key.to_id());
+                        }
+                        swc_core::ecma::ast::ObjectPatProp::Rest(rest) => {
+                            self.collect_pat_idents(&rest.arg);
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+            }
+            Pat::Rest(rest) => {
+                self.collect_pat_idents(&rest.arg);
+            }
+            Pat::Assign(assign) => {
+                self.collect_pat_idents(&assign.left);
+            }
+            Pat::Expr(_) | Pat::Invalid(_) => {}
+            _ => unimplemented!(),
+        }
+    }
+
+    fn collect_decl_idents(&mut self, decl: &swc_core::ecma::ast::Decl) {
+        match decl {
+            swc_core::ecma::ast::Decl::Class(c) => {
+                self.idens.insert(c.ident.to_id());
+            }
+            swc_core::ecma::ast::Decl::Fn(f) => {
+                self.idens.insert(f.ident.to_id());
+            }
+            swc_core::ecma::ast::Decl::Var(v) => {
+                for declarator in &v.decls {
+                    self.collect_pat_idents(&declarator.name);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+impl Visit for FindTopLevelIdents {
+    fn visit_module_decl(&mut self, node: &ModuleDecl) {
+        match node {
+            ModuleDecl::Import(import_decl) => {
+                for spec in &import_decl.specifiers {
+                    match spec {
+                        ImportSpecifier::Named(s) => {
+                            self.idens.insert(s.local.to_id());
+                        }
+                        ImportSpecifier::Default(s) => {
+                            self.idens.insert(s.local.to_id());
+                        }
+                        ImportSpecifier::Namespace(s) => {
+                            self.idens.insert(s.local.to_id());
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+            }
+            ModuleDecl::ExportDecl(export_decl) => {
+                self.collect_decl_idents(&export_decl.decl);
+            }
+            ModuleDecl::ExportDefaultDecl(export_default) => {
+                match &export_default.decl {
+                    swc_core::ecma::ast::DefaultDecl::Class(c) => {
+                        if let Some(ident) = &c.ident {
+                            self.idens.insert(ident.to_id());
+                        }
+                    }
+                    swc_core::ecma::ast::DefaultDecl::Fn(f) => {
+                        if let Some(ident) = &f.ident {
+                            self.idens.insert(ident.to_id());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            // ExportDefaultExpr, ExportAll, ExportNamed, TS-specific — no new local bindings
+            _ => {}
+        }
+    }
+
+    fn visit_stmt(&mut self, node: &Stmt) {
+        // Only extract declarations; do NOT recurse into children
+        // so that nested declarations are not included.
+        if let Stmt::Decl(decl) = node {
+            self.collect_decl_idents(decl);
+        }
+    }
+}
+
 struct HoistedClosure {
     chosen_name: Ident,
     code: ArrowExpr,
@@ -80,12 +193,22 @@ struct HoistedClosure {
 #[derive(Default)]
 pub struct TransformVisitor {
     enabled: bool,
+    /// Stores a list of idents that are defined at the top level
+    /// Such idens do not need to be captured by closures
+    top_level_idents: HashSet<Id>,
     hoisted_closured: Vec<HoistedClosure>,
 }
 
 impl VisitMut for TransformVisitor {
     fn visit_mut_script(&mut self, _node: &mut swc_core::ecma::ast::Script) {
         panic!("Script are not supported");
+    }
+
+    fn visit_mut_module(&mut self, node: &mut swc_core::ecma::ast::Module) {
+        let mut find = FindTopLevelIdents::default();
+        node.visit_with(&mut find);
+        self.top_level_idents = find.idens;
+        node.visit_mut_children_with(self);
     }
 
     fn visit_mut_stmts(&mut self, node: &mut Vec<swc_core::ecma::ast::Stmt>) {
@@ -96,7 +219,7 @@ impl VisitMut for TransformVisitor {
             .is_some_and(|ss| ss.value == "use component");
 
         let old_enabled = self.enabled;
-        self.enabled = enable_directive;
+        self.enabled = enable_directive || old_enabled;
         node.visit_mut_children_with(self);
         self.enabled = old_enabled;
     }
@@ -157,7 +280,7 @@ impl VisitMut for TransformVisitor {
         };
 
         // Remove all values that are declared within the arrow function
-        captured_values.values.retain(|o| !captured_values.decls.contains(o));
+        captured_values.values.retain(|o| !captured_values.decls.contains(o) && !self.top_level_idents.contains(o));
 
         let chosen_name = Ident::new_private(Atom::new("h"), Span::dummy());
 
@@ -204,6 +327,6 @@ impl VisitMut for TransformVisitor {
 #[plugin_transform]
 pub fn process_transform(mut program: Program, _metadata: TransformPluginProgramMetadata) -> Program {
     program.visit_mut_with(&mut jsx::JsxTransform::default());
-    // program.visit_mut_with(&mut TransformVisitor::default());
+    program.visit_mut_with(&mut TransformVisitor::default());
     program
 }

@@ -8,6 +8,7 @@ export { Fragment } from "./fragment";
 export { type Attributes, type AttributeValue } from "./attributes";
 export { type SSRElement, isSSRElement } from "./ssr-element";
 export { resumed } from "./global-signals";
+export * from "./children-array";
 
 import { register, serialize } from "@lentjs/core-serialize";
 import { isFunction, isObject } from "./utils";

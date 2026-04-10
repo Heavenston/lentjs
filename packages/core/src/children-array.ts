@@ -1,0 +1,50 @@
+import { defineSerialization, register } from "@lentjs/core-serialize";
+
+type K<T> = ["g", ()=>T] | ["v", T];
+
+export class ChildernArray<T> extends Array<T> {
+  constructor() {
+    super();
+    defineSerialization(this, this.reducer.bind(this), (ChildernArray<T>).reviver);
+  }
+
+  public child(val: T): this {
+    this.push(val);
+    return this;
+  }
+
+  public computed(getter: () => T): this {
+    Object.defineProperty(this, this.length, {
+      get: getter,
+      enumerable: true,
+      configurable: true,
+    });
+    return this;
+  }
+
+  private reducer(): K<T>[] {
+    let result: K<T>[] = [];
+    for (let i = 0; i < this.length; i++) {
+      const desc = Object.getOwnPropertyDescriptor(this, i)!;
+      if (desc.get)
+        result.push(["g", desc.get]);
+      else
+        result.push(["v", desc.value]);
+    }
+    return result;
+  }
+
+  private static reviver<T>(val: K<T>[]): ChildernArray<T> {
+    const result = new ChildernArray<T>;
+    for (const i of val) {
+      if (i[0] === "g") {
+        result.computed(i[1]);
+      }
+      else {
+        result.push(i[1]);
+      }
+    }
+    return result;
+  }
+  static { register(ChildernArray.reviver, "__lentjs_ChildrenArray.reviver") }
+}

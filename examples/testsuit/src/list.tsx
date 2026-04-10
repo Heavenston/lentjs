@@ -16,7 +16,7 @@ const elementRender = register((getElements: SignalAccessor<Element[]>, setEleme
     attr:id={`el-${element.id}`}
     class={c.element}
   >
-    {element.id} ({()=>getIdx()+1}/{()=>getElements().length}):{" "}
+    {element.id} ({getIdx()+1}/{getElements().length}):{" "}
     <button
       on:click={() => {
         const idx = getIdx();
@@ -92,10 +92,10 @@ const List: ComponentFn<{}> = register(() => {
 
   return [
     <div>
-      Count: {() => elements().length}
+      Count: {elements().length}
     </div>,
     <div>
-      List: {() => elements().map(p => p.id).join(", ")}
+      List: {elements().map(p => p.id).join(", ")}
     </div>,
     <RefFor<Element>
       each={elements}

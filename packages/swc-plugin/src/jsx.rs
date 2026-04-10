@@ -1,7 +1,9 @@
+use std::collections::HashSet;
+
 ///! Code in this module is largely AI-Generated but with a few tweaks
 
 use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ Span, util::take::Take }, ecma::{
-    ast::{Bool, CallExpr, Callee, Expr, ExprOrSpread, Ident, ImportDecl, ImportNamedSpecifier, ImportSpecifier, JSXAttrName, JSXAttrOrSpread, JSXAttrValue, JSXElement, JSXElementChild, JSXElementName, JSXExpr, JSXFragment, JSXMemberExpr, JSXObject, KeyValueProp, Lit, MemberExpr, MemberProp, Module, ModuleDecl, ModuleItem, ObjectLit, Prop, PropName, PropOrSpread, Stmt, Str},
+    ast::{Bool, CallExpr, Callee, Expr, ExprOrSpread, Id, Ident, ImportDecl, ImportNamedSpecifier, ImportSpecifier, JSXAttrName, JSXAttrOrSpread, JSXAttrValue, JSXElement, JSXElementChild, JSXElementName, JSXExpr, JSXFragment, JSXMemberExpr, JSXObject, KeyValueProp, Lit, MemberExpr, MemberProp, Module, ModuleDecl, ModuleItem, ObjectLit, Prop, PropName, PropOrSpread, Stmt, Str},
     visit::{ Visit, VisitMut, VisitMutWith, VisitWith },
 }};
 
@@ -10,12 +12,14 @@ use crate::jsx_whitespace::collapse_jsx_whitespace;
 const IMPORT_SOURCE: &str = "@lentjs/core";
 const FACTORY_NAME: &str = "h";
 const FRAGMENT_NAME: &str = "Fragment";
+const CHILDREN_ARRAY_NAME: &str = "ChildernArray";
 
 /// Tries to chose wether or not an expression may invoke any reactive code.
 /// This may happen because of signals, or stores, so we detect function calls
 /// and member expression.
 #[derive(Default)]
 struct ExpressionNeedsWrapping {
+    filter_list: HashSet<Id>,
     found_dynamic: bool,
 }
 
@@ -36,8 +40,11 @@ impl Visit for ExpressionNeedsWrapping {
         // We do not visit function bodies
     }
 
-    fn visit_call_expr(&mut self, _node: &CallExpr) {
-        self.found_dynamic = true;
+    fn visit_call_expr(&mut self, node: &CallExpr) {
+        let ignore = node.callee.as_expr().and_then(|e| e.as_ident()).is_some_and(|i| self.filter_list.contains(&i.clone().into()));
+        if !ignore {
+            self.found_dynamic = true;
+        }
     }
 
     fn visit_member_expr(&mut self, _node: &MemberExpr) {
@@ -45,16 +52,11 @@ impl Visit for ExpressionNeedsWrapping {
     }
 }
 
-fn expr_needs_wrapping(expr: &Expr) -> bool {
-    let mut e = ExpressionNeedsWrapping::default();
-    expr.visit_with(&mut e);
-    e.found_dynamic
-}
-
 #[derive(Default)]
 pub struct JsxTransform {
     factory_ident: Option<Ident>,
     fragment_ident: Option<Ident>,
+    children_array_ident: Option<Ident>,
 }
 
 impl VisitMut for JsxTransform {
@@ -66,7 +68,7 @@ impl VisitMut for JsxTransform {
             specifiers.push(ImportSpecifier::Named(ImportNamedSpecifier {
                 span: Span::dummy(),
                 local: factory_ident.clone(),
-                imported: Some(swc_core::ecma::ast::ModuleExportName::Ident(Ident::from(factory_ident))),
+                imported: Some(swc_core::ecma::ast::ModuleExportName::Ident(Ident::from(FACTORY_NAME))),
                 is_type_only: false,
             }));
         }
@@ -74,7 +76,15 @@ impl VisitMut for JsxTransform {
             specifiers.push(ImportSpecifier::Named(ImportNamedSpecifier {
                 span: Span::dummy(),
                 local: fragment_ident.clone(),
-                imported: Some(swc_core::ecma::ast::ModuleExportName::Ident(Ident::from(fragment_ident))),
+                imported: Some(swc_core::ecma::ast::ModuleExportName::Ident(Ident::from(FRAGMENT_NAME))),
+                is_type_only: false,
+            }));
+        }
+        if let Some(children_array_ident) = self.children_array_ident.clone() {
+            specifiers.push(ImportSpecifier::Named(ImportNamedSpecifier {
+                span: Span::dummy(),
+                local: children_array_ident.clone(),
+                imported: Some(swc_core::ecma::ast::ModuleExportName::Ident(Ident::from(CHILDREN_ARRAY_NAME))),
                 is_type_only: false,
             }));
         }
@@ -119,6 +129,10 @@ impl JsxTransform {
 
     fn get_fragment_ident(&mut self) -> Ident {
         self.fragment_ident.get_or_insert_with(|| Ident::new_private(Atom::new(FRAGMENT_NAME), Span::dummy())).clone()
+    }
+
+    fn get_children_array_ident(&mut self) -> Ident {
+        self.children_array_ident.get_or_insert_with(|| Ident::new_private(Atom::new(CHILDREN_ARRAY_NAME), Span::dummy())).clone()
     }
 
     /// `<Foo bar="baz">child</Foo>`
@@ -215,7 +229,7 @@ impl JsxTransform {
                         _ => unimplemented!(),
                     };
                     let value = self.jsx_attr_value_to_expr(a.value);
-                    if expr_needs_wrapping(&value) {
+                    if self.expr_needs_wrapping(&value) {
                        PropOrSpread::Prop(Box::new(Prop::Getter(swc_core::ecma::ast::GetterProp {
                             key,
                             body: Some(swc_core::ecma::ast::BlockStmt {
@@ -245,13 +259,14 @@ impl JsxTransform {
                 children.remove(0)
             }
             else {
-                Box::new(Expr::Array(swc_core::ecma::ast::ArrayLit {
-                    span: Span::dummy(),
-                    elems: children.into_iter().map(ExprOrSpread::from).map(Some).collect(),
-                }))
+                Box::new(self.build_children_array(children))
+                // Box::new(Expr::Array(swc_core::ecma::ast::ArrayLit {
+                //     span: Span::dummy(),
+                //     elems: children.into_iter().map(ExprOrSpread::from).map(Some).collect(),
+                // }))
             };
 
-            if expr_needs_wrapping(&children_list_expr) {
+            if self.expr_needs_wrapping(&children_list_expr) {
                 props.push(PropOrSpread::Prop(Box::new(Prop::Getter(swc_core::ecma::ast::GetterProp {
                     key: PropName::Str("children".into()),
                     body: Some(swc_core::ecma::ast::BlockStmt {
@@ -270,6 +285,31 @@ impl JsxTransform {
         }
 
         Expr::Object(ObjectLit { span, props })
+    }
+
+    fn build_children_array(&mut self, children: Vec<Box<Expr>>) -> Expr {
+        let mut current = Expr::New(swc_core::ecma::ast::NewExpr {
+            callee: Box::new(Expr::Ident(self.get_children_array_ident())),
+            ..Default::default()
+        });
+
+        for child in children {
+            let must_wrap = self.expr_needs_wrapping(&child);
+            current = Expr::Call(CallExpr {
+                callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
+                    obj: Box::new(current),
+                    prop: MemberProp::Ident(if must_wrap { "computed".into() } else { "child".into() }),
+                    ..Default::default()
+                }))),
+                args: std::iter::once(ExprOrSpread {
+                    spread: None,
+                    expr: if must_wrap { Box::new(self.wrap_in_arrow_fn(*child)) } else { child },
+                }).collect(),
+                ..Default::default()
+            });
+        }
+
+        current
     }
 
     /// Convert an attribute value to an expression.
@@ -330,15 +370,22 @@ impl JsxTransform {
             .collect()
     }
 
+    fn expr_needs_wrapping(&mut self, expr: &Expr) -> bool {
+        let mut e = ExpressionNeedsWrapping {
+            filter_list: [&self.factory_ident, &self.fragment_ident, &self.children_array_ident].into_iter()
+                .filter_map(|p| p.clone())
+                .map(Into::into)
+                .collect(),
+            found_dynamic: false,
+        };
+        expr.visit_with(&mut e);
+        e.found_dynamic
+    }
+
     fn wrap_in_arrow_fn(&mut self, expr: Expr) -> Expr {
         Expr::Arrow(swc_core::ecma::ast::ArrowExpr {
             body: Box::new(swc_core::ecma::ast::BlockStmtOrExpr::Expr(Box::new(expr))),
             ..Default::default()
         })
-    }
-
-    fn wrap_expr_if_needed(&mut self, expr: Expr) -> Expr {
-        if !expr_needs_wrapping(&expr) { return expr }
-        self.wrap_in_arrow_fn(expr)
     }
 }
