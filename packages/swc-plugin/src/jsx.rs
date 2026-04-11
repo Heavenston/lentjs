@@ -13,6 +13,7 @@ const IMPORT_SOURCE: &str = "@lentjs/core";
 const FACTORY_NAME: &str = "h";
 const FRAGMENT_NAME: &str = "Fragment";
 const CHILDREN_ARRAY_NAME: &str = "ChildernArray";
+const DEFINE_AS_PROPS_NAME: &str = "defineAsProps";
 
 /// Tries to chose wether or not an expression may invoke any reactive code.
 /// This may happen because of signals, or stores, so we detect function calls
@@ -110,7 +111,7 @@ impl JsxTransform {
             v.clone()
         }
         else {
-            let ident = Ident::new_private(Atom::new(FACTORY_NAME), Span::dummy());
+            let ident = Ident::new_private(Atom::new(name), Span::dummy());
             self.idents.insert(name.to_string(), ident.clone());
             ident
         }
@@ -265,7 +266,12 @@ impl JsxTransform {
             }
         }
 
-        Expr::Object(ObjectLit { span, props })
+        Expr::Call(CallExpr {
+            span,
+            args: vec![ExprOrSpread::from(Expr::Object(ObjectLit { span, props }))],
+            callee: Callee::Expr(Box::new(Expr::from(self.get_lentjs_ident(DEFINE_AS_PROPS_NAME)))),
+            ..Default::default()
+        })
     }
 
     fn build_children_array(&mut self, children: Vec<Box<Expr>>) -> Expr {
