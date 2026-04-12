@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 ///! Code in this module is largely AI-Generated but with a few tweaks
 
-use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ Span, util::take::Take }, ecma::{
-    ast::{Bool, CallExpr, Callee, Expr, ExprOrSpread, Id, Ident, ImportDecl, ImportNamedSpecifier, ImportSpecifier, JSXAttrName, JSXAttrOrSpread, JSXAttrValue, JSXElement, JSXElementChild, JSXElementName, JSXExpr, JSXFragment, JSXMemberExpr, JSXObject, KeyValueProp, Lit, MemberExpr, MemberProp, Module, ModuleDecl, ModuleItem, ObjectLit, Prop, PropName, PropOrSpread, Stmt, Str},
+use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ Span, SyntaxContext, util::take::Take }, ecma::{
+    ast::{Bool, CallExpr, Callee, Expr, ExprOrSpread, Id, Ident, ImportDecl, ImportNamedSpecifier, ImportSpecifier, JSXAttrName, JSXAttrOrSpread, JSXAttrValue, JSXElement, JSXElementChild, JSXElementName, JSXExpr, JSXFragment, JSXMemberExpr, JSXObject, KeyValueProp, Lit, MemberExpr, MemberProp, Module, ModuleDecl, ModuleItem, ObjectLit, Prop, PropName, PropOrSpread, SpreadElement, Stmt, Str},
     visit::{ Visit, VisitMut, VisitMutWith, VisitWith },
 }};
 
@@ -201,9 +201,25 @@ impl JsxTransform {
     }
 
     fn build_props(&mut self, attrs: Vec<JSXAttrOrSpread>, mut children: Vec<Box<Expr>>, span: swc_core::common::Span) -> Expr {
-        let mut props: Vec<PropOrSpread> = attrs
+        enum MyProp {
+            Simple(PropName, Expr),
+            Spread(SpreadElement),
+        }
+
+        let children_prop = if children.is_empty() {
+            None
+        } else {
+            let e = if children.len() == 1 {
+                *children.remove(0)
+            }
+            else {
+                self.build_children_array(children)
+            };
+            Some(MyProp::Simple(PropName::Ident("children".into()), e))
+        };
+        let (getter_props, simple_props) = attrs
             .into_iter()
-            .map(|attr| match attr {
+            .map(|attr| -> MyProp {match attr {
                 JSXAttrOrSpread::JSXAttr(a) => {
                     let key = match a.name {
                         JSXAttrName::Ident(id) => PropName::Ident(id),
@@ -211,64 +227,70 @@ impl JsxTransform {
                         _ => unimplemented!(),
                     };
                     let value = self.jsx_attr_value_to_expr(a.value);
-                    if self.expr_needs_wrapping(&value) {
-                       PropOrSpread::Prop(Box::new(Prop::Getter(swc_core::ecma::ast::GetterProp {
-                            key,
-                            body: Some(swc_core::ecma::ast::BlockStmt {
-                                stmts: vec![Stmt::Return(swc_core::ecma::ast::ReturnStmt {
-                                    arg: Some(Box::new(value)),
-                                    ..Default::default()
-                                })],
-                                ..Default::default()
-                            }),
-                            ..Default::default()
-                        })))     
-                    }
-                    else {
-                        PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                            key,
-                            value: Box::new(value),
-                        })))
-                    }
+                    MyProp::Simple(key, value)
                 }
-                JSXAttrOrSpread::SpreadElement(s) => PropOrSpread::Spread(s),
+                JSXAttrOrSpread::SpreadElement(s) => MyProp::Spread(s),
                 _ => unimplemented!(),
-            })
-            .collect();
+            }})
+            .chain(std::iter::once(children_prop).filter_map(std::convert::identity))
+            .collect::<Vec<_>>().into_iter()
+            .partition::<Vec<_>, _>(|p| match p { MyProp::Simple(_, e) => self.expr_needs_wrapping(e), _ => false });
 
-        if !children.is_empty() {
-            let children_list_expr = if children.len() == 1 {
-                children.remove(0)
-            }
-            else {
-                Box::new(self.build_children_array(children))
-                // Box::new(Expr::Array(swc_core::ecma::ast::ArrayLit {
-                //     span: Span::dummy(),
-                //     elems: children.into_iter().map(ExprOrSpread::from).map(Some).collect(),
-                // }))
-            };
+        let base_obj = ObjectLit {
+            span,
+            props: simple_props.into_iter()
+                .map(|e| match e {
+                    MyProp::Simple(key, value) => PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                        key, value: Box::new(value),
+                    }))),
+                    MyProp::Spread(spread) => PropOrSpread::Spread(spread),
+                })
+                .collect(),
+        };
 
-            if self.expr_needs_wrapping(&children_list_expr) {
-                props.push(PropOrSpread::Prop(Box::new(Prop::Getter(swc_core::ecma::ast::GetterProp {
-                    key: PropName::Str("children".into()),
-                    body: Some(swc_core::ecma::ast::BlockStmt {
-                        stmts: vec![Stmt::Return(swc_core::ecma::ast::ReturnStmt {
-                            arg: Some(children_list_expr),
-                            ..Default::default()
-                        })],
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }))));
-            }
-            else {
-                props.push(PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp { key: PropName::Str("children".into()), value: children_list_expr }))));
-            }
+        if getter_props.is_empty() {
+            return Expr::from(base_obj);
         }
+        
+        let descriptors_obj = ObjectLit {
+            span,
+            props: getter_props.into_iter()
+                .map(|e| match e { MyProp::Simple(key, val) => (key, val), _ => unreachable!() })
+                .map(|(key, val)| {
+                    PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                        key,
+                        value: Box::new(ObjectLit {
+                            props: vec![
+                                Prop::KeyValue(KeyValueProp {
+                                    key: PropName::Ident("get".into()),
+                                    value: Box::new(self.wrap_in_arrow_fn(val)),
+                                }).into(),
+                                Prop::KeyValue(KeyValueProp {
+                                    key: PropName::Ident("enumerable".into()),
+                                    value: Box::new(Expr::Lit(Lit::Bool(true.into()))),
+                                }).into(),
+                            ],
+                            ..Default::default()
+                        }.into()),
+                    })))
+                })
+                .collect(),
+        };
+        let final_obj_expr = Expr::Call(CallExpr {
+            span,
+            args: vec![ExprOrSpread::from(Expr::from(base_obj)), ExprOrSpread::from(Expr::from(descriptors_obj))],
+            callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
+                span,
+                // TODO: Object may be redefined, how to access the global Object(?)
+                obj: Box::new(Expr::Ident(Ident::new("Object".into(), Span::dummy(), SyntaxContext::from_u32(1)))),
+                prop: MemberProp::Ident("defineProperties".into()),
+            }))),
+            ..Default::default()
+        });
 
         Expr::Call(CallExpr {
             span,
-            args: vec![ExprOrSpread::from(Expr::Object(ObjectLit { span, props }))],
+            args: vec![ExprOrSpread::from(Expr::from(final_obj_expr))],
             callee: Callee::Expr(Box::new(Expr::from(self.get_lentjs_ident(DEFINE_AS_PROPS_NAME)))),
             ..Default::default()
         })
