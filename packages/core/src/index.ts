@@ -192,7 +192,7 @@ function createSSRElement(element: string, props: any): SSRElement {
   for (const propName of Object.keys(props)) {
     // TODO: Children may be reactive too!(?)
     if (propName === "children") {
-      builder.appendInnerHTML(stringifyJSXElement(props[propName], false));
+      builder.appendInnerHTML(stringifyJSXElement((getProperty<any, any>).bind(null, props, "children"), false));
       continue;
     }
 

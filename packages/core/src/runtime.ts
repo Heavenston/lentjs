@@ -189,18 +189,19 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
       const data = ctx.directivesData[parseInt(t.value)] as ResumeAttributesData;
       for (const [k, v] of data) {
         const handler = notNull(getHandlerForAttribute(k));
-        handler.setOnHTMLElement(el, k, v);
+        enterOwner(ctx.ownerStack.at(-1)!, () => {
+          handler.setOnHTMLElement(el, k, v);
+        });
       }
     }
     if (t.name === `${ATTRIBUTE_PREFIX}:dyn-attrs`) {
       const data = ctx.directivesData[parseInt(t.value)] as DynamicAttributesData;
       for (const [reactivityData, propName, callback] of data) {
         const handler = notNull(getHandlerForAttribute(propName));
-        const unsub = resumeReaction(() => {
+        enterOwner(ctx.ownerStack.at(-1)!, () => resumeTask(() => {
           const val = callback();
           untrack(() => handler.setOnHTMLElement(el, propName, val));
-        }, reactivityData);
-        onCleanup(unsub, ctx.ownerStack.at(-1)!);
+        }, reactivityData));
       }
     }
   }
