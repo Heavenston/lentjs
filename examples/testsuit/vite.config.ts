@@ -58,21 +58,14 @@ export default defineConfig({
           code: /____RANDOM_ID/,
         },
         async handler(code, id) {
-          const pref = new BigUint64Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(id)))[0].toString(36).replace(/[/=]/g, "");
-          const d = new Uint16Array(await crypto.subtle.digest("SHA-512", Uint8Array.from(code)));
-          const usedIds = new Set<number>;
-          let i = 0;
-
-          function newId() {
-            if (i+1 >= d.length) throw new Error("Ran out of ids");
-            const id = d[i++];
-            if (usedIds.has(id)) return newId;
-            usedIds.add(id);
-            return id;
+          function toBase64(arr: Uint8Array): string {
+            return (arr as any).toBase64();
           }
-
+          const prefix = toBase64(new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(`${id}\n${code}`)))).replace(/[+/=]/g, "").slice(0,16);
+          let i = 0;
+          const newId = () => i++;
           return {
-            code: code.replace(/____RANDOM_ID/g, () => `${pref}_${newId().toString(16).padStart(4, "0")}`),
+            code: code.replace(/____RANDOM_ID/g, () => `${prefix}_${newId().toString(16).padStart(2, "0")}`),
           };
         },
       },
