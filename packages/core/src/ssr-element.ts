@@ -6,7 +6,6 @@ const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
 
 export function newSSRElement(t: string): SSRElement {
-  console.log({t});
   const obj: SSRElement = { [SSRElementMarker]: true, t };
   defineSerialization(obj, o => o.t, newSSRElement);
   return obj;

@@ -1,5 +1,6 @@
 import { type ComponentFn, register, createSignal, createTask, type EventHandler, For, onCleanup, getContext } from "@lentjs/core";
 import { AppContextId } from "./app";
+import { createUid } from "@lentjs/core/src/utils";
 
 type CounterButtonProps = {
   min: number,
@@ -78,6 +79,7 @@ const Counter: ComponentFn<{}> = register(() => {
   };
 
   return <div class={["a", "b b"]}>
+    <div>{typeof document === "undefined" ? "Server" : "Client"}{" "}{createUid()}</div>
     <div>
       App context id: {getContext(AppContextId)}
     </div>

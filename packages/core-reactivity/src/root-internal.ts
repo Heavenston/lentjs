@@ -1,5 +1,5 @@
 import { defineSerialization, register } from "@lentjs/core-serialize";
-import { assert, createUid, noop, remove } from "@lentjs/utils";
+import { createUid, noop, remove } from "@lentjs/utils";
 import type { TaskCallback } from "./task";
 import type { CapturedReactivityData } from "./reaction";
 

@@ -14,9 +14,6 @@ function reducer(p: object): ReducedProps {
       result.push(["v", k, desc.value]);
     }
   }
-
-  console.log(p, result);
-
   return result;
 }
 
