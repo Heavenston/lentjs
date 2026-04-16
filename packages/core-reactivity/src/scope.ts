@@ -183,7 +183,7 @@ export class Scope {
       return noop;
     }
     if (this.state !== "alive") {
-      console.warn(`Cannot listen for scope state ${state} from state ${this.state}`);
+      console.warn(`Cannot listen for scope state '${state}' from state '${this.state}'`);
       return noop;
     }
     this.#callbacks[state].push(cb);

@@ -10,7 +10,7 @@ use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ Span, SyntaxContext, util::tak
 use crate::jsx_whitespace::collapse_jsx_whitespace;
 
 const IMPORT_SOURCE: &str = "@lentjs/core";
-const FACTORY_NAME: &str = "h";
+const FACTORY_NAME: &str = "factory";
 const FRAGMENT_NAME: &str = "Fragment";
 const CHILDREN_ARRAY_NAME: &str = "ChildernArray";
 const DEFINE_AS_PROPS_NAME: &str = "defineAsProps";
