@@ -281,6 +281,7 @@ export function startRuntime(rootElement: HTMLElement) {
   const dataElement = rootElement.querySelector(`*[${ATTRIBUTE_PREFIX}\\:data]`);
   assert(dataElement !== null, "Could not find the data script element");
   assert(dataElement instanceof HTMLScriptElement && dataElement.lang === "application/json");
+  console.log("Size of data:", dataElement.innerText.toString().length);
   const ctx: RunCtx = {
     directivesData: deserialize(dataElement.innerText) as any,
     nodesToRemove: [],
