@@ -4,7 +4,6 @@ import c from "./list.module.scss";
 function createElement(): Element {
   return { id: crypto.randomUUID().split("-")[0] };
 }
-register(createElement, "____RANDOM_ID");
 
 type Element = { id: string };
 const elementRender = register((getElements: SignalAccessor<Element[]>, setElements: SignalSetter<Element[]>, element: Element, getIdx: SignalAccessor<number>) => {
