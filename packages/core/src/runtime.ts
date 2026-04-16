@@ -6,7 +6,7 @@ import { assert, noop, notNull, unreachable } from "./utils";
 import { deserialize } from "@lentjs/core-serialize";
 import { setResumed } from "./global-signals";
 
-const REMOVE_DIRECTIVES = false;
+const REMOVE_DIRECTIVES = true;
 
 export const DIRECTIVE_PREFIX = "lentjs";
 export const ATTRIBUTE_PREFIX = `data-${DIRECTIVE_PREFIX}`;
@@ -250,7 +250,7 @@ export function startRuntime(rootElement: HTMLElement) {
   domVisitor(ctx, rootElement);
   assert(ctx.dynamicStateStack.length === 0);
   console.log(ctx.nodesToRemove.length, "total directive nodes and attributes found");
-  if (REMOVE_DIRECTIVES)
+  if (REMOVE_DIRECTIVES && localStorage.getItem("LENTJS_KEEP_DIRECTIVES") === null)
     for (const n of ctx.nodesToRemove) {
       if (n instanceof Attr)
         n.ownerElement?.removeAttributeNode(n);
