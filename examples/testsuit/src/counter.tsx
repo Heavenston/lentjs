@@ -1,6 +1,6 @@
 import { type ComponentFn, register, createSignal, createTask, type EventHandler, For, getScope } from "@lentjs/core";
 import { AppContextId } from "./app";
-import { createUid } from "@lentjs/core/src/utils";
+import { createUid } from "@lentjs/utils";
 
 type CounterButtonProps = {
   min: number,

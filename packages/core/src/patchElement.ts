@@ -1,5 +1,5 @@
 import { ChildernArray, isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular, type JSXElementWithScope } from ".";
-import { assert, unreachable } from "./utils";
+import { assert, unreachable } from "@lentjs/utils";
 import { isInTrackingContext, untrack, getScope, startReaction, resumeReaction } from "@lentjs/core-reactivity";
 
 export type JSXStateCommon = { kind: string, element: JSXElement };

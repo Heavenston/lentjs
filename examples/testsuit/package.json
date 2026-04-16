@@ -16,6 +16,7 @@
     "@lentjs/vitejs-plugin": "workspace:*"
   },
   "dependencies": {
-    "@lentjs/core": "workspace:*"
+    "@lentjs/core": "workspace:*",
+    "@lentjs/utils": "workspace:*"
   }
 }

@@ -1,6 +1,6 @@
 import { defineSerialization, register } from "@lentjs/core-serialize";
 import { escapeHtml } from "./escape-html";
-import { assert } from "./utils";
+import { assert } from "@lentjs/utils";
 
 const SSRElementMarker = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };

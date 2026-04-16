@@ -12,7 +12,7 @@ export * from "./children-array";
 export { defineAsProps } from "./props-ser";
 
 import { register, serialize } from "@lentjs/core-serialize";
-import { getProperty, isFunction, isObject } from "./utils";
+import { getProperty, isFunction, isObject } from "@lentjs/utils";
 import { createTask, startReaction, untrack, Scope, getScope, taskCaptureContextKey, type TaskCaptureData } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName, ATTRIBUTE_PREFIX } from "./runtime";
 import { escapeHtml } from "./escape-html";
