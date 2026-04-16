@@ -30,6 +30,7 @@ const elementRender = register((getElements: SignalAccessor<Element[]>, setEleme
       +
     </button>
     <button
+      disabled={getIdx() === 0}
       on:click={() => {
         const idx = getIdx();
         setElements.update(elements => {
@@ -52,6 +53,7 @@ const elementRender = register((getElements: SignalAccessor<Element[]>, setEleme
       Delete {i}
     </button>
     <button
+      disabled={getIdx()+1 === getElements().length}
       on:click={() => {
         const idx = getIdx();
         setElements.update(elements => {
