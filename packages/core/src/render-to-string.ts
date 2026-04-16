@@ -114,16 +114,24 @@ export function createSSRElement(element: string, props: any): SSRElement {
 }
 
 export function renderToString(el: ComponentFn<{}>): string {
-  global_directive_data_array.length = 0;
-
   const [scope, cleanup] = Scope.createControlled();
   const taskCaptureData: TaskCaptureData = { capturedTasks: [] };
   scope.setContext(taskCaptureContextKey, taskCaptureData);
-  const rootScopeDirective = createSSRDirective("sco", scope);
-  const t = scope.enter(() => stringifyJSXElement(factory(el)));
-  const tasksDirective = createSSRDirective("tasks", taskCaptureData);
-  const directivesData = `<script lang="application/json" ${ATTRIBUTE_PREFIX}:data>${serialize(global_directive_data_array)}</script>`;
-  // We need to cleanup after serialization otherwise we serialize the scopes in the cleaned state
-  cleanup();
-  return `${directivesData}${rootScopeDirective}${t}${tasksDirective}`;
+
+  try {
+    const rootScopeDirective = createSSRDirective("sco", scope);
+    const t = scope.enter(() => stringifyJSXElement(factory(el)));
+    const tasksDirective = createSSRDirective("tasks", taskCaptureData);
+    const directivesData = `<script lang="application/json" ${ATTRIBUTE_PREFIX}:data>${serialize(global_directive_data_array)}</script>`;
+    return `${directivesData}${rootScopeDirective}${t}${tasksDirective}`;
+  }
+  catch(e) {
+    throw e;
+  }
+  finally {
+    // We need to cleanup after serialization otherwise we serialize the scopes in the cleaned state
+    cleanup();
+
+    global_directive_data_array.length = 0;
+  }
 }
