@@ -57,6 +57,7 @@ const Todo: ComponentFn<{}> = register(() => {
       createTask("Say Bye"),
     ],
   });
+  const proposedTaskName = () => `Task #${state.tasks.length}`;
 
   const areAllDone = () => state.tasks.every(t => t.done);
 
@@ -65,20 +66,20 @@ const Todo: ComponentFn<{}> = register(() => {
       e.preventDefault();
       const el = e.currentTarget;
       if (!(el instanceof HTMLFormElement)) return;
-      const trimmed = state.input_text.trim();
-      if (!trimmed) return;
-      state.tasks = [...state.tasks, createTask(trimmed)];
+      const name = state.input_text.trim() || proposedTaskName();
+      state.tasks = [...state.tasks, createTask(name)];
       state.input_text = "";
     }}>
       <input
         value={state.input_text}
+        attr:placeholder={proposedTaskName()}
         on:input={e => {
           const el = e.currentTarget;
           if (!(el instanceof HTMLInputElement)) return;
           state.input_text = el.value;
         }}
       />
-      <button disabled={!state.input_text.trim()}>Create Task</button>
+      <button>Create Task</button>
     </form>
     <button on:click={() => {
       const action = areAllDone();
