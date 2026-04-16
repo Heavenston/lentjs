@@ -11,7 +11,7 @@ type ForState = {
   currentState: Map<unknown, ElementState>,
 };
 export type RefForProps<T> = {
-  each: () => T[],
+  each: T[],
   key: (value: T) => unknown,
   children: (element: T, idx: SignalAccessor<number>) => JSXElement,
 };
@@ -22,7 +22,7 @@ const forMapper = register(<T>(props: RefForProps<T>, state: ForState, previous:
   const previousElements = Array.isArray(previous) ? previous : [previous];
   const newElements: JSXElement[] = [];
 
-  const each = props.each();
+  const each = props.each;
   each.forEach((val, idx) => {
     const key = props.key(val);
     const previousElementState = previousState.get(key);

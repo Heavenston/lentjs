@@ -98,7 +98,7 @@ const List: ComponentFn<{}> = register(() => {
       List: {elements().map(p => p.id).join(", ")}
     </div>,
     <RefFor<Element>
-      each={elements}
+      each={elements()}
       key={el => el.id}
     >
       {elementRender.bind(null, elements, setElements)}

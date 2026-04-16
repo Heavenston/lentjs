@@ -39,7 +39,7 @@ export class Scope {
       parent: scope.parent,
       state: scope.state,
       detachingWithParent: scope.#detachingWithParent,
-      contextValues: new Map(scope.#contextValues.entries().filter(([k]) => typeof k !== "symbol")),
+      contextValues: new Map([...scope.#contextValues.entries()].filter(([k]) => typeof k !== "symbol")),
     };
   }
 

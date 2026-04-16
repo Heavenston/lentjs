@@ -31,7 +31,7 @@ const Task: ComponentFn<TaskProps> = register((props) => {
   });
 
   return <div class={[c["task"], { [c["task-completed"]]: props.task.done }]}>
-    <span>{() => props.task.text}</span>
+    <span>{props.task.text}</span>
     <input checked={props.task.done} attr:type="checkbox" on:change={e => {
       const el = e.currentTarget;
       if (!(el instanceof HTMLInputElement)) return;
@@ -85,10 +85,10 @@ const Todo: ComponentFn<{}> = register(() => {
       for (const task of state.tasks)
         task.done = !action;
     }} disabled={state.tasks.length <= 0}>
-      Mark all as{() => areAllDone() ? " not" : null} done
+      Mark all as{areAllDone() ? " not" : null} done
     </button>
     <RefFor<TaskData>
-      each={() => state.tasks}
+      each={state.tasks}
       key={task => task.id}
     >
       {task => <Task task={task} onDelete={() => { state.tasks = state.tasks.filter(p => p.id !== task.id) }} />}

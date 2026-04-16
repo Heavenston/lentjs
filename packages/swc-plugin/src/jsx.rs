@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 ///! Code in this module is largely AI-Generated but with a few tweaks
 
 use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ Span, SyntaxContext, util::take::Take }, ecma::{
-    ast::{Bool, CallExpr, Callee, Expr, ExprOrSpread, Id, Ident, ImportDecl, ImportNamedSpecifier, ImportSpecifier, JSXAttrName, JSXAttrOrSpread, JSXAttrValue, JSXElement, JSXElementChild, JSXElementName, JSXExpr, JSXFragment, JSXMemberExpr, JSXObject, KeyValueProp, Lit, MemberExpr, MemberProp, Module, ModuleDecl, ModuleItem, ObjectLit, Prop, PropName, PropOrSpread, SpreadElement, Stmt, Str},
+    ast::{Bool, CallExpr, Callee, Expr, ExprOrSpread, Id, Ident, ImportDecl, ImportNamedSpecifier, ImportSpecifier, JSXAttrName, JSXAttrOrSpread, JSXAttrValue, JSXElement, JSXElementChild, JSXElementName, JSXExpr, JSXFragment, JSXMemberExpr, JSXObject, KeyValueProp, Lit, MemberExpr, MemberProp, Module, ModuleDecl, ModuleItem, ObjectLit, Prop, PropName, PropOrSpread, SpreadElement, Str},
     visit::{ Visit, VisitMut, VisitMutWith, VisitWith },
 }};
 
@@ -381,7 +381,12 @@ impl JsxTransform {
 
     fn expr_needs_wrapping(&mut self, expr: &Expr) -> bool {
         let mut e = ExpressionNeedsWrapping {
-            filter_list: self.idents.values().cloned().map(Into::into).collect(),
+            filter_list: self.idents.iter()
+                .filter(|&(k, _)| k != FACTORY_NAME)
+                .map(|(_, v)| v)
+                .cloned()
+                .map(Into::into)
+                .collect(),
             found_dynamic: false,
         };
         expr.visit_with(&mut e);

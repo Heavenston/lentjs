@@ -28,8 +28,8 @@ const ConditionalCounter: ComponentFn<{}> = register(() => {
     <button on:click={() => setShow.update(u => !u)}>
       {show() ? "Hide" : "Show"}
     </button>
-    <Show when={show}>
-      {() => <Counter />}
+    <Show when={show()}>
+      {<Counter />}
     </Show>
   </>;
 }, "____RANDOM_ID");
