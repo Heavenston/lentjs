@@ -1,6 +1,6 @@
 import { ChildernArray, isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular, type JSXElementWithScope } from ".";
 import { assert, unreachable } from "./utils";
-import { createReaction, isInTrackingContext, untrack, getScope } from "@lentjs/core-reactivity";
+import { isInTrackingContext, untrack, getScope, startReaction, resumeReaction } from "@lentjs/core-reactivity";
 
 export type JSXStateCommon = { kind: string, element: JSXElement };
 export type JSXStateSingular = JSXStateCommon & { kind: "singular", element: JSXElementSingular, node: ChildNode | null };
@@ -156,19 +156,48 @@ function patchElementSingular(parent: Node, anchorElement: ChildNode | null, pre
 }
 
 function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, child: JSXElementDynamic): JSXStateDynamic {
+  const scope = getScope();
+
+  const [firstChildReturn, initialCapturedReactivity] = startReaction(() => scope.enter(() => child()));
+
+  if (initialCapturedReactivity.length === 0) {
+    const state = patchElement(parent, anchorElement, null, firstChildReturn);
+    return {
+      kind: "dynamic",
+      startAnchor: getFirstElement(state),
+      endAnchor: getLastElement(state),
+      element: child,
+      cleanup() {
+        cleanupStateNodes(state);
+      },
+      remove() {
+        this.cleanup();
+        removeStateNodes(state);
+      },
+      changeAnchor(newAnchor) {
+        changeStateAnchor(parent, state,newAnchor);
+      },
+    };
+  }
+
   const dynamicStartAnchor = new Comment("runtime-dyn-start");
   const dynamicEndAnchor = new Comment("runtime-dyn-end");
   parent.insertBefore(dynamicStartAnchor, anchorElement);
   parent.insertBefore(dynamicEndAnchor, anchorElement);
 
-  let lastResultState: JSXState | null = null;
-  const scope = getScope();
-  const unsub = createReaction(() => scope.enter(() => {
-    const val = child(lastResultState?.element);
+  let previousChildReturn = firstChildReturn;
+  let previousResultState: JSXState | null = null;
+
+  scope.enter(() => {
+    previousResultState = patchElement(parent, dynamicEndAnchor, previousResultState, firstChildReturn);
+  });
+
+  const unsub = resumeReaction(() => scope.enter(() => {
+    previousChildReturn = child(previousChildReturn);
     untrack(() => {
-      lastResultState = patchElement(parent, dynamicEndAnchor, lastResultState, val);
+      previousResultState = patchElement(parent, dynamicEndAnchor, previousResultState, previousChildReturn);
     });
-  }));
+  }), initialCapturedReactivity);
 
   return {
     kind: "dynamic",
@@ -177,18 +206,18 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, chil
     element: child,
     cleanup() {
       unsub();
-      cleanupStateNodes(lastResultState!);
+      cleanupStateNodes(previousResultState!);
     },
     remove() {
       this.cleanup();
       dynamicStartAnchor.remove();
       dynamicEndAnchor.remove();
-      removeStateNodes(lastResultState!);
+      removeStateNodes(previousResultState!);
     },
     changeAnchor(newAnchor) {
       parent.insertBefore(dynamicStartAnchor, newAnchor);
       parent.insertBefore(dynamicEndAnchor, newAnchor);
-      changeStateAnchor(parent, lastResultState!, dynamicEndAnchor);
+      changeStateAnchor(parent, previousResultState!, dynamicEndAnchor);
     },
   };
 }
