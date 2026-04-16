@@ -55,6 +55,7 @@ type RunCtx = {
 function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Comment, parent: Node, d: D) {
   switch (d.name) {
   case "tasks":
+    ctx.nodesToRemove.push(directiveNode);
     for (const task of d.data.capturedTasks) {
       Scope.enter(task.parentScope, () => {
         resumeTask(task.task, task.reactivityData);
@@ -133,10 +134,12 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     break;
   }
   case "sco": {
+    ctx.nodesToRemove.push(directiveNode);
     ctx.scopeStack.push(d.data);
     break;
   }
   case "sco/": {
+    ctx.nodesToRemove.push(directiveNode);
     ctx.scopeStack.pop();
     break;
   }
