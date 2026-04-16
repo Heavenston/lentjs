@@ -21,6 +21,7 @@ import { global_directive_data_array, sharedSSRSerialize } from "./shared-global
 import { type SSRElement, isSSRElement, SSRElementBuilder } from "./ssr-element";
 import { cleanupStateNodes, patchElement } from "./patchElement";
 import { resumed } from "./global-signals";
+import { ChildernArray } from "./children-array";
 
 export type JSXElementString = number | string;
 export type JSXElementSingular = SSRElement | ChildNode | JSXElementString | null | undefined;
@@ -86,7 +87,7 @@ function createSSRDirective(name: string, arg: unknown = null, embed: boolean = 
   }
 }
 
-function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): string {
+function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false, isComputedInArray: boolean = false): string {
   if (isSSRElement(el)) {
     return el.t;
   }
@@ -105,6 +106,7 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
       return stringifyJSXElement(val, false);
     }
     const prefix = createSSRDirective("dyn", {
+      isComputedInArray,
       update: el,
       reactivityData: reactivityData,
     });
@@ -118,15 +120,25 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
       return `${prefix}${stringifyJSXElement(el.fun(), false)}${suffix}`;
     });
   }
+  else if (el instanceof ChildernArray) {
+    let t = "";
+    for (let i = 0; i < el.length; i++) {
+      if (t.length !== 0 && isInsideDynamic)
+        t += createSSRDirective("sep");
+      t += stringifyJSXElement(el.getOrComputed(i), isInsideDynamic, el.isComputed(i));
+    }
+    if (isInsideDynamic)
+      return `${createSSRDirective("chi")}${t}${createSSRDirective("chi/")}`;
+    else
+      return t;
+  }
   else if (Array.isArray(el)) {
     if (!isInsideDynamic) {
       return el.map(e => stringifyJSXElement(e, false)).join("");
     }
 
     const t = el.map(e => stringifyJSXElement(e, true)).join(createSSRDirective("sep"));
-    const prefix = createSSRDirective("arr");
-    const suffix = createSSRDirective("arr/");
-    return `${prefix}${t}${suffix}`;
+    return `${createSSRDirective("arr")}${t}${createSSRDirective("arr/")}`;
   }
   else {
     el satisfies Node;

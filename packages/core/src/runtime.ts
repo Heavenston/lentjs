@@ -1,10 +1,11 @@
-import { Scope, type JSXElementDynamic } from ".";
+import { Scope, type JSXElement, type JSXElementDynamic } from ".";
 import { getHandlerForAttribute } from "./attributes";
-import { changeStateAnchor, cleanupStateNodes, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState } from "./patchElement";
+import { changeStateAnchor, cleanupStateNodes, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState, type JSXStateDynamic } from "./patchElement";
 import { type CapturedReactivityData, resumeReaction, resumeTask, untrack, type TaskCaptureData } from "@lentjs/core-reactivity";
 import { assert, noop, notNull, unreachable } from "./utils";
 import { deserialize } from "@lentjs/core-serialize";
 import { setResumed } from "./global-signals";
+import { ChildernArray } from "./children-array";
 
 const REMOVE_DIRECTIVES = true;
 
@@ -15,6 +16,7 @@ export type Directives = {
   "tasks": TaskCaptureData,
 
   "dyn": {
+    isComputedInArray: boolean,
     update: JSXElementDynamic,
     reactivityData: CapturedReactivityData,
   },
@@ -25,6 +27,10 @@ export type Directives = {
 
   "arr": null,
   "arr/": null,
+
+  "chi": null,
+  "chi/": null,
+
   "sep": null,
 
   "nul": null,
@@ -43,7 +49,9 @@ export type DynamicAttributesData = [reactivityData: CapturedReactivityData, pro
 type StateStackElement =
   | { kind: "dynamic-start", startDirective: Comment, data: Directives["dyn"] }
   | { kind: "array-start" }
-  | { kind: "state", state: JSXState }
+  | { kind: "children-array-start" }
+  | { kind: "state", state: JSXState, isComputedInArray?: false }
+  | { kind: "state", state: JSXStateDynamic, isComputedInArray: true }
 ;
 type RunCtx = {
   directivesData: readonly unknown[],
@@ -100,6 +108,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     if (ctx.dynamicStateStack.length > 0)
       ctx.dynamicStateStack.push({
         kind: "state",
+        isComputedInArray: dynamic.data.isComputedInArray,
         state: {
           kind: "dynamic",
           startAnchor: isStatic ? getFirstElement(resultState) : startAnchor,
@@ -162,6 +171,34 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
 
     assert(ctx.dynamicStateStack.pop()?.kind === "array-start");
     ctx.dynamicStateStack.push({ kind: "state", state: { kind: "array", element: states.map(s => s.element), states } })
+    break;
+  }
+  case "chi": {
+    ctx.nodesToRemove.push(directiveNode);
+    ctx.dynamicStateStack.push({
+      kind: "children-array-start",
+    });
+    break;
+  }
+  case "chi/": {
+    ctx.nodesToRemove.push(directiveNode);
+    let states: JSXState[] = [];
+    let elements = new ChildernArray<JSXElement>;
+    while (ctx.dynamicStateStack.length > 0 && ctx.dynamicStateStack.at(-1)?.kind !== "children-array-start") {
+      const el = ctx.dynamicStateStack.pop();
+      assert(el?.kind === "state");
+      if (el.isComputedInArray) {
+        elements.computed(el.state.element);
+      }
+      else {
+        elements.child(el.state.element);
+      }
+      states.push(el.state);
+    }
+    states.reverse();
+
+    assert(ctx.dynamicStateStack.pop()?.kind === "array-start");
+    ctx.dynamicStateStack.push({ kind: "state", state: { kind: "array", element: elements, states } })
     break;
   }
   // Dummy directive, does nothing (makes sure text nodes are broken up)

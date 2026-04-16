@@ -22,6 +22,11 @@ export class ChildernArray<T> extends Array<T> {
     return this;
   }
 
+  public isComputed(idx: number): boolean {
+    const desc = Object.getOwnPropertyDescriptor(this, idx);
+    return desc?.get != null;
+  }
+
   public getOrComputed(idx: number): T | (() => T) {
     const desc = Object.getOwnPropertyDescriptor(this, idx);
     if (!desc) throw new Error("Out of bound access");
