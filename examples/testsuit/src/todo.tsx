@@ -20,7 +20,7 @@ const Task: ComponentFn<TaskProps> = register((props) => {
 
   console.log("Creation of task component", props.task.text);
   onResume(() => {
-    console.log("Start of task component", props.task.text);
+    console.log("Resume of task component", props.task.text);
   });
   onUnmount(() => {
     console.log("Unmount of component", props.task.text);

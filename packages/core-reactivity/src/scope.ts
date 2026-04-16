@@ -16,7 +16,10 @@ export type ScopeCleanup = {
   detach(): void;
 };
 
-export function createContextKey<T>(id: string): ContextKey<T> {
+export function createContextKey<T>(id: string, cfg?: { noSerialize?: boolean }): ContextKey<T> {
+  if (cfg?.noSerialize)
+    // @ts-ignore Fake convertion
+    return Symbol(id);
   // @ts-ignore Fake convertion
   return id;
 }
@@ -36,7 +39,7 @@ export class Scope {
       parent: scope.parent,
       state: scope.state,
       detachingWithParent: scope.#detachingWithParent,
-      contextValues: scope.#contextValues,
+      contextValues: new Map(scope.#contextValues.entries().filter(([k]) => typeof k !== "symbol")),
     };
   }
 
@@ -74,6 +77,9 @@ export class Scope {
   }
 
   public static enter<T, A extends any[]>(scope: Scope | null, cb: (...args: A) => T, ...args: A): T {
+    if (scope?.state === "cleaned") {
+      console.warn("Should not enter a cleaned scope");
+    }
     const prev = Scope.#currentScope;
     Scope.#currentScope = scope;
     try {
@@ -144,9 +150,12 @@ export class Scope {
       return;
     }
 
-    this.#callbacks[newState].splice(0).forEach(cb => cb());
-    // Remove the other callbacks, they are not needed anymore
-    this.#callbacks[newState === "cleaned" ? "detached" : "cleaned"].splice(0);
+    this.enter(() => {
+      this.#state = newState;
+      this.#callbacks[newState].splice(0).forEach(cb => cb());
+      // Remove the other callbacks, they are not needed anymore
+      this.#callbacks[newState === "cleaned" ? "detached" : "cleaned"].splice(0);
+    });
   }
 
   #cleanupWithParent() {

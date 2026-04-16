@@ -151,7 +151,7 @@ export function renderToString(el: ComponentFn<{}>): string {
     const taskCaptureData: TaskCaptureData = { capturedTasks: [] };
     scope.setContext(taskCaptureContextKey, taskCaptureData);
     const rootScopeDirective = createSSRDirective("sco", scope);
-    const t = scope.enter(stringifyJSXElement, h(el));
+    const t = scope.enter(() => stringifyJSXElement(h(el)));
     const tasksDirective = createSSRDirective("tasks", taskCaptureData);
     const directivesData = `<script lang="application/json" ${ATTRIBUTE_PREFIX}:data>${serialize(global_directive_data_array)}</script>`;
     // We need to cleanup after serialization otherwise we serialize the scopes in the cleaned state

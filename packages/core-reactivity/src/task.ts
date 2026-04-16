@@ -16,7 +16,7 @@ export type CapturedTaskData = {
 export type TaskCaptureData = {
   capturedTasks: CapturedTaskData[],
 };
-export const taskCaptureContextKey = createContextKey<TaskCaptureData>("__lentjs_taskCaptureData");
+export const taskCaptureContextKey = createContextKey<TaskCaptureData>("__lentjs_taskCaptureData", { noSerialize: true });
 
 function internalCreateOrResumeTask(task: TaskCallback, config: TaskConfig, resumeWithReactivityData: CapturedReactivityData | null) {
   const parentScope = Scope.currentScope;
