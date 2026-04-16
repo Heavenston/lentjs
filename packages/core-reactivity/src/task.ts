@@ -1,8 +1,6 @@
-import { createControlledOwner, enterOwner, getOwner, onCleanup } from "./owner";
-import { noop, remove } from "@lentjs/utils";
-import { createReaction, resumeReaction, type CapturedReactivityData } from "./reaction";
-import { convertOwner } from "./owner-internal";
-import type { RootCaptureTaskData } from "./root-internal";
+import { assert, noop, remove } from "@lentjs/utils";
+import { createReaction, resumeReaction, startReaction, type CapturedReactivityData } from "./reaction";
+import { createContextKey, Scope } from "./scope";
 
 export type TaskCallback = () => void;
 
@@ -10,35 +8,38 @@ export type TaskConfig = {
   initialCleanup?: () => void,
 };
 
+export type CapturedTaskData = {
+  task: TaskCallback,
+  reactivityData: CapturedReactivityData,
+  parentScope: Scope | null,
+};
+export type TaskCaptureData = {
+  capturedTasks: CapturedTaskData[],
+};
+export const taskCaptureContextKey = createContextKey<TaskCaptureData>("__lentjs_taskCaptureData");
+
 function internalCreateOrResumeTask(task: TaskCallback, config: TaskConfig, resumeWithReactivityData: CapturedReactivityData | null) {
-  const parentOwner = getOwner();
-  const captureData = convertOwner(parentOwner)?.captureData ?? null;
+  const parentScope = Scope.currentScope;
+  const taskCaptureData = parentScope?.tryGetContext(taskCaptureContextKey) ?? null;
 
   let previousCleanup = config.initialCleanup ?? noop;
   const cb = () => {
     previousCleanup();
-    const [owner, cleanupOwner] = createControlledOwner(parentOwner);
-    previousCleanup = cleanupOwner;
-    enterOwner(owner, task);
+    const [scope, cleanupScope] = Scope.createControlled(parentScope);
+    previousCleanup = cleanupScope;
+    scope.enter(task);
   };
-  const unsub = resumeWithReactivityData ? resumeReaction(cb, resumeWithReactivityData) : createReaction(cb);
 
-  if (parentOwner) {
-    if (captureData) {
-      const data: RootCaptureTaskData = {
-        task,
-        capture: unsub,
-        root: convertOwner(parentOwner),
-      };
-      captureData.tasks.push(data);
-      onCleanup(() => {
-        remove(captureData.tasks, data);
-        unsub();
-      }, parentOwner);
-    }
-    else {
-      onCleanup(() => unsub(), parentOwner);
-    }
+  if (taskCaptureData) {
+    assert(resumeWithReactivityData === null, "Cannot resume a task while capturing tasks");
+    const [_void, reactivityData] = startReaction(task);
+    const captured: CapturedTaskData = { parentScope, reactivityData, task };
+    taskCaptureData.capturedTasks.push(captured);
+    parentScope?.onCleanup(() => remove(taskCaptureData.capturedTasks, captured));
+  }
+  else {
+    const unsub = resumeWithReactivityData ? resumeReaction(cb, resumeWithReactivityData) : createReaction(cb);
+    parentScope?.onCleanup(() => unsub());
   }
 }
 
