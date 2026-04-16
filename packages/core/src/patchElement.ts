@@ -1,6 +1,6 @@
-import { ChildernArray, isJSXElementDynamic, isJSXElementString, isJSXElementWithOwner, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular, type JSXElementWithOwner } from ".";
-import { assert, notNull, unreachable } from "./utils";
-import { createReaction, enterOwner, getOwner, isInTrackingContext, untrack } from "@lentjs/core-reactivity";
+import { ChildernArray, isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular, type JSXElementWithScope } from ".";
+import { assert, unreachable } from "./utils";
+import { createReaction, isInTrackingContext, untrack, getScope } from "@lentjs/core-reactivity";
 
 export type JSXStateCommon = { kind: string, element: JSXElement };
 export type JSXStateSingular = JSXStateCommon & { kind: "singular", element: JSXElementSingular, node: ChildNode | null };
@@ -13,9 +13,9 @@ export type JSXStateDynamic = JSXStateCommon & {
   cleanup(): void;
   remove(): void,
 };
-export type JSXStateWithOwner = JSXStateCommon & { kind: "withOwner", element: JSXElementWithOwner, resultState: JSXState };
+export type JSXStateWithScope = JSXStateCommon & { kind: "withScope", element: JSXElementWithScope, resultState: JSXState };
 export type JSXStateArray = JSXStateCommon & { kind: "array", element: JSXElementArray, states: JSXState[] }
-export type JSXState = JSXStateSingular | JSXStateArray | JSXStateWithOwner | JSXStateDynamic;
+export type JSXState = JSXStateSingular | JSXStateArray | JSXStateWithScope | JSXStateDynamic;
 
 export function getFirstElement(state: JSXState): ChildNode | null {
   switch (state.kind) {
@@ -28,7 +28,7 @@ export function getFirstElement(state: JSXState): ChildNode | null {
         return potentialAnchor;
     }
     return null;
-  case "withOwner":
+  case "withScope":
     return getFirstElement(state.resultState);
   case "dynamic":
     return state.startAnchor;
@@ -46,7 +46,7 @@ export function getLastElement(state: JSXState): ChildNode | null {
         return potentialAnchor;
     }
     return null;
-  case "withOwner":
+  case "withScope":
     return getLastElement(state.resultState);
   case "dynamic":
     return state.endAnchor;
@@ -73,7 +73,7 @@ export function changeStateAnchor(parent: Node, state: JSXState, newAnchor: Chil
     if (state.node !== null)
       parent.insertBefore(state.node, newAnchor);
     break;
-  case "withOwner":
+  case "withScope":
     changeStateAnchor(parent, state.resultState, newAnchor);
     break;
   case "dynamic":
@@ -92,7 +92,7 @@ export function removeStateNodes(state: JSXState) {
   case "array":
     state.states.forEach(removeStateNodes);
     break;
-  case "withOwner":
+  case "withScope":
     removeStateNodes(state.resultState);
     break;
   case "dynamic":
@@ -109,7 +109,7 @@ export function cleanupStateNodes(state: JSXState) {
   case "array":
     state.states.forEach(cleanupStateNodes);
     break;
-  case "withOwner":
+  case "withScope":
     cleanupStateNodes(state.resultState);
     break;
   case "dynamic":
@@ -162,8 +162,8 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, chil
   parent.insertBefore(dynamicEndAnchor, anchorElement);
 
   let lastResultState: JSXState | null = null;
-  const owner = notNull(getOwner());
-  const unsub = createReaction(() => enterOwner(owner, () => {
+  const scope = getScope();
+  const unsub = createReaction(() => scope.enter(() => {
     const val = child(lastResultState?.element);
     untrack(() => {
       lastResultState = patchElement(parent, dynamicEndAnchor, lastResultState, val);
@@ -272,13 +272,13 @@ export function patchElement(parent: Node, anchorElement: ChildNode | null, prev
     return patchElementDynamic(parent, anchorElement, child);
   }
 
-  if (isJSXElementWithOwner(child)) {
+  if (isJSXElementWithScope(child)) {
     if (previousState) removeStateNodes(previousState);
-    return enterOwner(child.withOwner, () => {
+    return child.withScope.enter((): JSXStateWithScope => {
       const el = child.fun();
       const resultState = patchElement(parent, anchorElement, null, el);
       return {
-        kind: "withOwner",
+        kind: "withScope",
         element: child,
         resultState,
       };

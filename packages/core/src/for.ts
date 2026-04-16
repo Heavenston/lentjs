@@ -1,10 +1,10 @@
-import { createControlledOwner, createSignal, enterOwner, untrack, type JSXElement } from ".";
-import type { OwnerCleanup, SignalSetter } from "@lentjs/core-reactivity";
+import { createSignal, Scope, type JSXElement } from ".";
+import type { ScopeCleanup, SignalSetter } from "@lentjs/core-reactivity";
 import { closure, register } from "@lentjs/core-serialize";
 
 type ElementState<T> = {
   setEl: SignalSetter<T>,
-  cleanup: OwnerCleanup,
+  cleanup: ScopeCleanup,
 };
 type ForState<T> = {
   elements: ElementState<T>[],
@@ -30,13 +30,13 @@ const forMapper = register(<T>(props: ForProps<T>, state: ForState<T>, previous:
     }
     else {
       const [getEl, setEl] = createSignal(val);
-      const [owner, ownerCleanup] = createControlledOwner();
+      const [scope, scopeCleanup] = Scope.createControlled();
       newState.push({
         setEl,
-        cleanup: ownerCleanup,
+        cleanup: scopeCleanup,
       });
       newElements.push({
-        withOwner: owner,
+        withScope: scope,
         fun: props.children.bind(null, idx, getEl),
       });
     }

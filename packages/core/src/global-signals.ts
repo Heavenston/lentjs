@@ -1,11 +1,12 @@
-import { createContextId, createSignal, provideContextGlobally, tryGetContext, type SignalAccessor, type SignalSetter } from "@lentjs/core-reactivity";
+import { createContextKey, createSignal, getScope, type SignalAccessor, type SignalSetter } from "@lentjs/core-reactivity";
 
-const ResumedSignalContextId = createContextId<[SignalAccessor<boolean>, SignalSetter<boolean>]>("__lentjs_resumedSignal");
+const resumedSignalContextId = createContextKey<[SignalAccessor<boolean>, SignalSetter<boolean>]>("__lentjs_resumedSignal");
 function getResumedSignal(): [SignalAccessor<boolean>, SignalSetter<boolean>] {
-  let resumedSignal = tryGetContext(ResumedSignalContextId);
+  const scope = getScope();
+  let resumedSignal = scope.tryGetContext(resumedSignalContextId);
   if (!resumedSignal) {
     resumedSignal = createSignal<boolean>(false);
-    provideContextGlobally(ResumedSignalContextId, resumedSignal);
+    scope.root.setContext(resumedSignalContextId, resumedSignal);
   }
   return resumedSignal;
 }

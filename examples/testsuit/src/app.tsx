@@ -1,9 +1,9 @@
-import { type ComponentFn, register, createSignal, Show, createContextId, provideContext } from "@lentjs/core";
+import { type ComponentFn, register, createSignal, Show, createContextKey, getScope } from "@lentjs/core";
 import Counter from "./counter";
 import Todo from "./todo";
 import List from "./list";
 
-export const AppContextId = createContextId<string>("____RANDOM_ID");
+export const AppContextId = createContextKey<string>("____RANDOM_ID");
 
 const Complex: ComponentFn<{}> = register(() => {
   "use component";
@@ -20,7 +20,7 @@ const Complex: ComponentFn<{}> = register(() => {
 const ConditionalCounter: ComponentFn<{}> = register(() => {
   "use component";
 
-  provideContext(AppContextId, "Within ContitionalCounter");
+  getScope().setContext(AppContextId, "Within ContitionalCounter");
 
   const [show, setShow] = createSignal(true);
   
@@ -37,7 +37,7 @@ const ConditionalCounter: ComponentFn<{}> = register(() => {
 const App: ComponentFn<{}> = register(() => {
   "use component";
 
-  provideContext(AppContextId, "Within app");
+  getScope().setContext(AppContextId, "Within App");
 
   return <>
     <Counter />

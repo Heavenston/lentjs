@@ -1,4 +1,4 @@
-import { onCleanup, renderClasslist, type ClassList, type EventHandler, type JSXElement } from ".";
+import { getScope, renderClasslist, type ClassList, type EventHandler, type JSXElement } from ".";
 import type { SSRElementBuilder } from "./ssr-element";
 
 export type AttributeValue = string | boolean | number | undefined;
@@ -49,7 +49,7 @@ const handlers: AttributeHandler<any>[] = [
     setOnHTMLElement(el, propName, value) {
       const tk = propName.slice(3);
       el.addEventListener(tk, value);
-      onCleanup(() => el.removeEventListener(tk, value));
+      getScope().onCleanup(() => el.removeEventListener(tk, value));
     },
     setOnSSRElement() { },
   }),

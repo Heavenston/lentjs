@@ -73,6 +73,20 @@ export class Scope {
     return [scope, scope.#createCleanup()];
   }
 
+  public static enter<T, A extends any[]>(scope: Scope | null, cb: (...args: A) => T, ...args: A): T {
+    const prev = Scope.#currentScope;
+    Scope.#currentScope = scope;
+    try {
+      return cb(...args);
+    }
+    catch(e) {
+      throw e;
+    }
+    finally {
+      Scope.#currentScope = prev;
+    }
+  }
+
   #state: ScopeState = "alive";
   #detachingWithParent: boolean = false;
   #contextValues: Map<unknown, unknown> = new Map;
@@ -86,6 +100,13 @@ export class Scope {
     return this.#state;
   }
 
+  public get root(): Scope {
+    let current: Scope = this;
+    while (current.parent !== null)
+      current = current.parent;
+    return current;
+  }
+
   private constructor(parentOrReduced: Scope | ReducedScope | null) {
     if (parentOrReduced instanceof Scope || parentOrReduced === null)  {
       this.parent = parentOrReduced;
@@ -94,9 +115,11 @@ export class Scope {
       this.parent = parentOrReduced.parent;
       this.#state = parentOrReduced.state;
       this.#contextValues = parentOrReduced.contextValues;
-      this.#cleanupWithParent();
-      if (parentOrReduced.detachingWithParent)
-        this.#detachWithParent();
+      if (this.parent) {
+        this.#cleanupWithParent();
+        if (parentOrReduced.detachingWithParent)
+          this.#detachWithParent();
+      }
     }
     defineSerialization(this, Scope.reducer, Scope.reviver);
   }
@@ -142,17 +165,7 @@ export class Scope {
   }
 
   public enter<T, A extends any[]>(cb: (...args: A) => T, ...args: A): T {
-    const prev = Scope.#currentScope;
-    Scope.#currentScope = this;
-    try {
-      return cb(...args);
-    }
-    catch(e) {
-      throw e;
-    }
-    finally {
-      Scope.#currentScope = prev;
-    }
+    return Scope.enter(this, cb, ...args);
   }
 
   public on(state: FinalScopeStates, cb: () => void): ScopeUnsubscribe {

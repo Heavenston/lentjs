@@ -13,7 +13,7 @@ export { defineAsProps } from "./props-ser";
 
 import { register, serialize } from "@lentjs/core-serialize";
 import { getProperty, isFunction, isObject } from "./utils";
-import { createCapturingOwner, createOwner, createTask, enterOwner, onCleanup, startReaction, untrack, type Owner } from "@lentjs/core-reactivity";
+import { createTask, startReaction, untrack, Scope, getScope, taskCaptureContextKey, type TaskCaptureData } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type ResumeAttributesData, type DirectiveName, type Directives, type DynamicAttributesData, type MarkerDirectiveName, ATTRIBUTE_PREFIX } from "./runtime";
 import { escapeHtml } from "./escape-html";
 import { getHandlerForAttribute, type Attributes } from "./attributes";
@@ -26,8 +26,8 @@ export type JSXElementString = number | string;
 export type JSXElementSingular = SSRElement | ChildNode | JSXElementString | null | undefined;
 export type JSXElementArray = JSXElement[];
 export type JSXElementDynamic = (previous?: JSXElement) => JSXElement;
-export type JSXElementWithOwner = { fun: () => JSXElement, withOwner: Owner };
-export type JSXElement = JSXElementSingular | JSXElementArray | JSXElementWithOwner | JSXElementDynamic;
+export type JSXElementWithScope = { fun: () => JSXElement, withScope: Scope };
+export type JSXElement = JSXElementSingular | JSXElementArray | JSXElementWithScope | JSXElementDynamic;
 export type PropertyValue = string | number | (() => PropertyValue);
 export type ClassList = string | Partial<Record<string, boolean>> | ClassList[];
 
@@ -43,8 +43,11 @@ export function onResume(cb: () => void) {
   createTask(resumeTaskFn.bind(null, cb));
 }
 
+const unmountResumeFn = register((cb: () => void) => {
+  getScope().onCleanup(cb);
+}, "__lentjs_unmountResumeFn");
 export function onUnmount(cb: () => void) {
-  onResume(onCleanup.bind(null, cb));
+  onResume(unmountResumeFn.bind(null, cb));
 }
 
 export function isJSXElementString(t: unknown): t is JSXElementString {
@@ -55,8 +58,8 @@ export function isJSXElementDynamic(t: JSXElement): t is JSXElementDynamic {
   return isFunction(t);
 }
 
-export function isJSXElementWithOwner(t: JSXElement): t is JSXElementWithOwner {
-  return isObject(t) && ("withOwner" in t && "fun" in t);
+export function isJSXElementWithScope(t: JSXElement): t is JSXElementWithScope {
+  return isObject(t) && ("withScope" in t && "fun" in t);
 }
 
 export function renderClasslist(list: ClassList): string[] {
@@ -108,10 +111,10 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
     const suffix = createSSRDirective("dyn/");
     return `${prefix}${stringifyJSXElement(val, true)}${suffix}`;
   }
-  else if (isJSXElementWithOwner(el)) {
-    const prefix = createSSRDirective("own", el.withOwner);
-    const suffix = createSSRDirective("own/");
-    return enterOwner(el.withOwner, () => {
+  else if (isJSXElementWithScope(el)) {
+    const prefix = createSSRDirective("sco", el.withScope);
+    const suffix = createSSRDirective("sco/");
+    return el.withScope.enter(() => {
       return `${prefix}${stringifyJSXElement(el.fun(), false)}${suffix}`;
     });
   }
@@ -132,7 +135,7 @@ function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false): 
 }
 
 export function renderToDom(parent: Node, el: ComponentFn<{}>) {
-  enterOwner(createOwner(), () => {
+  Scope.create().enter(() => {
     const val = patchElement(parent, null, null, h(el));
     // @ts-ignore This is useless and just used to prevent val from being gced
     globalThis[Symbol("gc-prevention")] = val;
@@ -144,15 +147,16 @@ export function renderToString(el: ComponentFn<{}>): string {
 
   global_h_config = "ssr";
   try {
-    const [owner, cleanup, capture] = createCapturingOwner();
-    const rootOwnerDirective = createSSRDirective("own", owner);
-    const t = enterOwner(owner, () => stringifyJSXElement(h(el)));
-    const captureData = capture();
-    const tasksDirective = createSSRDirective("tasks", captureData.tasks);
+    const [scope, cleanup] = Scope.createControlled();
+    const taskCaptureData: TaskCaptureData = { capturedTasks: [] };
+    scope.setContext(taskCaptureContextKey, taskCaptureData);
+    const rootScopeDirective = createSSRDirective("sco", scope);
+    const t = scope.enter(stringifyJSXElement, h(el));
+    const tasksDirective = createSSRDirective("tasks", taskCaptureData);
     const directivesData = `<script lang="application/json" ${ATTRIBUTE_PREFIX}:data>${serialize(global_directive_data_array)}</script>`;
-    // We need to cleanp after serialization otherwise we serialize the cleaned owners
+    // We need to cleanup after serialization otherwise we serialize the scopes in the cleaned state
     cleanup();
-    return `${directivesData}${rootOwnerDirective}${t}${tasksDirective}`;
+    return `${directivesData}${rootScopeDirective}${t}${tasksDirective}`;
   }
   catch(e) {
     throw e;
@@ -165,10 +169,9 @@ export function renderToString(el: ComponentFn<{}>): string {
 function createHTMLElement(element: string, props: any): HTMLElement {
   const el = document.createElement(element);
   for (const propName of Object.keys(props)) {
-    // TODO: Children may be reactive too!(?)
     if (propName === "children") {
       const state = patchElement(el, null, null, () => props[propName]);
-      onCleanup(() => cleanupStateNodes(state));
+      getScope().onCleanup(() => cleanupStateNodes(state));
       continue;
     }
 
@@ -234,7 +237,7 @@ export function h<P>(element: string | ComponentFn<P>, props?: P): JSXElement {
   }
   else {
     return {
-      withOwner: createOwner(),
+      withScope: Scope.create(),
       fun: element.bind(null, props!),
     };
   }

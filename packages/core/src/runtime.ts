@@ -1,7 +1,7 @@
-import type { CapturedOwnerData, JSXElementDynamic, JSXElementWithOwner, Owner } from ".";
+import { Scope, type JSXElementDynamic } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, cleanupStateNodes, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState } from "./patchElement";
-import { type CapturedReactivityData, resumeReaction, enterOwner, resumeTask, untrack, onCleanup } from "@lentjs/core-reactivity";
+import { type CapturedReactivityData, resumeReaction, resumeTask, untrack, type TaskCaptureData } from "@lentjs/core-reactivity";
 import { assert, noop, notNull, unreachable } from "./utils";
 import { deserialize } from "@lentjs/core-serialize";
 import { setResumed } from "./global-signals";
@@ -12,7 +12,7 @@ export const DIRECTIVE_PREFIX = "lentjs";
 export const ATTRIBUTE_PREFIX = `data-${DIRECTIVE_PREFIX}`;
 
 export type Directives = {
-  "tasks": CapturedOwnerData["tasks"],
+  "tasks": TaskCaptureData,
 
   "dyn": {
     update: JSXElementDynamic,
@@ -20,8 +20,8 @@ export type Directives = {
   },
   "dyn/": null,
 
-  "own": JSXElementWithOwner["withOwner"],
-  "own/": null,
+  "sco": Scope,
+  "sco/": null,
 
   "arr": null,
   "arr/": null,
@@ -49,14 +49,14 @@ type RunCtx = {
   directivesData: readonly unknown[],
   nodesToRemove: (ChildNode | Attr)[],
   dynamicStateStack: StateStackElement[],
-  ownerStack: Owner[],
+  scopeStack: Scope[],
 };
 
 function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Comment, parent: Node, d: D) {
   switch (d.name) {
   case "tasks":
-    for (const task of d.data) {
-      enterOwner(task.owner, () => {
+    for (const task of d.data.capturedTasks) {
+      Scope.enter(task.parentScope, () => {
         resumeTask(task.task, task.reactivityData);
       });
     }
@@ -87,8 +87,8 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
       ctx.nodesToRemove.push(startAnchor, endAnchor);
     }
     else {
-      const owner = notNull(ctx.ownerStack.at(-1));
-      unsub = resumeReaction(() => enterOwner(owner, () => {
+      const scope = notNull(ctx.scopeStack.at(-1));
+      unsub = resumeReaction(() => scope.enter(() => {
         const newJSXElement = dynamic.data.update(resultState.element);
         untrack(() => {
           resultState = patchElement(parent, endAnchor, resultState, newJSXElement);
@@ -132,12 +132,12 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
 
     break;
   }
-  case "own": {
-    ctx.ownerStack.push(d.data);
+  case "sco": {
+    ctx.scopeStack.push(d.data);
     break;
   }
-  case "own/": {
-    ctx.ownerStack.pop();
+  case "sco/": {
+    ctx.scopeStack.pop();
     break;
   }
   case "arr": {
@@ -189,7 +189,7 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
       const data = ctx.directivesData[parseInt(t.value)] as ResumeAttributesData;
       for (const [k, v] of data) {
         const handler = notNull(getHandlerForAttribute(k));
-        enterOwner(ctx.ownerStack.at(-1)!, () => {
+        ctx.scopeStack.at(-1)!.enter(() => {
           handler.setOnHTMLElement(el, k, v);
         });
       }
@@ -198,7 +198,7 @@ function handleHTMLElement(ctx: RunCtx, el: HTMLElement) {
       const data = ctx.directivesData[parseInt(t.value)] as DynamicAttributesData;
       for (const [reactivityData, propName, callback] of data) {
         const handler = notNull(getHandlerForAttribute(propName));
-        enterOwner(ctx.ownerStack.at(-1)!, () => resumeTask(() => {
+        ctx.scopeStack.at(-1)!.enter(() => resumeTask(() => {
           const val = callback();
           untrack(() => handler.setOnHTMLElement(el, propName, val));
         }, reactivityData));
@@ -231,7 +231,7 @@ function domVisitor(ctx: RunCtx, node: ChildNode) {
       directivesData: ctx.directivesData,
       nodesToRemove: ctx.nodesToRemove,
       dynamicStateStack: [],
-      ownerStack: ctx.ownerStack,
+      scopeStack: ctx.scopeStack,
     }, n);
   });
 }
@@ -245,7 +245,7 @@ export function startRuntime(rootElement: HTMLElement) {
     directivesData: deserialize(dataElement.innerText) as any,
     nodesToRemove: [],
     dynamicStateStack: [],
-    ownerStack: [],
+    scopeStack: [],
   };
   domVisitor(ctx, rootElement);
   assert(ctx.dynamicStateStack.length === 0);
@@ -258,7 +258,7 @@ export function startRuntime(rootElement: HTMLElement) {
         n.remove();
     }
 
-  enterOwner(notNull(ctx.ownerStack[0]), () => {
+  notNull(ctx.scopeStack[0]).enter(() => {
     setResumed();
   });
 

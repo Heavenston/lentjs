@@ -1,4 +1,4 @@
-import { type ComponentFn, createStore, RefFor, register, onUnmount, onResume, onCleanup, resumed } from "@lentjs/core";
+import { type ComponentFn, createStore, RefFor, register, onUnmount, onResume, resumed, getScope } from "@lentjs/core";
 import c from "./todo.module.scss";
 
 type TaskData = {
@@ -25,7 +25,7 @@ const Task: ComponentFn<TaskProps> = register((props) => {
   onUnmount(() => {
     console.log("Unmount of component", props.task.text);
   });
-  onCleanup(() => {
+  getScope().onCleanup(() => {
     if (!resumed()) return;
     console.log("Cleanup of component", props.task.text);
   });

@@ -1,4 +1,4 @@
-import { type ComponentFn, register, createSignal, createTask, type EventHandler, For, onCleanup, getContext } from "@lentjs/core";
+import { type ComponentFn, register, createSignal, createTask, type EventHandler, For, getScope } from "@lentjs/core";
 import { AppContextId } from "./app";
 import { createUid } from "@lentjs/core/src/utils";
 
@@ -23,12 +23,12 @@ const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
   createTask(() => {
     const val = rawCount();
     console.log("Task!", val);
-    onCleanup(() => {
+    getScope().onCleanup(() => {
       console.log("Count task cleanup", val);
     });
   });
 
-  onCleanup(() => {
+  getScope().onCleanup(() => {
     console.log("Count component onCleanup");
   });
 
@@ -81,7 +81,7 @@ const Counter: ComponentFn<{}> = register(() => {
   return <div class={["a", "b b"]}>
     <div>{typeof document === "undefined" ? "Server" : "Client"}{" "}{createUid()}</div>
     <div>
-      App context id: {getContext(AppContextId)}
+      App context id: {getScope().getContext(AppContextId)}
     </div>
     <div>
       Min: <input attr:type="number" attr:value={min()} attr:max={max()} on:change={onChangeMin} />
