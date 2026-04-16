@@ -1,3 +1,4 @@
+import { defineSerialization, register } from "@lentjs/core-serialize";
 import { noop, remove } from "@lentjs/utils";
 
 export type ScopeState = "alive" | "detached" | "cleaned";
@@ -20,8 +21,37 @@ export function createContextKey<T>(id: string): ContextKey<T> {
   return id;
 }
 
+type ReducedScope = {
+  parent: Scope | null,
+  state: ScopeState,
+  detachingWithParent?: boolean,
+  contextValues: Map<unknown, unknown>,
+};
+
 export class Scope {
   static #currentScope: Scope | null = null;
+
+  private static reducer(scope: Scope): ReducedScope {
+    return {
+      parent: scope.parent,
+      state: scope.state,
+      detachingWithParent: scope.#detachingWithParent,
+      contextValues: scope.#contextValues,
+    };
+  }
+
+  private static reviver(reduced: ReducedScope): Scope {
+    return new Scope(reduced);
+  }
+  static { register(Scope.reviver, "__lentjs_scope.reviver") }
+
+  private static cleanupReducer(cleanup: ScopeCleanup): Scope {
+    return cleanup.scope;
+  }
+  private static cleanupReviver(scope: Scope): ScopeCleanup {
+    return scope.#createCleanup();
+  }
+  static { register(Scope.cleanupReviver, "__lentjs_scope.cleanupReviver") }
 
   public static get currentScope(): Scope | null {
     return Scope.#currentScope;
@@ -40,16 +70,7 @@ export class Scope {
     const scope = new Scope(parent);
     if (parent)
       scope.#cleanupWithParent();
-
-    const cleanup: ScopeCleanup = () => {
-      scope.#setState("cleaned");
-    };
-    cleanup.scope = scope;
-    cleanup.detach = () => {
-      scope.#setState("detached");
-    };
-
-    return [scope, cleanup];
+    return [scope, scope.#createCleanup()];
   }
 
   #state: ScopeState = "alive";
@@ -65,8 +86,31 @@ export class Scope {
     return this.#state;
   }
 
-  private constructor(parent: Scope | null) {
-    this.parent = parent;
+  private constructor(parentOrReduced: Scope | ReducedScope | null) {
+    if (parentOrReduced instanceof Scope || parentOrReduced === null)  {
+      this.parent = parentOrReduced;
+    }
+    else {
+      this.parent = parentOrReduced.parent;
+      this.#state = parentOrReduced.state;
+      this.#contextValues = parentOrReduced.contextValues;
+      this.#cleanupWithParent();
+      if (parentOrReduced.detachingWithParent)
+        this.#detachWithParent();
+    }
+    defineSerialization(this, Scope.reducer, Scope.reviver);
+  }
+
+  #createCleanup(): ScopeCleanup {
+    const cleanup: ScopeCleanup = () => {
+      this.#setState("cleaned");
+    };
+    cleanup.scope = this;
+    cleanup.detach = () => {
+      this.#setState("detached");
+    };
+    defineSerialization(cleanup, Scope.cleanupReducer, Scope.cleanupReviver);
+    return cleanup;
   }
 
   #setState(newState: FinalScopeStates) {
