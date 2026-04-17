@@ -5,7 +5,7 @@ import { type CapturedReactivityData, resumeReaction, resumeTask, untrack, type 
 import { assert, noop, notNull, unreachable } from "@lentjs/utils";
 import { deserialize } from "@lentjs/core-serialize";
 import { setResumed } from "./global-signals";
-import { ChildernArray } from "./children-array";
+import { ChildrenArray } from "./children-array";
 
 const REMOVE_DIRECTIVES = true;
 
@@ -183,7 +183,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
   case "chi/": {
     ctx.nodesToRemove.push(directiveNode);
     let states: JSXState[] = [];
-    let elements = new ChildernArray<JSXElement>;
+    let elements = new ChildrenArray<JSXElement>;
     while (ctx.dynamicStateStack.length > 0 && ctx.dynamicStateStack.at(-1)?.kind !== "children-array-start") {
       const el = ctx.dynamicStateStack.pop();
       assert(el?.kind === "state");

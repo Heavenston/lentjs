@@ -2,10 +2,10 @@ import { defineSerialization, register } from "@lentjs/core-serialize";
 
 type K<T> = ["g", ()=>T] | ["v", T];
 
-export class ChildernArray<T> extends Array<T> {
+export class ChildrenArray<T> extends Array<T> {
   constructor() {
     super();
-    defineSerialization(this, this.reducer.bind(this), (ChildernArray<T>).reviver);
+    defineSerialization(this, this.reducer.bind(this), (ChildrenArray<T>).reviver);
   }
 
   public child(val: T): this {
@@ -48,8 +48,8 @@ export class ChildernArray<T> extends Array<T> {
     return result;
   }
 
-  private static reviver<T>(val: K<T>[]): ChildernArray<T> {
-    const result = new ChildernArray<T>;
+  private static reviver<T>(val: K<T>[]): ChildrenArray<T> {
+    const result = new ChildrenArray<T>;
     for (const i of val) {
       if (i[0] === "g") {
         result.computed(i[1]);
@@ -60,5 +60,5 @@ export class ChildernArray<T> extends Array<T> {
     }
     return result;
   }
-  static { register(ChildernArray.reviver, "__lentjs_ChildrenArray.reviver") }
+  static { register(ChildrenArray.reviver, "__lentjs_ChildrenArray.reviver") }
 }

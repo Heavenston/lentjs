@@ -3,6 +3,8 @@
 
 mod jsx;
 mod jsx_whitespace;
+mod lentjs_idents_importer;
+mod register_dollar_magic;
 
 use std::collections::{HashMap, HashSet};
 
@@ -12,7 +14,7 @@ use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ Span, util::take::Take }, ecma
 }};
 use swc_core::plugin::{plugin_transform, proxies::TransformPluginProgramMetadata};
 
-const REGISTER_FN_NAME: &str = "register";
+use crate::{lentjs_idents_importer::LentjsIdentsImporter, register_dollar_magic::RegisterDollarMagic};
 
 #[derive(Default)]
 struct FindCapturedValues {
@@ -190,8 +192,8 @@ struct HoistedClosure {
     code: ArrowExpr,
 }
 
-#[derive(Default)]
-pub struct TransformVisitor {
+pub struct TransformVisitor<'a> {
+    importer: &'a mut LentjsIdentsImporter,
     enabled: bool,
     /// Stores a list of idents that are defined at the top level
     /// Such idens do not need to be captured by closures
@@ -199,7 +201,18 @@ pub struct TransformVisitor {
     hoisted_closured: Vec<HoistedClosure>,
 }
 
-impl VisitMut for TransformVisitor {
+impl<'a> TransformVisitor<'a> {
+    pub fn new(importer: &'a mut LentjsIdentsImporter) -> Self {
+        Self {
+            importer,
+            enabled: Default::default(),
+            top_level_idents: Default::default(),
+            hoisted_closured: Default::default(),
+        }
+    }
+}
+
+impl VisitMut for TransformVisitor<'_> {
     fn visit_mut_script(&mut self, _node: &mut swc_core::ecma::ast::Script) {
         panic!("Script are not supported");
     }
@@ -209,6 +222,15 @@ impl VisitMut for TransformVisitor {
         node.visit_with(&mut find);
         self.top_level_idents = find.idens;
         node.visit_mut_children_with(self);
+    }
+
+    fn visit_mut_call_expr(&mut self, node: &mut CallExpr) {
+        let is_register_dollar = node.callee.as_expr().and_then(|e| e.as_ident()).is_some_and(|p| p.sym == "register$");
+
+        let old_enabled = self.enabled;
+        self.enabled = is_register_dollar || old_enabled;
+        node.visit_mut_children_with(self);
+        self.enabled = old_enabled;
     }
 
     fn visit_mut_stmts(&mut self, node: &mut Vec<swc_core::ecma::ast::Stmt>) {
@@ -226,7 +248,6 @@ impl VisitMut for TransformVisitor {
 
     fn visit_mut_module_items(&mut self, items: &mut Vec<swc_core::ecma::ast::ModuleItem>) {
         items.visit_mut_children_with(self);
-        let foreach_closure_ident = Ident::new_no_ctxt(Atom::new(REGISTER_FN_NAME), Span::dummy());
         let insert_point = items.iter().enumerate().find(|p| p.1.is_stmt()).map(|(idx, _)| idx).unwrap_or(items.len());
 
         if self.hoisted_closured.is_empty() {
@@ -237,7 +258,7 @@ impl VisitMut for TransformVisitor {
             kind: swc_core::ecma::ast::VarDeclKind::Const,
             decls: self.hoisted_closured.drain(..).map(|h| {
                 let init: Expr = CallExpr {
-                    callee: swc_core::ecma::ast::Callee::Expr(foreach_closure_ident.clone().into()),
+                    callee: swc_core::ecma::ast::Callee::Expr(self.importer.get(lentjs_idents_importer::LentjsIdent::Register).clone().into()),
                     args: vec![
                         ExprOrSpread::from(Box::new(h.code.into())),
                         ExprOrSpread::from(Box::new(swc_core::ecma::ast::Str {
@@ -280,7 +301,7 @@ impl VisitMut for TransformVisitor {
         };
 
         // Remove all values that are declared within the arrow function
-        captured_values.values.retain(|o| !captured_values.decls.contains(o) && !self.top_level_idents.contains(o));
+        captured_values.values.retain(|o| !captured_values.decls.contains(o) && !self.top_level_idents.contains(o) && !self.importer.is_ident(o));
 
         let chosen_name = Ident::new_private(Atom::new("h"), Span::dummy());
 
@@ -326,7 +347,10 @@ impl VisitMut for TransformVisitor {
 
 #[plugin_transform]
 pub fn process_transform(mut program: Program, _metadata: TransformPluginProgramMetadata) -> Program {
-    program.visit_mut_with(&mut jsx::JsxTransform::default());
-    program.visit_mut_with(&mut TransformVisitor::default());
+    let mut lentjs_idents_importer = LentjsIdentsImporter::default();
+    program.visit_mut_with(&mut jsx::JsxTransform::new(&mut lentjs_idents_importer));
+    program.visit_mut_with(&mut TransformVisitor::new(&mut lentjs_idents_importer));
+    program.visit_mut_with(&mut RegisterDollarMagic::new(&mut lentjs_idents_importer));
+    lentjs_idents_importer.insert_import_decl(program.as_mut_module().expect("Only modules are supported"));
     program
 }

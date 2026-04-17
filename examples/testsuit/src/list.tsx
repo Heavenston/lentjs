@@ -1,4 +1,4 @@
-import { createSignal, RefFor, register, type ComponentFn, type SignalAccessor, type SignalSetter } from "@lentjs/core";
+import { createSignal, RefFor, register$, type ComponentFn, type SignalAccessor, type SignalSetter } from "@lentjs/core";
 import c from "./list.module.scss";
 
 function createElement(): Element {
@@ -6,9 +6,7 @@ function createElement(): Element {
 }
 
 type Element = { id: string };
-const elementRender = register((getElements: SignalAccessor<Element[]>, setElements: SignalSetter<Element[]>, element: Element, getIdx: SignalAccessor<number>) => {
-  "use component";
-
+const elementRender = register$((getElements: SignalAccessor<Element[]>, setElements: SignalSetter<Element[]>, element: Element, getIdx: SignalAccessor<number>) => {
   const i = crypto.randomUUID().split("-")[0];
 
   return <div
@@ -82,11 +80,9 @@ const elementRender = register((getElements: SignalAccessor<Element[]>, setEleme
       +
     </button>
   </div>;
-}, "____RANDOM_ID");
+});
 
-const List: ComponentFn<{}> = register(() => {
-  "use component";
-
+const List: ComponentFn<{}> = register$(() => {
   const [elements, setElements] = createSignal<Element[]>(
     new Array(3).fill(null).map(createElement)
   );
@@ -105,5 +101,5 @@ const List: ComponentFn<{}> = register(() => {
       {elementRender.bind(null, elements, setElements)}
     </RefFor>,
   ];
-}, "____RANDOM_ID");
+});
 export default List;

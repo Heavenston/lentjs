@@ -4,7 +4,7 @@ import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type MarkerDirec
 import { escapeHtml } from "./escape-html";
 import { global_directive_data_array, sharedSSRSerialize } from "./shared-globals";
 import { isSSRElement, SSRElementBuilder, type SSRElement } from "./ssr-element";
-import { ChildernArray } from "./children-array";
+import { ChildrenArray } from "./children-array";
 import { factory, isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, type ComponentFn, type JSXElement } from ".";
 import { getProperty } from "@lentjs/utils";
 import { getHandlerForAttribute } from "./attributes";
@@ -53,7 +53,7 @@ export function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = f
       return `${prefix}${stringifyJSXElement(el.fun(), false)}${suffix}`;
     });
   }
-  else if (el instanceof ChildernArray) {
+  else if (el instanceof ChildrenArray) {
     let t = "";
     for (let i = 0; i < el.length; i++) {
       if (t.length !== 0 && isInsideDynamic)

@@ -1,4 +1,4 @@
-import { ChildernArray, isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular, type JSXElementWithScope } from ".";
+import { ChildrenArray, isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular, type JSXElementWithScope } from ".";
 import { assert, unreachable } from "@lentjs/utils";
 import { isInTrackingContext, untrack, getScope, startReaction, resumeReaction } from "@lentjs/core-reactivity";
 
@@ -227,7 +227,7 @@ function appendArray(parent: Node, anchorElement: ChildNode | null, child: JSXEl
   let currentAnchor = anchorElement;
   let states: JSXState[] = [];
   for (let i = child.length-1; i>=0;i--) {
-    const childEl = child instanceof ChildernArray ? child.getOrComputed(i) : child[i];
+    const childEl = child instanceof ChildrenArray ? child.getOrComputed(i) : child[i];
     const state = patchElement(parent, currentAnchor, null, childEl);
     states.push(state);
     currentAnchor = getFirstElement(state) ?? currentAnchor;
@@ -255,7 +255,7 @@ export function patchElementArrayNew(
   const states = Array<JSXState>();
   let currentAnchor = anchorElement;
   for (let i = child.length-1; i>=0; i--) {
-    const childEl = child instanceof ChildernArray ? child.getOrComputed(i) : child[i];
+    const childEl = child instanceof ChildrenArray ? child.getOrComputed(i) : child[i];
 
     const prev = toKeepMap.get(childEl);
     toKeepMap.delete(childEl);

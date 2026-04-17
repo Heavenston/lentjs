@@ -1,4 +1,4 @@
-import { type ComponentFn, createStore, RefFor, register, onUnmount, onResume, resumed, getScope } from "@lentjs/core";
+import { type ComponentFn, createStore, RefFor, onUnmount, onResume, resumed, getScope, register$ } from "@lentjs/core";
 import c from "./todo.module.scss";
 
 type TaskData = {
@@ -15,9 +15,7 @@ type TaskProps = {
   task: TaskData,
   onDelete: () => void,
 };
-const Task: ComponentFn<TaskProps> = register((props) => {
-  "use component";
-
+const Task: ComponentFn<TaskProps> = register$((props) => {
   console.log("Creation of task component", props.task.text);
   onResume(() => {
     console.log("Resume of task component", props.task.text);
@@ -41,15 +39,13 @@ const Task: ComponentFn<TaskProps> = register((props) => {
       Delete
     </button>
   </div>;
-}, "____RANDOM_ID");
+});
 
 type TodoState = {
   input_text: string,
   tasks: TaskData[],
 };
-const Todo: ComponentFn<{}> = register(() => {
-  "use component";
-
+const Todo: ComponentFn<{}> = register$(() => {
   const state = createStore<TodoState>({
     input_text: "Hi",
     tasks: [
@@ -95,5 +91,5 @@ const Todo: ComponentFn<{}> = register(() => {
       {task => <Task task={task} onDelete={() => { state.tasks = state.tasks.filter(p => p.id !== task.id) }} />}
     </RefFor>
   </>;
-}, "____RANDOM_ID");
+});
 export default Todo;

@@ -8,14 +8,14 @@ export { Fragment } from "./fragment";
 export type { Attributes, AttributeValue } from "./attributes";
 export { type SSRElement, isSSRElement } from "./ssr-element";
 export { resumed } from "./global-signals";
-export { ChildernArray } from "./children-array";
+export { ChildrenArray } from "./children-array";
 export { defineAsProps } from "./props-ser";
 export { factory } from "./factory";
 export { renderToString } from "./render-to-string";
 export { renderToDom } from "./render-to-dom";
 
 import { register } from "@lentjs/core-serialize";
-import { isFunction, isObject } from "@lentjs/utils";
+import { assert, isFunction, isObject } from "@lentjs/utils";
 import { createTask, untrack, Scope, getScope } from "@lentjs/core-reactivity";
 import type { SSRElement } from "./ssr-element";
 import { resumed } from "./global-signals";
@@ -69,4 +69,9 @@ export function renderClasslist(list: ClassList): string[] {
   return Object.entries(list)
     .filter(([k, v]) => typeof k === "string" && v)
     .map(([k, _]) => k);
+}
+
+export function register$<T extends object>(val: T, id?: string): T {
+  assert(typeof id === "string");
+  return register(val, id);
 }

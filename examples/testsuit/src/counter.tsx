@@ -1,4 +1,4 @@
-import { type ComponentFn, register, createSignal, createTask, type EventHandler, For, getScope } from "@lentjs/core";
+import { type ComponentFn, createSignal, createTask, type EventHandler, For, getScope, register$ } from "@lentjs/core";
 import { AppContextId } from "./app";
 import { createUid } from "@lentjs/utils";
 
@@ -6,9 +6,7 @@ type CounterButtonProps = {
   min: number,
   max: number,
 };
-const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
-  "use component";
-
+const CounterButton: ComponentFn<CounterButtonProps> = register$(props => {
   const [rawCount, setCount] = createSignal(props.min);
 
   const clamp = (val: number): number => {
@@ -57,11 +55,9 @@ const CounterButton: ComponentFn<CounterButtonProps> = register(props => {
       Decrement to {count()-1}
     </button>
   </div>;
-}, "____RANDOM_ID");
+});
 
-const Counter: ComponentFn<{}> = register(() => {
-  "use component";
-
+const Counter: ComponentFn<{}> = register$(() => {
   const [min, setMin] = createSignal(0);
   const [max, setMax] = createSignal(10);
 
@@ -91,5 +87,5 @@ const Counter: ComponentFn<{}> = register(() => {
     </div>
     <CounterButton min={min()} max={max()} />
   </div>
-}, "____RANDOM_ID");
+});
 export default Counter;

@@ -1,19 +1,13 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 ///! Code in this module is largely AI-Generated but with a few tweaks
 
-use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ Span, SyntaxContext, util::take::Take }, ecma::{
-    ast::{Bool, CallExpr, Callee, Expr, ExprOrSpread, Id, Ident, ImportDecl, ImportNamedSpecifier, ImportSpecifier, JSXAttrName, JSXAttrOrSpread, JSXAttrValue, JSXElement, JSXElementChild, JSXElementName, JSXExpr, JSXFragment, JSXMemberExpr, JSXObject, KeyValueProp, Lit, MemberExpr, MemberProp, Module, ModuleDecl, ModuleItem, ObjectLit, Prop, PropName, PropOrSpread, SpreadElement, Str},
+use swc_core::{atoms::Wtf8Atom, common::{ Span, SyntaxContext, util::take::Take }, ecma::{
+    ast::{Bool, CallExpr, Callee, Expr, ExprOrSpread, Id, Ident, JSXAttrName, JSXAttrOrSpread, JSXAttrValue, JSXElement, JSXElementChild, JSXElementName, JSXExpr, JSXFragment, JSXMemberExpr, JSXObject, KeyValueProp, Lit, MemberExpr, MemberProp, ObjectLit, Prop, PropName, PropOrSpread, SpreadElement, Str},
     visit::{ Visit, VisitMut, VisitMutWith, VisitWith },
 }};
 
-use crate::jsx_whitespace::collapse_jsx_whitespace;
-
-const IMPORT_SOURCE: &str = "@lentjs/core";
-const FACTORY_NAME: &str = "factory";
-const FRAGMENT_NAME: &str = "Fragment";
-const CHILDREN_ARRAY_NAME: &str = "ChildernArray";
-const DEFINE_AS_PROPS_NAME: &str = "defineAsProps";
+use crate::{jsx_whitespace::collapse_jsx_whitespace, lentjs_idents_importer::{LentjsIdent, LentjsIdentsImporter}};
 
 /// Tries to chose wether or not an expression may invoke any reactive code.
 /// This may happen because of signals, or stores, so we detect function calls
@@ -53,40 +47,11 @@ impl Visit for ExpressionNeedsWrapping {
     }
 }
 
-#[derive(Default)]
-pub struct JsxTransform {
-    idents: HashMap<String, Ident>,
+pub struct JsxTransform<'a> {
+    importer: &'a mut LentjsIdentsImporter,
 }
 
-impl VisitMut for JsxTransform {
-    fn visit_mut_module(&mut self, module: &mut Module) {
-        module.visit_mut_children_with(self);
-
-        let mut specifiers = Vec::new();
-        for (name, ident) in &self.idents {
-            specifiers.push(ImportSpecifier::Named(ImportNamedSpecifier {
-                span: Span::dummy(),
-                local: ident.clone(),
-                imported: Some(swc_core::ecma::ast::ModuleExportName::Ident(Ident::from(name.as_str()))),
-                is_type_only: false,
-            }));
-        }
-
-        if specifiers.is_empty() {
-            return;
-        }
-
-        let import = ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
-            span: Span::dummy(),
-            specifiers,
-            src: Box::new(Str::from(IMPORT_SOURCE)),
-            type_only: false,
-            with: None,
-            phase: Default::default(),
-        }));
-        module.body.insert(0, import);
-    }
-
+impl VisitMut for JsxTransform<'_> {
     fn visit_mut_expr(&mut self, expr: &mut Expr) {
         // Transform children first (bottom-up).
         expr.visit_mut_children_with(self);
@@ -105,15 +70,10 @@ impl VisitMut for JsxTransform {
     }
 }
 
-impl JsxTransform {
-    fn get_lentjs_ident(&mut self, name: &str) -> Ident {
-        if let Some(v) = self.idents.get(name) {
-            v.clone()
-        }
-        else {
-            let ident = Ident::new_private(Atom::new(name), Span::dummy());
-            self.idents.insert(name.to_string(), ident.clone());
-            ident
+impl<'a> JsxTransform<'a> {
+    pub fn new(importer: &'a mut LentjsIdentsImporter) -> Self {
+        Self {
+            importer,
         }
     }
 
@@ -130,7 +90,7 @@ impl JsxTransform {
     /// `<>child</>`
     /// → `createElement(Fragment, null, "child")`
     fn transform_fragment(&mut self, frag: JSXFragment) -> Expr {
-        let tag = Expr::Ident(self.get_lentjs_ident(FRAGMENT_NAME));
+        let tag = Expr::Ident(self.importer.get(LentjsIdent::Fragment));
         let children = self.build_children(frag.children);
         let props = self.build_props(vec![], children, frag.opening.span);
 
@@ -157,7 +117,7 @@ impl JsxTransform {
 
         Expr::Call(CallExpr {
             span,
-            callee: Callee::Expr(Box::new(Expr::Ident(self.get_lentjs_ident(FACTORY_NAME)))),
+            callee: Callee::Expr(Box::new(Expr::Ident(self.importer.get(LentjsIdent::Factory)))),
             args,
             ..Default::default()
         })
@@ -291,14 +251,14 @@ impl JsxTransform {
         Expr::Call(CallExpr {
             span,
             args: vec![ExprOrSpread::from(Expr::from(final_obj_expr))],
-            callee: Callee::Expr(Box::new(Expr::from(self.get_lentjs_ident(DEFINE_AS_PROPS_NAME)))),
+            callee: Callee::Expr(Box::new(Expr::from(self.importer.get(LentjsIdent::DefineAsProps)))),
             ..Default::default()
         })
     }
 
     fn build_children_array(&mut self, children: Vec<Box<Expr>>) -> Expr {
         let mut current = Expr::New(swc_core::ecma::ast::NewExpr {
-            callee: Box::new(Expr::Ident(self.get_lentjs_ident(CHILDREN_ARRAY_NAME))),
+            callee: Box::new(Expr::Ident(self.importer.get(LentjsIdent::ChildrenArray))),
             ..Default::default()
         });
 
@@ -381,8 +341,8 @@ impl JsxTransform {
 
     fn expr_needs_wrapping(&mut self, expr: &Expr) -> bool {
         let mut e = ExpressionNeedsWrapping {
-            filter_list: self.idents.iter()
-                .filter(|&(k, _)| k != FACTORY_NAME)
+            filter_list: self.importer.idents()
+                .filter(|&(k, _)| k != LentjsIdent::Factory)
                 .map(|(_, v)| v)
                 .cloned()
                 .map(Into::into)
