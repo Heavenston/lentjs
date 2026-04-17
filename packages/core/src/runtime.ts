@@ -1,7 +1,7 @@
 import { Scope, type JSXElement, type JSXElementDynamic } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, cleanupStateNodes, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState, type JSXStateDynamic } from "./patchElement";
-import { type CapturedReactivityData, resumeReaction, resumeTask, untrack, type TaskCaptureData } from "@lentjs/core-reactivity";
+import { type CapturedReactivityData, resumeReaction, resumeTask, untrack, type TaskCaptureData, getScope } from "@lentjs/core-reactivity";
 import { assert, noop, notNull, unreachable } from "@lentjs/utils";
 import { deserialize } from "@lentjs/core-serialize";
 import { setResumed } from "./global-signals";
@@ -139,6 +139,8 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
           },
         },
       });
+    else
+      ctx.scopeStack.at(-1)!.onCleanup(unsub);
 
     break;
   }
