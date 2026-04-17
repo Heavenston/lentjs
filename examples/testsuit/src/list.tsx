@@ -1,4 +1,4 @@
-import { createSignal, RefFor, register$, type ComponentFn, type SignalAccessor, type SignalSetter } from "@lentjs/core";
+import { createSignal, RefFor, register$, type ComponentFn, type SignalSetter } from "@lentjs/core";
 import c from "./list.module.scss";
 
 function createElement(): Element {
@@ -6,21 +6,20 @@ function createElement(): Element {
 }
 
 type Element = { id: string };
-const elementRender = register$((getElements: SignalAccessor<Element[]>, setElements: SignalSetter<Element[]>, element: Element, getIdx: SignalAccessor<number>) => {
+const ElementComp: ComponentFn<{ elements: Element[], setElements: SignalSetter<Element[]>, element: Element, idx: number }> = register$(props => {
   const i = crypto.randomUUID().split("-")[0];
 
   return <div
-    attr:id={`el-${element.id}`}
+    attr:id={`el-${props.element.id}`}
     class={c.element}
   >
-    {element.id} ({getIdx()+1}/{getElements().length}):{" "}
+    {props.element.id} ({props.idx+1}/{props.elements.length}):{" "}
     <button
       on:click={() => {
-        const idx = getIdx();
-        setElements.update(elements => {
+        props.setElements.update(elements => {
           const newEl = createElement();
-          console.log("Adding",newEl.id,"before",elements[idx].id);
-          elements.splice(idx, 0, newEl);
+          console.log("Adding",newEl.id,"before",elements[props.idx].id);
+          elements.splice(props.idx, 0, newEl);
           return [...elements];
         });
       }}
@@ -28,10 +27,10 @@ const elementRender = register$((getElements: SignalAccessor<Element[]>, setElem
       +
     </button>
     <button
-      disabled={getIdx() === 0}
+      disabled={props.idx === 0}
       on:click={() => {
-        const idx = getIdx();
-        setElements.update(elements => {
+        const idx = props.idx;
+        props.setElements.update(elements => {
           if (idx === 0) return elements;
           const prev = elements[idx-1];
           console.log("Swap", prev.id, "with", elements[idx].id);
@@ -45,16 +44,16 @@ const elementRender = register$((getElements: SignalAccessor<Element[]>, setElem
     </button>
     <button
       on:click={() => {
-        setElements.update(els => els.filter(e => e.id !== element.id));
+        props.setElements.update(els => els.filter(e => e.id !== props.element.id));
       }}
     >
       Delete {i}
     </button>
     <button
-      disabled={getIdx()+1 === getElements().length}
+      disabled={props.idx+1 === props.elements.length}
       on:click={() => {
-        const idx = getIdx();
-        setElements.update(elements => {
+        const idx = props.idx;
+        props.setElements.update(elements => {
           if (idx+1 >= elements.length) return elements;
           const next = elements[idx+1];
           console.log("Swap", next.id, "with", elements[idx].id);
@@ -68,8 +67,8 @@ const elementRender = register$((getElements: SignalAccessor<Element[]>, setElem
     </button>
     <button
       on:click={() => {
-        const idx = getIdx();
-        setElements.update(elements => {
+        const idx = props.idx;
+        props.setElements.update(elements => {
           const newEl = createElement();
           console.log("Adding",newEl.id,"after",elements[idx].id);
           elements.splice(idx+1, 0, newEl);
@@ -98,7 +97,7 @@ const List: ComponentFn<{}> = register$(() => {
       each={elements()}
       key={el => el.id}
     >
-      {elementRender.bind(null, elements, setElements)}
+      {(element, idx) => <ElementComp element={element} idx={idx()} elements={elements()} setElements={setElements} />}
     </RefFor>,
   ];
 });
