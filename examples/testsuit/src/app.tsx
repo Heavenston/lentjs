@@ -1,9 +1,9 @@
-import { type ComponentFn, createSignal, Show, createContextKey, getScope, register$ } from "@lentjs/core";
+import { type ComponentFn, createSignal, Show, createContextId, getScope, register$ } from "@lentjs/core";
 import Counter from "./counter";
 import Todo from "./todo";
 import List from "./list";
 
-export const AppContextId = createContextKey<string>("____RANDOM_ID");
+export const AppContextId = createContextId<string>("____RANDOM_ID");
 
 const Complex: ComponentFn<{}> = register$(() => {
   return [

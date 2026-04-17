@@ -4,11 +4,11 @@ import { noop, remove } from "@lentjs/utils";
 export type ScopeState = "alive" | "detached" | "cleaned";
 export type FinalScopeStates = Exclude<ScopeState, "alive">;
 export type ScopeUnsubscribe = () => void;
-declare const ContextKeySymbol: unique symbol;
+declare const ContextIdSymbol: unique symbol;
 /**
- * Opaque type representing the key for a context value
+ * Opaque type representing the id for a context value
  */
-export type ContextKey<T> = { [ContextKeySymbol]: T };
+export type ContextId<T> = { [ContextIdSymbol]: T };
 
 export type ScopeCleanup = {
   scope: Scope;
@@ -16,7 +16,7 @@ export type ScopeCleanup = {
   detach(): void;
 };
 
-export function createContextKey<T>(id: string, cfg?: { noSerialize?: boolean }): ContextKey<T> {
+export function createContextId<T>(id: string, cfg?: { noSerialize?: boolean }): ContextId<T> {
   if (cfg?.noSerialize)
     // @ts-ignore Fake convertion
     return Symbol(id);
@@ -200,30 +200,30 @@ export class Scope {
     return this.on("detached", cb);
   }
 
-  public hasContext<T>(key: ContextKey<T>): boolean {
-    return this.#contextValues.has(key);
+  public hasContext<T>(id: ContextId<T>): boolean {
+    return this.#contextValues.has(id);
   }
 
-  public getContext<T>(key: ContextKey<T>): T {
-    if (!this.#contextValues.has(key)) {
+  public getContext<T>(id: ContextId<T>): T {
+    if (!this.#contextValues.has(id)) {
       if (this.parent === null)
-        throw new Error(`No context value found for key ${key}`);
-      return this.parent.getContext(key);
+        throw new Error(`No context value found for id '${id}'`);
+      return this.parent.getContext(id);
     }
-    return this.#contextValues.get(key) as T;
+    return this.#contextValues.get(id) as T;
   }
 
-  public tryGetContext<T>(key: ContextKey<T>): T | null {
-    if (!this.#contextValues.has(key)) {
+  public tryGetContext<T>(id: ContextId<T>): T | null {
+    if (!this.#contextValues.has(id)) {
       if (this.parent === null)
         return null;
-      return this.parent.tryGetContext(key);
+      return this.parent.tryGetContext(id);
     }
-    return this.#contextValues.get(key) as T;
+    return this.#contextValues.get(id) as T;
   }
 
-  public setContext<T>(key: ContextKey<T>, value: T) {
-    this.#contextValues.set(key, value);
+  public setContext<T>(id: ContextId<T>, value: T) {
+    this.#contextValues.set(id, value);
   }
 }
 

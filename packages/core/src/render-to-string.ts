@@ -1,5 +1,5 @@
 import { serialize } from "@lentjs/core-serialize";
-import { startReaction, Scope, taskCaptureContextKey, type TaskCaptureData } from "@lentjs/core-reactivity";
+import { startReaction, Scope, taskCaptureContextId, type TaskCaptureData } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type MarkerDirectiveName, ATTRIBUTE_PREFIX, type ResumeAttributesData, type DynamicAttributesData } from "./runtime";
 import { escapeHtml } from "./escape-html";
 import { global_directive_data_array, sharedSSRSerialize } from "./shared-globals";
@@ -116,7 +116,7 @@ export function createSSRElement(element: string, props: any): SSRElement {
 export function renderToString(el: ComponentFn<{}>): string {
   const [scope, cleanup] = Scope.createControlled();
   const taskCaptureData: TaskCaptureData = { capturedTasks: [] };
-  scope.setContext(taskCaptureContextKey, taskCaptureData);
+  scope.setContext(taskCaptureContextId, taskCaptureData);
 
   try {
     const rootScopeDirective = createSSRDirective("sco", scope);
