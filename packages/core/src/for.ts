@@ -10,7 +10,7 @@ type ForState<T> = {
   elements: ElementState<T>[],
 };
 export type ForProps<T> = {
-  each: () => T[],
+  each: T[],
   children: (idx: number, element: () => T) => JSXElement,
 };
 const forMapper = register(<T>(props: ForProps<T>, state: ForState<T>, previous: JSXElement): JSXElement => {
@@ -19,7 +19,7 @@ const forMapper = register(<T>(props: ForProps<T>, state: ForState<T>, previous:
   const oldElements = Array.isArray(previous) ? previous : [previous];
   const newElements: JSXElement[] = [];
 
-  const each = props.each();
+  const each = props.each;
   for (let idx = 0; idx < each.length; idx++) {
     const val: T = each[idx]!;
     const oldel = oldState[idx];
