@@ -95,7 +95,6 @@ export function createSSRElement(element: string, props: any): SSRElement {
     const attrHandler = getHandlerForAttribute(propName);
     if (attrHandler === null) continue;
     const [val, reactivityData] = startReaction(() => props[propName]);
-    attrHandler.setOnSSRElement(builder, propName, val);
     if (reactivityData.length > 0)
       dynamicAttributesData.push([reactivityData, propName, (getProperty<any, any>).bind(null, props, propName)])
     if (attrHandler.forceResume)

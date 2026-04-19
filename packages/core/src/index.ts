@@ -1,9 +1,10 @@
 export * from "@lentjs/core-reactivity";
+export { register } from "@lentjs/core-serialize";
+export { createUid, assert } from "@lentjs/utils";
 export { For } from "./for";
 export { RefFor } from "./ref-for";
 export { Show } from "./show";
 export { startRuntime } from "./runtime";
-export { register } from "@lentjs/core-serialize";
 export { Fragment } from "./fragment";
 export type { Attributes, AttributeValue } from "./attributes";
 export { type SSRElement, isSSRElement } from "./ssr-element";
