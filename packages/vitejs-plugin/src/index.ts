@@ -1,6 +1,6 @@
 import { type PluginOption } from "vite";
-import { compilePlugin } from "./compile-plugin";
-import { randomIdPlugin } from "./random-id-plugin";
+import { compilePlugin } from "./compile-plugin.js";
+import { randomIdPlugin } from "./random-id-plugin.js";
 
 export type LentjsVitejsPluginConfig = {
   
