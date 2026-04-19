@@ -286,7 +286,7 @@ export function startRuntime(rootElement: HTMLElement) {
   console.log("Size of data:", dataElement.innerText.toString().length);
   const ctx: RunCtx = {
     directivesData: deserialize(dataElement.innerText) as any,
-    nodesToRemove: [],
+    nodesToRemove: [dataElement],
     dynamicStateStack: [],
     scopeStack: [],
   };
