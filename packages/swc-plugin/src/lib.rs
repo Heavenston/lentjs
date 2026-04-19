@@ -9,7 +9,7 @@ mod register_dollar_magic;
 use std::collections::{HashMap, HashSet};
 
 use swc_core::{atoms::{Atom, Wtf8Atom}, common::{ Span, util::take::Take }, ecma::{
-    ast::{ArrowExpr, CallExpr, Expr, ExprOrSpread, Id, Ident, ImportSpecifier, MemberExpr, MemberProp, ModuleDecl, Null, Pat, Program, Stmt, VarDecl, VarDeclarator},
+    ast::{ArrowExpr, CallExpr, Expr, ExprOrSpread, Id, Ident, ImportSpecifier, MemberExpr, MemberProp, ModuleDecl, ModuleItem, Null, Pat, Program, Stmt, VarDecl, VarDeclarator},
     visit::{ Visit, VisitMut, VisitMutWith, VisitWith },
 }};
 use swc_core::plugin::{plugin_transform, proxies::TransformPluginProgramMetadata};
@@ -248,7 +248,13 @@ impl VisitMut for TransformVisitor<'_> {
 
     fn visit_mut_module_items(&mut self, items: &mut Vec<swc_core::ecma::ast::ModuleItem>) {
         items.visit_mut_children_with(self);
-        let insert_point = items.iter().enumerate().find(|p| p.1.is_stmt()).map(|(idx, _)| idx).unwrap_or(items.len());
+        let insert_point = items.iter().enumerate().find(|(_, p)| match *p {
+            ModuleItem::ModuleDecl(module_decl) => match module_decl {
+                ModuleDecl::Import(_) | ModuleDecl::TsImportEquals(_) => false,
+                _ => true,
+            },
+            _ => true,
+        }).map(|(idx, _)| idx).unwrap_or(items.len());
 
         if self.hoisted_closured.is_empty() {
             return;
