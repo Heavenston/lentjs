@@ -33,8 +33,8 @@
     "bunup": "^0.16.31"
   },
   "dependencies": {
+    "@lentjs/swc-plugin": "workspace:*",
     "@swc/core": "^1.15.24",
-    "vite": "^8.0.3",
-    "@lentjs/swc-plugin": "workspace:*"
+    "vite": "^8.0.8"
   }
 }
