@@ -8,6 +8,7 @@
   },
   "scripts": {
     "check-types": "turbo check-types",
-    "dev": "turbo dev"
+    "dev": "turbo dev",
+    "build": "turbo build"
   }
 }
