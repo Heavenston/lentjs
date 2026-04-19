@@ -63,9 +63,15 @@ export function ssrPlugin(): PluginOption {
           let html = await fs.readFile("./index.html", { encoding: "utf-8" });
           html = await server.transformIndexHtml(req.url!, html);
 
-          const { render } = await server.ssrLoadModule("src/entry-server.ts");
-
-          html = html.replace("<!--ssr-outlet-->", render(req));
+          try {
+            const { render } = await server.ssrLoadModule("src/entry-server.ts");
+            html = html.replace("<!--ssr-outlet-->", render(req));
+          }
+          catch(e) {
+            if (e instanceof Error)
+              html = html.replace("<!--ssr-outlet-->", e.toString());
+            console.error(e);
+          }
 
           res.write(html);
           res.end();
