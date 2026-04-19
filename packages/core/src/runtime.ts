@@ -293,7 +293,7 @@ export function startRuntime(rootElement: HTMLElement) {
   domVisitor(ctx, rootElement);
   assert(ctx.dynamicStateStack.length === 0);
   console.log(ctx.nodesToRemove.length, "total directive nodes and attributes found");
-  if (REMOVE_DIRECTIVES && localStorage.getItem("LENTJS_KEEP_DIRECTIVES") === null)
+  if (REMOVE_DIRECTIVES && localStorage.getItem("LENTJS_KEEP_DIRECTIVES") !== "true")
     for (const n of ctx.nodesToRemove) {
       if (n instanceof Attr)
         n.ownerElement?.removeAttributeNode(n);
