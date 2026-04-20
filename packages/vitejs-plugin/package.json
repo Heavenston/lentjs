@@ -25,12 +25,7 @@
     "typescript": "^5"
   },
   "scripts": {
-    "check-types": "tsc --noEmit",
-    "build": "bunup",
-    "dev": "bunup --watch"
-  },
-  "devDependencies": {
-    "bunup": "^0.16.31"
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@lentjs/swc-plugin": "workspace:*",

@@ -14,6 +14,7 @@ export { defineAsProps } from "./props-ser";
 export { factory } from "./factory";
 export { renderToString } from "./render-to-string";
 export { renderToDom } from "./render-to-dom";
+export type { JSX } from "./jsx";
 
 import { register } from "@lentjs/core-serialize";
 import { assert, isFunction, isObject } from "@lentjs/utils";

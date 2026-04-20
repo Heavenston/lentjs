@@ -1,1 +1,2 @@
-export type { JSX } from "./src/jsx";
+export type { JSX } from "./dist";
+export { Fragment } from "./dist";

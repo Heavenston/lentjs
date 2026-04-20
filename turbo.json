@@ -7,10 +7,6 @@
     "dev": {
       "persistent": true,
       "cache": false
-    },
-    "build": {
-      "outputs": ["dist/**"],
-      "dependsOn": ["^build"]
     }
   }
 }

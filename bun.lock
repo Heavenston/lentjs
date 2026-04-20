@@ -5,6 +5,7 @@
     "": {
       "name": "lentjs",
       "devDependencies": {
+        "bunup": "^0.16.31",
         "turbo": "^2.8.20",
       },
     },
@@ -87,9 +88,6 @@
         "@lentjs/swc-plugin": "workspace:*",
         "@swc/core": "^1.15.24",
         "vite": "^8.0.8",
-      },
-      "devDependencies": {
-        "bunup": "^0.16.31",
       },
       "peerDependencies": {
         "typescript": "^5",
