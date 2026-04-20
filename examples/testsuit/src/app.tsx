@@ -2,6 +2,7 @@ import { type ComponentFn, createSignal, Show, createContextId, getScope, regist
 import Counter from "./counter";
 import Todo from "./todo";
 import List from "./list";
+import AsyncTasks from "./async-tasks";
 
 export const AppContextId = createContextId<string>("____RANDOM_ID");
 
@@ -33,16 +34,19 @@ const ConditionalCounter: ComponentFn<{}> = register$(() => {
 const App: ComponentFn<{}> = register$(() => {
   getScope().setContext(AppContextId, "Within App");
 
-  return <>
-    <Counter />
-    <hr />
-    <ConditionalCounter />
-    <hr />
-    <Todo />
-    <hr />
-    <Complex />
-    <hr />
-    <List />
-  </>;
+  // return <>
+  //   <Counter />
+  //   <hr />
+  //   <ConditionalCounter />
+  //   <hr />
+  //   <Todo />
+  //   <hr />
+  //   <Complex />
+  //   <hr />
+  //   <List />
+  //   <hr />
+  //   <AsyncTasks />
+  // </>;
+  return <AsyncTasks />;
 });
 export default App;

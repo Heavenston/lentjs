@@ -65,7 +65,7 @@ export function ssrPlugin(): PluginOption {
 
           try {
             const { render } = await server.ssrLoadModule("src/entry-server.ts");
-            html = html.replace("<!--ssr-outlet-->", render(req));
+            html = html.replace("<!--ssr-outlet-->", await render(req));
           }
           catch(e) {
             if (e instanceof Error)

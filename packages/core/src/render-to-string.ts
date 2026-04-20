@@ -112,15 +112,18 @@ export function createSSRElement(element: string, props: any): SSRElement {
   return builder.build();
 }
 
-export function renderToString(el: ComponentFn<{}>): string {
+export async function renderToString(el: ComponentFn<{}>): Promise<string> {
   const [scope, cleanup] = Scope.createControlled();
-  const taskCaptureData: TaskCaptureData = { capturedTasks: [] };
+  const taskCaptureData: TaskCaptureData = { capturedTasks: [], capturedAsyncTasks: [] };
   scope.setContext(taskCaptureContextId, taskCaptureData);
 
   try {
-    const rootScopeDirective = createSSRDirective("sco", scope);
     const t = scope.enter(() => stringifyJSXElement(factory(el)));
-    const tasksDirective = createSSRDirective("tasks", taskCaptureData);
+    await Promise.allSettled(taskCaptureData.capturedAsyncTasks.map(t => t.promise));
+    const rootScopeDirective = createSSRDirective("sco", scope);
+    const tasksDirective = createSSRDirective("tasks", {
+      tasks: taskCaptureData.capturedTasks,
+    });
     const directivesData = `<script lang="application/json" ${ATTRIBUTE_PREFIX}:data>${serialize(global_directive_data_array)}</script>`;
     return `${directivesData}${rootScopeDirective}${t}${tasksDirective}`;
   }

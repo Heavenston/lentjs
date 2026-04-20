@@ -3,6 +3,11 @@ import { listenForSignalReads, registerSignalCallback, type SignalCallback, type
 declare const CapturedReactivityData: unique symbol;
 export type CapturedReactivityData = Readonly<{ [CapturedReactivityData]: "capturedReactionReactivityData", length: number }>;
 
+export const EMPTY_REACTIVITY_DATA: CapturedReactivityData = Object.freeze(convertReactivityData([]));
+export function combineReactivityData(a: CapturedReactivityData, b: CapturedReactivityData): CapturedReactivityData {
+  return Object.freeze(convertReactivityData([...convertReactivityData(a), ...convertReactivityData(b)]));
+}
+
 function convertReactivityData<T>(val: T): T extends CapturedReactivityData ? SignalId[] : T extends SignalId[] ? CapturedReactivityData : T {
   // @ts-ignore
   return val;
@@ -52,6 +57,6 @@ export function resumeReaction(reaction: () => void, reactivityData: CapturedRea
 export function startReaction<T>(reaction: () => T): [T, CapturedReactivityData] {
   const signalReads: SignalId[] = [];
   const val = listenForSignalReads(reaction, signalReads);
-  return [val, convertReactivityData(signalReads)];
+  return [val, Object.freeze(convertReactivityData(signalReads))];
 }
 

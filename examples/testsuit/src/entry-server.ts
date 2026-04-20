@@ -2,7 +2,7 @@ import type { Connect } from "vite";
 import App from "./app";
 import { renderToString } from "@lentjs/core";
 
-export function render(req: Connect.IncomingMessage): string {
+export async function render(req: Connect.IncomingMessage): Promise<string> {
   const url = new URL(`http://localhost${req.url}`);
   if (url.searchParams.get("no-ssr") != null)
     return "";

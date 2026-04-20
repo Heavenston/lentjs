@@ -13,8 +13,12 @@ const REMOVE_DIRECTIVES = true;
 export const DIRECTIVE_PREFIX = "l";
 export const ATTRIBUTE_PREFIX: `data-${typeof DIRECTIVE_PREFIX}` = `data-${DIRECTIVE_PREFIX}`;
 
+export type TaskResumeData = {
+  tasks: TaskCaptureData["capturedTasks"],
+};
+
 export type Directives = {
-  "tasks": TaskCaptureData,
+  "tasks": TaskResumeData,
 
   "dyn": {
     isComputedInArray: boolean,
@@ -65,7 +69,7 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
   switch (d.name) {
   case "tasks":
     ctx.nodesToRemove.push(directiveNode);
-    for (const task of d.data.capturedTasks) {
+    for (const task of d.data.tasks) {
       Scope.enter(task.parentScope, () => {
         resumeTask(task.task, task.reactivityData);
       });
