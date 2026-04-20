@@ -94,6 +94,7 @@ export class Scope {
   }
 
   #state: ScopeState = "alive";
+  #controller: AbortController | null = null;
   #detachingWithParent: boolean = false;
   #contextValues: Map<unknown, unknown> = new Map;
   readonly #callbacks: Record<FinalScopeStates, (() => void)[]> = {
@@ -106,11 +107,24 @@ export class Scope {
     return this.#state;
   }
 
+  public get cleaned(): boolean {
+    return this.state === "cleaned";
+  }
+
   public get root(): Scope {
     let current: Scope = this;
     while (current.parent !== null)
       current = current.parent;
     return current;
+  }
+
+  public get signal(): AbortSignal {
+    if (this.#controller === null) {
+      this.#controller = new AbortController();
+      if (this.#state === "cleaned")
+        this.#controller.abort();
+    }
+    return this.#controller.signal;
   }
 
   private constructor(parentOrReduced: Scope | ReducedScope | null) {
@@ -142,6 +156,9 @@ export class Scope {
     return cleanup;
   }
 
+  /**
+   * Only place where this.#state is changed
+   */
   #setState(newState: FinalScopeStates) {
     if (this.state !== "alive") {
       if (this.state !== newState) {
@@ -152,6 +169,7 @@ export class Scope {
 
     this.enter(() => {
       this.#state = newState;
+      this.#controller?.abort();
       this.#callbacks[newState].splice(0).forEach(cb => cb());
       // Remove the other callbacks, they are not needed anymore
       this.#callbacks[newState === "cleaned" ? "detached" : "cleaned"].splice(0);
