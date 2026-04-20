@@ -1,7 +1,8 @@
-import { Scope, type JSXElement, type JSXElementDynamic } from ".";
+import type { JSXElement, JSXElementDynamic } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, cleanupStateNodes, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState, type JSXStateDynamic } from "./patchElement";
-import { type CapturedReactivityData, resumeReaction, resumeTask, untrack, type TaskCaptureData } from "@lentjs/core-reactivity";
+import { Scope, resumeReaction, resumeTask, untrack } from "@lentjs/core-reactivity";
+import type { CapturedReactivityData, TaskCaptureData } from "@lentjs/core-reactivity";
 import { assert, noop, notNull, unreachable } from "@lentjs/utils";
 import { deserialize } from "@lentjs/core-serialize";
 import { setResumed } from "./global-signals";

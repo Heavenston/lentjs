@@ -1,4 +1,6 @@
-import { getScope, renderClasslist, type ClassList, type EventHandler, type JSXElement } from ".";
+import type { ClassList, EventHandler, JSXElement } from ".";
+import { renderClasslist } from ".";
+import { getScope } from "@lentjs/core-reactivity";
 import type { SSRElementBuilder } from "./ssr-element";
 
 export type AttributeValue = string | boolean | number | undefined;

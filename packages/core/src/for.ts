@@ -1,5 +1,6 @@
-import { createSignal, Scope, type JSXElement } from ".";
+import type { JSXElement } from ".";
 import type { ScopeCleanup, SignalSetter } from "@lentjs/core-reactivity";
+import { createSignal, Scope } from "@lentjs/core-reactivity";
 import { closure, register } from "@lentjs/core-serialize";
 
 type ElementState<T> = {
