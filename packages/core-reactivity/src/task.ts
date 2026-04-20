@@ -4,10 +4,6 @@ import { createContextId, Scope, type ContextId } from "./scope";
 
 export type TaskCallback = () => void;
 
-export type TaskConfig = {
-  initialCleanup?: () => void,
-};
-
 export type CapturedTaskData = {
   task: TaskCallback,
   reactivityData: CapturedReactivityData,
@@ -18,11 +14,11 @@ export type TaskCaptureData = {
 };
 export const taskCaptureContextId: ContextId<TaskCaptureData> = createContextId<TaskCaptureData>("__lentjs_taskCaptureData", { noSerialize: true });
 
-function internalCreateOrResumeTask(task: TaskCallback, config: TaskConfig, resumeWithReactivityData: CapturedReactivityData | null) {
+function internalCreateOrResumeTask(task: TaskCallback, resumeWithReactivityData: CapturedReactivityData | null) {
   const parentScope = Scope.currentScope;
   const taskCaptureData = parentScope?.tryGetContext(taskCaptureContextId) ?? null;
 
-  let previousCleanup = config.initialCleanup ?? noop;
+  let previousCleanup = noop;
   const cb = () => {
     previousCleanup();
     const [scope, cleanupScope] = Scope.createControlled(parentScope);
@@ -43,10 +39,10 @@ function internalCreateOrResumeTask(task: TaskCallback, config: TaskConfig, resu
   }
 }
 
-export function createTask(task: TaskCallback, config: TaskConfig = {}): void {
-  internalCreateOrResumeTask(task, config, null);
+export function createTask(task: TaskCallback): void {
+  internalCreateOrResumeTask(task, null);
 }
 
-export function resumeTask(task: TaskCallback, reactivityData: CapturedReactivityData, config: TaskConfig = {}): void {
-  internalCreateOrResumeTask(task, config, reactivityData);
+export function resumeTask(task: TaskCallback, reactivityData: CapturedReactivityData): void {
+  internalCreateOrResumeTask(task, reactivityData);
 }
