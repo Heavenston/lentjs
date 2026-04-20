@@ -50,14 +50,14 @@ const resumeTaskFn = register((cb: () => void) => {
   if (!resumed()) return;
   untrack(cb);
 }, "__lentjs_onResumeTaskFn");
-export function onResume(cb: () => void) {
+export function onResume(cb: () => void): void {
   createTask(resumeTaskFn.bind(null, cb));
 }
 
 const unmountResumeFn = register((cb: () => void) => {
   getScope().onCleanup(cb);
 }, "__lentjs_unmountResumeFn");
-export function onUnmount(cb: () => void) {
+export function onUnmount(cb: () => void): void {
   onResume(unmountResumeFn.bind(null, cb));
 }
 

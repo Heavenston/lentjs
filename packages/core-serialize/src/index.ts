@@ -3,7 +3,7 @@ import { assert, constant, getProperty, identity, isFunction, isObject, noop } f
 
 const isClassMethodSymbol = Symbol("is-class-method-symbol");
 
-const closureDataSymbol = Symbol("closure-data");
+const closureDataSymbol: unique symbol = Symbol("closure-data");
 type ClosureData = {
   og_function: () => unknown,
   thisarg?: unknown,
@@ -66,9 +66,9 @@ export function getValueRegistryId(value: unknown): string | null {
   return null;
 }
 
-export const definedSerializationSymbol = Symbol("serialization");
+export const definedSerializationSymbol: unique symbol = Symbol("serialization");
 export type DefinedSerializationData<O = unknown, A = unknown> = [reducer: (val: O) => A, reviver: (data: A) => O];
-export function defineSerialization<O, A>(value: O, ...[reducer, reviver]: DefinedSerializationData<O, A>) {
+export function defineSerialization<O, A>(value: O, ...[reducer, reviver]: DefinedSerializationData<O, A>): void {
   Object.defineProperty(value, definedSerializationSymbol, { value: [reducer, reviver] });
 }
 

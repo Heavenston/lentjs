@@ -10,7 +10,7 @@ import { ChildrenArray } from "./children-array";
 const REMOVE_DIRECTIVES = true;
 
 export const DIRECTIVE_PREFIX = "l";
-export const ATTRIBUTE_PREFIX = `data-${DIRECTIVE_PREFIX}`;
+export const ATTRIBUTE_PREFIX: `data-${typeof DIRECTIVE_PREFIX}` = `data-${DIRECTIVE_PREFIX}`;
 
 export type Directives = {
   "tasks": TaskCaptureData,
@@ -278,7 +278,7 @@ function domVisitor(ctx: RunCtx, node: ChildNode) {
   });
 }
 
-export function startRuntime(rootElement: HTMLElement) {
+export function startRuntime(rootElement: HTMLElement): void {
   console.time("startRuntime");
   const dataElement = rootElement.querySelector(`*[${ATTRIBUTE_PREFIX}\\:data]`);
   assert(dataElement !== null, "Could not find the data script element");

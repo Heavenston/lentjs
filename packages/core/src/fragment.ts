@@ -1,8 +1,8 @@
 import { getProperty } from "@lentjs/utils";
-import type { JSXElement } from ".";
+import type { ComponentFn, JSXElement } from ".";
 import { register } from "@lentjs/core-serialize";
 
-export const Fragment = register((props: { children?: JSXElement }): JSXElement => {
+export const Fragment: ComponentFn<{ children?: JSXElement }> = register(props => {
   // equivalent to:
   // return () => props.children;
   return (getProperty<{ children?: JSXElement }, "children">).bind(null, props, "children");

@@ -59,6 +59,6 @@ const forMapper = register(<T>(props: RefForProps<T>, state: ForState, previous:
 
   return newElements;
 }, "__lentjs_refForMapper");
-export const RefFor = register(<T>(props: RefForProps<T>): JSXElement => {
+export const RefFor: <T>(props: RefForProps<T>) => JSXElement = register(<T>(props: RefForProps<T>): JSXElement => {
   return closure(forMapper, props, { currentState: new Map });
 }, "__lentjs_refFor");

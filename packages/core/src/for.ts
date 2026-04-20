@@ -49,6 +49,6 @@ const forMapper = register(<T>(props: ForProps<T>, state: ForState<T>, previous:
 
   return newElements;
 }, "__lentjs_forMapper");
-export const For = register(<T>(props: ForProps<T>): JSXElement => {
+export const For: <T>(props: ForProps<T>) => JSXElement = register(<T>(props: ForProps<T>): JSXElement => {
   return closure(forMapper<T>, props, { elements: [] });
 }, "__lentjs_for");

@@ -40,7 +40,7 @@ export function isObject(t: unknown): t is object {
   return (typeof t === "function" || typeof t === "object") && t !== null;
 }
 
-export function filterInPlace<T>(arr: T[], pred: (v: T) => boolean) {
+export function filterInPlace<T>(arr: T[], pred: (v: T) => boolean): void {
   arr.splice(0, Infinity, ...arr.filter(pred));
   // let j = 0;
   // for (let i = 0; i < arr.length; i++) {
@@ -51,7 +51,7 @@ export function filterInPlace<T>(arr: T[], pred: (v: T) => boolean) {
   // arr.length = j;
 }
 
-export function remove<T>(arr: T[], val: T) {
+export function remove<T>(arr: T[], val: T): void {
   filterInPlace(arr, val2 => val !== val2);
 }
 

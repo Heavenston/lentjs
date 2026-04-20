@@ -15,7 +15,7 @@ export function resumed(): boolean {
   return getResumedSignal()[0]();
 }
 
-export function setResumed() {
+export function setResumed(): void {
   getResumedSignal()[1](true);
 }
 

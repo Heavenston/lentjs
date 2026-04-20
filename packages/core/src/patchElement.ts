@@ -60,7 +60,7 @@ function stateIsAnchoredTo(state: JSXState, anchor: ChildNode | null): boolean {
   return lastEl === null || lastEl.nextSibling === anchor;
 }
 
-export function changeStateAnchor(parent: Node, state: JSXState, newAnchor: ChildNode | null) {
+export function changeStateAnchor(parent: Node, state: JSXState, newAnchor: ChildNode | null): void {
   switch (state.kind) {
   case "array":
     let currentAnchor = newAnchor;
@@ -84,7 +84,7 @@ export function changeStateAnchor(parent: Node, state: JSXState, newAnchor: Chil
   }
 }
 
-export function removeStateNodes(state: JSXState) {
+export function removeStateNodes(state: JSXState): void {
   switch (state.kind) {
   case "singular":
     state.node?.remove();
@@ -103,7 +103,7 @@ export function removeStateNodes(state: JSXState) {
   }
 }
 
-export function cleanupStateNodes(state: JSXState) {
+export function cleanupStateNodes(state: JSXState): void {
   switch (state.kind) {
   case "singular": break;
   case "array":

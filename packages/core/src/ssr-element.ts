@@ -2,7 +2,7 @@ import { defineSerialization, register } from "@lentjs/core-serialize";
 import { escapeHtml } from "./escape-html";
 import { assert } from "@lentjs/utils";
 
-const SSRElementMarker = Symbol("ssr-element-marker");
+const SSRElementMarker: unique symbol = Symbol("ssr-element-marker");
 export type SSRElement = { [SSRElementMarker]: true, t: string };
 
 export function newSSRElement(t: string): SSRElement {
@@ -63,12 +63,12 @@ export class SSRElementBuilder {
     return this;
   }
 
-  public appendInnerHTML(html: string) {
+  public appendInnerHTML(html: string): void {
     assert(!this.#selfClosing, "Cannot add inner html to self closing tag");
     this.#innerHTML += html;
   }
 
-  public appendInnerText(text: string) {
+  public appendInnerText(text: string): void {
     assert(!this.#selfClosing, "Cannot add inner text to self closing tag");
     this.#innerHTML += escapeHtml(text);
   }

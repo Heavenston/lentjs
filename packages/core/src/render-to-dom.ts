@@ -25,7 +25,7 @@ export function createHTMLElement(element: string, props: any): HTMLElement {
   return el;
 }
 
-export function renderToDom(parent: Node, el: ComponentFn<{}>) {
+export function renderToDom(parent: Node, el: ComponentFn<{}>): void {
   Scope.create().enter(() => {
     const val = patchElement(parent, null, null, factory(el));
     // @ts-ignore This is useless and just used to prevent val from being gced
