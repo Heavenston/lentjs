@@ -5,8 +5,8 @@
     "target": "ESNext",
     "module": "Preserve",
     "moduleDetection": "force",
-    "jsx": "react-jsx",
-    "allowJs": true,
+    "isolatedDeclarations": true,
+    "declaration": true,
 
     // Bundler mode
     "moduleResolution": "bundler",

@@ -1,6 +1,6 @@
 import { assert, noop, remove } from "@lentjs/utils";
 import { createReaction, resumeReaction, startReaction, type CapturedReactivityData } from "./reaction";
-import { createContextId, Scope } from "./scope";
+import { createContextId, Scope, type ContextId } from "./scope";
 
 export type TaskCallback = () => void;
 
@@ -16,7 +16,7 @@ export type CapturedTaskData = {
 export type TaskCaptureData = {
   capturedTasks: CapturedTaskData[],
 };
-export const taskCaptureContextId = createContextId<TaskCaptureData>("__lentjs_taskCaptureData", { noSerialize: true });
+export const taskCaptureContextId: ContextId<TaskCaptureData> = createContextId<TaskCaptureData>("__lentjs_taskCaptureData", { noSerialize: true });
 
 function internalCreateOrResumeTask(task: TaskCallback, config: TaskConfig, resumeWithReactivityData: CapturedReactivityData | null) {
   const parentScope = Scope.currentScope;
@@ -43,10 +43,10 @@ function internalCreateOrResumeTask(task: TaskCallback, config: TaskConfig, resu
   }
 }
 
-export function createTask(task: TaskCallback, config: TaskConfig = {}) {
+export function createTask(task: TaskCallback, config: TaskConfig = {}): void {
   internalCreateOrResumeTask(task, config, null);
 }
 
-export function resumeTask(task: TaskCallback, reactivityData: CapturedReactivityData, config: TaskConfig = {}) {
+export function resumeTask(task: TaskCallback, reactivityData: CapturedReactivityData, config: TaskConfig = {}): void {
   internalCreateOrResumeTask(task, config, reactivityData);
 }

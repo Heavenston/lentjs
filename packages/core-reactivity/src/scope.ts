@@ -222,7 +222,7 @@ export class Scope {
     return this.#contextValues.get(id) as T;
   }
 
-  public setContext<T>(id: ContextId<T>, value: T) {
+  public setContext<T>(id: ContextId<T>, value: T): void {
     this.#contextValues.set(id, value);
   }
 }

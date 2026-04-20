@@ -7,8 +7,8 @@ type SignalState<V> = {
   currentValue: V,
 };
 
-const signalAccessorSymbol = Symbol("signal-accessor");
-const signalSetterSymbol = Symbol("signal-setter");
+const signalAccessorSymbol: unique symbol = Symbol("signal-accessor");
+const signalSetterSymbol: unique symbol = Symbol("signal-setter");
 export type SignalData = { signalId: string };
 export type SignalAccessor<V> = (() => V) & { [signalAccessorSymbol]: true } & SignalData;
 export type SignalSetter<V> = ((new_val: V) => void) & { [signalSetterSymbol]: true, update: (cb: (old_val: V) => V) => void } & SignalData;

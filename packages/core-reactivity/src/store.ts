@@ -2,7 +2,7 @@ import { definedSerializationSymbol, register } from "@lentjs/core-serialize";
 import { triggerSignalCallbacks, triggerSignalRead } from "./signal-internal";
 import { createUid } from "@lentjs/utils";
 
-const storeIdSymbol = Symbol("store");
+const storeIdSymbol: unique symbol = Symbol("store");
 export type Store<S> = S & { [storeIdSymbol]: string };
 
 const storeReviver = register(([storeId, obj]: [string, object]) => {

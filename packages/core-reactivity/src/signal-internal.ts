@@ -26,7 +26,7 @@ let currentSignalListener: SignalReadListener | null = null;
 //   signalCallbacks.delete(id);
 // }
 
-export function registerSignalCallback(callback: SignalCallback, id: SignalId) {
+export function registerSignalCallback(callback: SignalCallback, id: SignalId): void {
   assert(callback.onUpdate !== null, "Registering already canceled signal callback");
   let callbacks = signalCallbacks.get(id);
   if (!callbacks)
@@ -34,7 +34,7 @@ export function registerSignalCallback(callback: SignalCallback, id: SignalId) {
   callbacks.push(callback);
 }
 
-export function triggerSignalCallbacks(id: SignalId) {
+export function triggerSignalCallbacks(id: SignalId): void {
   const callbacks = signalCallbacks.get(id);
   if (!callbacks) return;
   signalCallbacks.set(id, []);
@@ -45,7 +45,7 @@ export function triggerSignalCallbacks(id: SignalId) {
   });
 }
 
-export function triggerSignalRead(id: SignalId) {
+export function triggerSignalRead(id: SignalId): void {
   currentSignalListener?.signalReads.push(id);
 }
 
