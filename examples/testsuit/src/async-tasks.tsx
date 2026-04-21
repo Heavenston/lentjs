@@ -5,6 +5,7 @@ export default register$<ComponentFn<{}>>(() => {
   const [value, setValue] = createSignal("starting task...");
 
   createAsyncTask(async ({ track, scope }) => {
+    console.log("Start of async task");
     const triggerValue = track(trigger);
     setValue("Start of task...");
     for (let i = 1; i < triggerValue.length && !scope.cleaned; i++) {

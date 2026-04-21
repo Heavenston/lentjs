@@ -18,10 +18,6 @@ function createSSRDirective(name: string, arg: unknown = null, embed: boolean = 
   }
 }
 
-function stringifyJSXElement(el: JSXElement): string {
-  return stringifySSRElementChild(toSSRElementChild(el));
-}
-
 export function isSSRElement(t: unknown): t is SSRElement {
   return t instanceof SSRElement;
 }
@@ -333,13 +329,18 @@ export async function renderToString(el: ComponentFn<{}>): Promise<string> {
   scope.setContext(taskCaptureContextId, taskCaptureData);
 
   try {
-    const t = scope.enter(() => factory(el));
+    const t = scope.enter(() => toSSRElementChild(factory(el)));
     await Promise.allSettled(taskCaptureData.capturedAsyncTasks.map(t => t.promise));
     const rootScopeDirective = createSSRDirective("sco", scope);
     const tasksDirective = createSSRDirective("tasks", {
       tasks: taskCaptureData.capturedTasks,
+      asyncTasks: taskCaptureData.capturedAsyncTasks.map(t => ({
+        task: t.task,
+        reactivityData: t.capture(),
+        parentScope: t.parentScope,
+      })),
     });
-    const html = stringifyJSXElement(t);
+    const html = stringifySSRElementChild(t);
     const directivesData = `<script lang="application/json" ${ATTRIBUTE_PREFIX}:data>${serialize(global_directive_data_array)}</script>`;
     return `${directivesData}${rootScopeDirective}${html}${tasksDirective}`;
   }

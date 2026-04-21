@@ -44,7 +44,7 @@ const registry = new Map<string, unknown>;
 const registryIdSymbol = Symbol("registry-id");
 export function register<V extends object>(value: V, id: string): V {
   if (registryIdSymbol in value) { return value; }
-  if (registry.has(id)) { console.warn("Duplicate registry id", id) }
+  if (registry.has(id) && typeof document !== "undefined") { console.warn("Duplicate registry id", id) }
   registry.set(id, value);
   Object.defineProperty(value, registryIdSymbol, { enumerable: true, value: id });
   if (isFunction(value) && !isClosure(value)) {

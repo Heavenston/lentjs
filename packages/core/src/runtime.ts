@@ -1,8 +1,8 @@
 import type { JSXElement, JSXElementDynamic } from ".";
 import { getHandlerForAttribute } from "./attributes";
 import { changeStateAnchor, cleanupStateNodes, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState, type JSXStateDynamic } from "./patchElement";
-import { Scope, resumeReaction, resumeTask, untrack } from "@lentjs/core-reactivity";
-import type { CapturedReactivityData, TaskCaptureData } from "@lentjs/core-reactivity";
+import { Scope, resumeAsyncTask, resumeReaction, resumeTask, untrack } from "@lentjs/core-reactivity";
+import type { AsyncTaskCallback, CapturedReactivityData, TaskCaptureData } from "@lentjs/core-reactivity";
 import { assert, noop, notNull, unreachable } from "@lentjs/utils";
 import { deserialize } from "@lentjs/core-serialize";
 import { setResumed } from "./global-signals";
@@ -15,6 +15,11 @@ export const ATTRIBUTE_PREFIX: `data-${typeof DIRECTIVE_PREFIX}` = `data-${DIREC
 
 export type TaskResumeData = {
   tasks: TaskCaptureData["capturedTasks"],
+  asyncTasks: {
+	task: AsyncTaskCallback;
+	reactivityData: CapturedReactivityData;
+	parentScope: Scope | null;
+  }[],
 };
 
 export type Directives = {
@@ -72,6 +77,11 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
     for (const task of d.data.tasks) {
       Scope.enter(task.parentScope, () => {
         resumeTask(task.task, task.reactivityData);
+      });
+    }
+    for (const asyncTask of d.data.asyncTasks) {
+      Scope.enter(asyncTask.parentScope, () => {
+        resumeAsyncTask(asyncTask.task, asyncTask.reactivityData);
       });
     }
     break;
