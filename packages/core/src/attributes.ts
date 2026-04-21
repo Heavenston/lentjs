@@ -1,7 +1,7 @@
-import type { ClassList, EventHandler, JSXElement } from ".";
+import type { ClassList, EventHandler, JSXElement, SSRElement } from ".";
 import { renderClasslist } from ".";
 import { getScope } from "@lentjs/core-reactivity";
-import type { SSRElementBuilder } from "./ssr-element";
+import type { SSRElementBuilder } from "./render-to-string";
 
 export type AttributeValue = string | boolean | number | undefined;
 export type Attributes = {
@@ -28,7 +28,10 @@ export type AttributeHandler<V> = {
    */
   forceResume: boolean,
   setOnHTMLElement(element: HTMLElement, propName: string, value: V): void;
-  setOnSSRElement(builder: SSRElementBuilder, propName: string, value: V): void;
+  /**
+   * Only called before serializing the element, not called everytime the value changes
+   */
+  setOnSSRElement(build: SSRElementBuilder, propName: string, value: V): void;
 };
 /// used for type inference
 function handler<V>(v: AttributeHandler<V>): AttributeHandler<V> { return v }

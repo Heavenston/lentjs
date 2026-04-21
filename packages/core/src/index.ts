@@ -7,20 +7,19 @@ export { Show } from "./show";
 export { startRuntime } from "./runtime";
 export { Fragment } from "./fragment";
 export type { Attributes, AttributeValue } from "./attributes";
-export { type SSRElement, isSSRElement } from "./ssr-element";
 export { resumed } from "./global-signals";
 export { ChildrenArray } from "./children-array";
 export { defineAsProps } from "./props-ser";
 export { factory } from "./factory";
-export { renderToString } from "./render-to-string";
+export { renderToString, isSSRElement, SSRElement } from "./render-to-string";
 export { renderToDom } from "./render-to-dom";
 export type { JSX } from "./jsx";
 
 import { register } from "@lentjs/core-serialize";
 import { assert, isFunction, isObject } from "@lentjs/utils";
 import { createTask, untrack, Scope, getScope } from "@lentjs/core-reactivity";
-import type { SSRElement } from "./ssr-element";
 import { resumed } from "./global-signals";
+import type { SSRElement } from "./render-to-string";
 
 export type JSXElementString = number | string;
 export type JSXElementSingular = SSRElement | ChildNode | JSXElementString | null | undefined;

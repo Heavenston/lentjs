@@ -27,6 +27,15 @@ export class ChildrenArray<T> extends Array<T> {
     return desc?.get != null;
   }
 
+  public asComputed(idx: number): (() => T) | null {
+    const desc = Object.getOwnPropertyDescriptor(this, idx);
+    if (!desc) throw new Error("Out of bound access");
+    if (desc.get)
+      return desc.get;
+    else
+      return null;
+  }
+
   public getOrComputed(idx: number): T | (() => T) {
     const desc = Object.getOwnPropertyDescriptor(this, idx);
     if (!desc) throw new Error("Out of bound access");

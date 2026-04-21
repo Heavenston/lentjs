@@ -1,12 +1,10 @@
 import { serialize } from "@lentjs/core-serialize";
-import { startReaction, Scope, taskCaptureContextId, type TaskCaptureData } from "@lentjs/core-reactivity";
+import { Scope, taskCaptureContextId, type TaskCaptureData, type CapturedReactivityData, createReaction } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type MarkerDirectiveName, ATTRIBUTE_PREFIX, type ResumeAttributesData, type DynamicAttributesData } from "./runtime";
 import { escapeHtml } from "./escape-html";
 import { global_directive_data_array, sharedSSRSerialize } from "./shared-globals";
-import { isSSRElement, SSRElementBuilder, type SSRElement } from "./ssr-element";
-import { ChildrenArray } from "./children-array";
-import { factory, isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, type ComponentFn, type JSXElement } from ".";
-import { getProperty } from "@lentjs/utils";
+import { ChildrenArray, factory, isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, type ComponentFn, type JSXElement, type JSXElementString } from ".";
+import { assert, notNull, unreachable } from "@lentjs/utils";
 import { getHandlerForAttribute } from "./attributes";
 
 function createSSRDirective<K extends MarkerDirectiveName>(name: K): string;
@@ -20,9 +18,138 @@ function createSSRDirective(name: string, arg: unknown = null, embed: boolean = 
   }
 }
 
-export function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = false, isComputedInArray: boolean = false): string {
+function stringifyJSXElement(el: JSXElement): string {
+  return stringifySSRElementChild(toSSRElementChild(el));
+}
+
+export function isSSRElement(t: unknown): t is SSRElement {
+  return t instanceof SSRElement;
+}
+
+/// Taken from http://xahlee.info/js/html5_non-closing_tag.html
+const selfClosingHTMLElement = [
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr",
+  "command",
+  "keygen",
+  "menuitem",
+];
+
+type SSRElementDynamicValueRec<T> = {
+  kind: "dynamic",
+  function: unknown,
+  unsub: () => [val: SSRElementValueRec<T>, CapturedReactivityData];
+};
+type SSRElementDynamicValue<T> = {
+  kind: "dynamic",
+  function: unknown,
+  unsub: () => [val: T, CapturedReactivityData];
+};
+type SSRElementStaticValue<T> = {
+  kind: "static",
+  value: T,
+};
+type SSRElementValueRec<T> = SSRElementDynamicValueRec<T> | SSRElementStaticValue<T>;
+type SSRElementValue<T> = SSRElementDynamicValue<T> | SSRElementStaticValue<T>;
+type SSRElementChildArray = SSRElementChildValue[] & { wasChildrenArray?: boolean };
+type SSRElementChild = null | undefined | JSXElementString | SSRElementChildArray | SSRElement;
+type SSRElementChildValue = SSRElementValueRec<SSRElementChild>;
+
+// Better than just 'arr instanceof ChildrenArray' because is keep 'T'
+function isChildrenArray<T>(arr: T[]): arr is ChildrenArray<T> {
+  return arr instanceof ChildrenArray;
+}
+
+function childrenArrayToArrayOfValues<T>(arr: T[]): SSRElementValueRec<T>[] {
+  if (!isChildrenArray(arr)) return arr.map(value => ({ kind: "static", value }));
+  let result: SSRElementValueRec<T>[] = [];
+  for (let i = 0; i < arr.length; i++) {
+    const cmpt = arr.asComputed(i);
+    if (cmpt !== null) {
+      throw new Error("TODO");
+    }
+    else {
+      result.push({ kind: "static", value: arr[i]! });
+    }
+  }
+  return result;
+}
+
+function toSSRElementChild(el: JSXElement): SSRElementChildValue {
+  if (el === null || el === undefined || isJSXElementString(el) || isSSRElement(el))
+    return { kind: "static", value: el };
+
+  if (isJSXElementDynamic(el)) {
+    let latestReturnValue: JSXElement;
+    let latestChildVal: SSRElementChildValue;
+    const unsub = createReaction(() => {
+      latestReturnValue = el(latestReturnValue);
+      latestChildVal = toSSRElementChild(latestReturnValue);
+    });
+    return {
+      kind: "dynamic",
+      function: el,
+      unsub: () => {
+        const reactivityData = unsub();
+        return [latestChildVal, reactivityData];
+      },
+    };
+  }
+  if (isJSXElementWithScope(el)) {
+    return el.withScope.enter(() => toSSRElementChild(el.fun()));
+  }
+  if (Array.isArray(el) && isChildrenArray(el)) {
+    let c: SSRElementChildArray = [];
+    c.wasChildrenArray = true;
+    for (let i = 0; i < el.length; i++) {
+      // FIXME: This doesn't differenciate computed children elements vs dynamic elements inside the array
+      c.push(toSSRElementChild(el.getOrComputed(i)));
+    }
+    return { kind: "static", value: c };
+  }
+  if (Array.isArray(el)) {
+    return { kind: "static", value: el.map(toSSRElementChild) };
+  }
+
+  el satisfies ChildNode;
+  assert(false, "Node as JSXElement not supported for render-to-string");
+}
+
+function stringifySSRElementChild(elValue: SSRElementChildValue, isInsideDynamic: boolean = false, isComputedInArray: boolean = false): string {
+  switch (elValue.kind) {
+  case "dynamic":
+    const [val, reactivityData] = elValue.unsub();
+
+    if (reactivityData.length <= 0 && !isInsideDynamic) {
+      return stringifySSRElementChild(val, false);
+    }
+
+    const prefix = createSSRDirective("dyn", {
+      isComputedInArray,
+      update: elValue.function as any,
+      reactivityData: reactivityData,
+    });
+    const suffix = createSSRDirective("dyn/");
+    return `${prefix}${stringifySSRElementChild(val, true)}${suffix}`;
+  case "static":
+  }
+
+  const el = elValue.value;
+
   if (isSSRElement(el)) {
-    return el.t;
+    return el.build();
   }
   else if (isJSXElementString(el)) {
     return escapeHtml(el.toString());
@@ -33,83 +160,171 @@ export function stringifyJSXElement(el: JSXElement, isInsideDynamic: boolean = f
   else if (el === undefined) {
     return isInsideDynamic ? createSSRDirective("und", null) : "";
   }
-  else if (isJSXElementDynamic(el)) {
-    const [val, reactivityData] = startReaction(() => el());
-    if (reactivityData.length <= 0 && !isInsideDynamic) {
-      return stringifyJSXElement(val, false);
-    }
-    const prefix = createSSRDirective("dyn", {
-      isComputedInArray,
-      update: el,
-      reactivityData: reactivityData,
-    });
-    const suffix = createSSRDirective("dyn/");
-    return `${prefix}${stringifyJSXElement(val, true)}${suffix}`;
-  }
-  else if (isJSXElementWithScope(el)) {
-    const prefix = createSSRDirective("sco", el.withScope);
-    const suffix = createSSRDirective("sco/");
-    return el.withScope.enter(() => {
-      return `${prefix}${stringifyJSXElement(el.fun(), false)}${suffix}`;
-    });
-  }
-  else if (el instanceof ChildrenArray) {
-    let t = "";
-    for (let i = 0; i < el.length; i++) {
-      if (t.length !== 0 && isInsideDynamic)
-        t += createSSRDirective("sep");
-      t += stringifyJSXElement(el.getOrComputed(i), isInsideDynamic, el.isComputed(i));
-    }
-    if (isInsideDynamic)
-      return `${createSSRDirective("chi")}${t}${createSSRDirective("chi/")}`;
-    else
-      return t;
-  }
   else if (Array.isArray(el)) {
     if (!isInsideDynamic) {
-      return el.map(e => stringifyJSXElement(e, false)).join("");
+      return el.map(e => stringifySSRElementChild(e, false)).join("");
     }
 
-    const t = el.map(e => stringifyJSXElement(e, true)).join(createSSRDirective("sep"));
-    return `${createSSRDirective("arr")}${t}${createSSRDirective("arr/")}`;
+    const t = el.map(e => stringifySSRElementChild(e, true)).join(createSSRDirective("sep"));
+    const dt = el.wasChildrenArray ? "chi" : "arr";
+    return `${createSSRDirective(dt)}${t}${createSSRDirective(`${dt}/`)}`;
   }
-  else {
-    el satisfies Node;
-    throw new Error("Node impossible on the server");
+
+  unreachable(el);
+}
+
+export class SSRElementBuilder {
+  #tag: string;
+  #selfClosing: boolean;
+  #attributes: string = "";
+  #innerHTML: string = "";
+
+  public constructor(tag: string) {
+    this.#tag = tag;
+    this.#selfClosing = selfClosingHTMLElement.includes(tag);
+  }
+
+  public appendAttribute(name: string, value: string | null = null): this {
+    if (value == null) {
+      this.#attributes += ` ${name}`;
+    }
+    else {
+      this.#attributes += ` ${name}="${escapeHtml(value)}"`;
+    }
+    return this;
+  }
+
+  public appendInnerHTML(html: string): void {
+    if (html === "") return;
+    assert(!this.#selfClosing, `Cannot add inner html to self closing tag (${this.#tag})`);
+    this.#innerHTML += html;
+  }
+
+  public build(): string {
+    if (this.#selfClosing) {
+      return `<${this.#tag}${this.#attributes}>`;
+    }
+    else {
+      return `<${this.#tag}${this.#attributes}>${this.#innerHTML}</${this.#tag}>`;
+    }
+  }
+}
+
+export class SSRElement {
+  #tag: string;
+  #props: Map<string, SSRElementValue<unknown>> = new Map;
+  #children: SSRElementChildValue;
+
+  public constructor(tag: string, props: any) {
+    this.#tag = tag;
+
+    for (const propName of Object.keys(props)) {
+      if (propName === "children") {
+        continue;
+      }
+
+      const descriptor = notNull(Object.getOwnPropertyDescriptor(props, propName));
+      if (descriptor.get) {
+        let latestVal: any;
+        const unsub = createReaction(() => {
+          latestVal = props[propName];
+        });
+        this.#props.set(propName, {
+          kind: "dynamic",
+          function: descriptor.get as any,
+          unsub: () => {
+            const reactivityData = unsub();
+            return [latestVal, reactivityData];
+          },
+        });
+      }
+      else {
+        this.#props.set(propName, {
+          kind: "static",
+          value: props[propName],
+        });
+      }
+    }
+
+    this.#children = toSSRElementChild(props["children"]);
+  }
+
+  public build(): string {
+    const builder = new SSRElementBuilder(this.#tag);
+    const attributesResumeData: ResumeAttributesData = [];
+    const dynamicAttributesData: DynamicAttributesData = [];
+
+    for (const [propName, propValue] of this.#props) {
+      const attrHandler = getHandlerForAttribute(propName);
+      if (attrHandler === null) {
+        console.warn(`Unsuported property '${propName}'`);
+        continue;
+      }
+
+      let value: unknown;
+      switch (propValue.kind) {
+      case "dynamic": {
+        const [val, reactivityData] = propValue.unsub();
+        value = val;
+        if (reactivityData.length > 0)
+          dynamicAttributesData.push([reactivityData, propName, propValue.function as any])
+        if (attrHandler.forceResume)
+          attributesResumeData.push([propName, val]);
+        break;
+      }
+      case "static":
+        value = propValue.value;
+        break;
+      }
+
+      attrHandler.setOnSSRElement(builder, propName, value);
+    }
+
+    if (attributesResumeData.length !== 0) {
+      builder.appendAttribute(`${ATTRIBUTE_PREFIX}:res-attrs`, sharedSSRSerialize(attributesResumeData).toString());
+    }
+    if (dynamicAttributesData.length !== 0) {
+      builder.appendAttribute(`${ATTRIBUTE_PREFIX}:dyn-attrs`, sharedSSRSerialize(dynamicAttributesData).toString());
+    }
+
+    builder.appendInnerHTML(stringifySSRElementChild(this.#children));
+
+    return builder.build();
   }
 }
 
 export function createSSRElement(element: string, props: any): SSRElement {
-  const builder = new SSRElementBuilder(element);
+  return new SSRElement(element, props);
+  // const el = new SSRElement(element);
 
-  const attributesResumeData: ResumeAttributesData = [];
-  const dynamicAttributesData: DynamicAttributesData = [];
+  // // const attributesResumeData: ResumeAttributesData = [];
+  // // const dynamicAttributesData: DynamicAttributesData = [];
 
-  for (const propName of Object.keys(props)) {
-    // TODO: Children may be reactive too!(?)
-    if (propName === "children") {
-      builder.appendInnerHTML(stringifyJSXElement((getProperty<any, any>).bind(null, props, "children"), false));
-      continue;
-    }
+  // // for (const propName of Object.keys(props)) {
+  // //   // TODO: Children may be reactive too!(?)
+  // //   if (propName === "children") {
+  // //     builder.appendInnerHTML(stringifyJSXElement((getProperty<any, any>).bind(null, props, "children"), false));
+  // //     continue;
+  // //   }
 
-    const attrHandler = getHandlerForAttribute(propName);
-    if (attrHandler === null) continue;
-    const [val, reactivityData] = startReaction(() => props[propName]);
-    if (reactivityData.length > 0)
-      dynamicAttributesData.push([reactivityData, propName, (getProperty<any, any>).bind(null, props, propName)])
-    if (attrHandler.forceResume)
-      attributesResumeData.push([propName, val]);
-    attrHandler.setOnSSRElement(builder, propName, val);
-  }
+  // //   const attrHandler = getHandlerForAttribute(propName);
+  // //   if (attrHandler === null) continue;
+  // //   const [val, reactivityData] = startReaction(() => props[propName]);
+  // //   if (reactivityData.length > 0)
+  // //     dynamicAttributesData.push([reactivityData, propName, (getProperty<any, any>).bind(null, props, propName)])
+  // //   if (attrHandler.forceResume)
+  // //     attributesResumeData.push([propName, val]);
+  // //   attrHandler.setOnSSRElement(builder, propName, val);
+  // // }
 
-  if (attributesResumeData.length !== 0) {
-    builder.appendAttribute(`${ATTRIBUTE_PREFIX}:res-attrs`, sharedSSRSerialize(attributesResumeData).toString());
-  }
-  if (dynamicAttributesData.length !== 0) {
-    builder.appendAttribute(`${ATTRIBUTE_PREFIX}:dyn-attrs`, sharedSSRSerialize(dynamicAttributesData).toString());
-  }
+  // // if (attributesResumeData.length !== 0) {
+  // //   builder.setAttribute(`${ATTRIBUTE_PREFIX}:res-attrs`, sharedSSRSerialize(attributesResumeData).toString());
+  // // }
+  // // if (dynamicAttributesData.length !== 0) {
+  // //   builder.setAttribute(`${ATTRIBUTE_PREFIX}:dyn-attrs`, sharedSSRSerialize(dynamicAttributesData).toString());
+  // // }
   
-  return builder.build();
+  // return el;
 }
 
 export async function renderToString(el: ComponentFn<{}>): Promise<string> {
@@ -118,14 +333,15 @@ export async function renderToString(el: ComponentFn<{}>): Promise<string> {
   scope.setContext(taskCaptureContextId, taskCaptureData);
 
   try {
-    const t = scope.enter(() => stringifyJSXElement(factory(el)));
+    const t = scope.enter(() => factory(el));
     await Promise.allSettled(taskCaptureData.capturedAsyncTasks.map(t => t.promise));
     const rootScopeDirective = createSSRDirective("sco", scope);
     const tasksDirective = createSSRDirective("tasks", {
       tasks: taskCaptureData.capturedTasks,
     });
+    const html = stringifyJSXElement(t);
     const directivesData = `<script lang="application/json" ${ATTRIBUTE_PREFIX}:data>${serialize(global_directive_data_array)}</script>`;
-    return `${directivesData}${rootScopeDirective}${t}${tasksDirective}`;
+    return `${directivesData}${rootScopeDirective}${html}${tasksDirective}`;
   }
   catch(e) {
     throw e;
