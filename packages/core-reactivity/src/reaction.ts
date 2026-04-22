@@ -32,6 +32,7 @@ function internalCreateOrResumeReaction(reaction: () => void, resumeWithSignalRe
   
   if (resumeWithSignalReads) {
     latestReactiveCallback = { onUpdate: callAndSub };
+    latestSignalReads = resumeWithSignalReads;
     for (const signalId of resumeWithSignalReads)
       registerSignalCallback(latestReactiveCallback, signalId);
   }

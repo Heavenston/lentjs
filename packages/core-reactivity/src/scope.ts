@@ -164,9 +164,6 @@ export class Scope {
    */
   #setState(newState: FinalScopeStates) {
     if (this.state !== "alive") {
-      if (this.state !== newState) {
-        console.warn(`Scope in state ${this.state} cannot switch to ${newState}`);
-      }
       return;
     }
 
