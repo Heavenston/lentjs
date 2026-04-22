@@ -235,4 +235,95 @@ describe("listen/untrack etc...", () => {
       expect(isInTrackingContext()).toBeTrue();
     }, []);
   });
+
+  test("listenForSignalReads propagates error from callback", () => {
+    expect(() => {
+      listenForSignalReads(() => {
+        throw new Error("listen boom");
+      }, []);
+    }).toThrow("listen boom");
+  });
+
+  test("listenForSignalReads restores listener after callback throws", () => {
+    const outerReads: SignalId[] = [];
+    const signalId = createSignalId();
+
+    listenForSignalReads(() => {
+      expect(() => {
+        listenForSignalReads(() => {
+          throw new Error("inner boom");
+        }, []);
+      }).toThrow("inner boom");
+
+      triggerSignalRead(signalId);
+    }, outerReads);
+
+    expect(outerReads).toBeArrayOfSize(1);
+    expect(outerReads[0]).toBe(signalId);
+  });
+
+  test("listenForSignalReads restores null listener after callback throws", () => {
+    expect(() => {
+      listenForSignalReads(() => {
+        throw new Error("boom");
+      }, []);
+    }).toThrow("boom");
+
+    expect(isInTrackingContext()).toBeFalse();
+  });
+
+  test("untrack propagates error from callback", () => {
+    expect(() => {
+      untrack(() => {
+        throw new Error("untrack boom");
+      });
+    }).toThrow("untrack boom");
+  });
+
+  test("untrack restores listener after callback throws", () => {
+    const reads: SignalId[] = [];
+    const signalId = createSignalId();
+
+    listenForSignalReads(() => {
+      expect(() => {
+        untrack(() => {
+          throw new Error("untrack boom");
+        });
+      }).toThrow("untrack boom");
+
+      triggerSignalRead(signalId);
+    }, reads);
+
+    expect(reads).toBeArrayOfSize(1);
+    expect(reads[0]).toBe(signalId);
+  });
+
+  test("triggerSignalRead outside any listener does not throw", () => {
+    const signalId = createSignalId();
+    expect(() => {
+      triggerSignalRead(signalId);
+    }).not.toThrow();
+  });
+
+  test("nested listenForSignalReads restores outer listener", () => {
+    const outerReads: SignalId[] = [];
+    const innerReads: SignalId[] = [];
+    const signalOuter1 = createSignalId();
+    const signalInner = createSignalId();
+    const signalOuter2 = createSignalId();
+
+    listenForSignalReads(() => {
+      triggerSignalRead(signalOuter1);
+      listenForSignalReads(() => {
+        triggerSignalRead(signalInner);
+      }, innerReads);
+      triggerSignalRead(signalOuter2);
+    }, outerReads);
+
+    expect(innerReads).toBeArrayOfSize(1);
+    expect(innerReads[0]).toBe(signalInner);
+    expect(outerReads).toBeArrayOfSize(2);
+    expect(outerReads[0]).toBe(signalOuter1);
+    expect(outerReads[1]).toBe(signalOuter2);
+  });
 });

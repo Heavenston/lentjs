@@ -66,6 +66,9 @@ export class Scope {
       scope.#cleanupWithParent();
       scope.#detachWithParent();
     }
+    else {
+      scope.#setState("detached");
+    }
     return scope;
   }
 
@@ -169,7 +172,8 @@ export class Scope {
 
     this.enter(() => {
       this.#state = newState;
-      this.#controller?.abort();
+      if (newState === "cleaned")
+        this.#controller?.abort();
       this.#callbacks[newState].splice(0).forEach(cb => cb());
       // Remove the other callbacks, they are not needed anymore
       this.#callbacks[newState === "cleaned" ? "detached" : "cleaned"].splice(0);
@@ -201,7 +205,6 @@ export class Scope {
       return noop;
     }
     if (this.state !== "alive") {
-      console.warn(`Cannot listen for scope state '${state}' from state '${this.state}'`);
       return noop;
     }
     this.#callbacks[state].push(cb);
