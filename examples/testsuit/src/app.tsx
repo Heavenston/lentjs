@@ -34,19 +34,18 @@ const ConditionalCounter: ComponentFn<{}> = register$(() => {
 const App: ComponentFn<{}> = register$(() => {
   getScope().setContext(AppContextId, "Within App");
 
-  // return <>
-  //   <Counter />
-  //   <hr />
-  //   <ConditionalCounter />
-  //   <hr />
-  //   <Todo />
-  //   <hr />
-  //   <Complex />
-  //   <hr />
-  //   <List />
-  //   <hr />
-  //   <AsyncTasks />
-  // </>;
-  return <AsyncTasks />;
+  return <>
+    <Counter />
+    <hr />
+    <ConditionalCounter />
+    <hr />
+    <Todo />
+    <hr />
+    <Complex />
+    <hr />
+    <List />
+    <hr />
+    <AsyncTasks />
+  </>;
 });
 export default App;

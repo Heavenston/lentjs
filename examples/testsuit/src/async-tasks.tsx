@@ -7,13 +7,21 @@ export default register$<ComponentFn<{}>>(() => {
   createAsyncTask(async ({ track, scope }) => {
     console.log("Start of async task");
     const triggerValue = track(trigger);
+
+    const targetDuration = typeof document === "undefined" ? 100 : 1000;
+    const startT = performance.now();
+
     setValue("Start of task...");
     for (let i = 1; i < triggerValue.length && !scope.cleaned; i++) {
-      setValue(triggerValue.slice(0, i));
-      await new Promise(res => setTimeout(res, 10));
+      setValue(`${performance.now() - startT}: ${triggerValue.slice(0, i)}`);
+
+      const remainingT = targetDuration - (performance.now() - startT);
+      const waitPerEl = Math.floor(remainingT / (triggerValue.length - i));
+      if (waitPerEl > 0)
+        await new Promise(res => setTimeout(res, waitPerEl));
     }
     if (scope.cleaned) return;
-    setValue(`${triggerValue}!`);
+    setValue(`${Math.trunc(performance.now() - startT)}: ${triggerValue}!`);
   });
 
   return <>
