@@ -18,14 +18,6 @@ export type SignalReadListener = {
 };
 let currentSignalListener: SignalReadListener | null = null;
 
-// export function registerSignalId(id: SignalId) {
-//   signalCallbacks.set(id, []);
-// }
-
-// export function unregisterSignalId(id: SignalId) {
-//   signalCallbacks.delete(id);
-// }
-
 export function registerSignalCallback(callback: SignalCallback, id: SignalId): void {
   assert(callback.onUpdate !== null, "Registering already canceled signal callback");
   let callbacks = signalCallbacks.get(id);
