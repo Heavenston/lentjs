@@ -1,8 +1,6 @@
 import * as devalue from "devalue";
 import { assert, constant, getProperty, identity, isFunction, isObject, noop } from "@lentjs/utils";
 
-const isClassMethodSymbol = Symbol("is-class-method-symbol");
-
 const closureDataSymbol: unique symbol = Symbol("closure-data");
 type ClosureData = {
   og_function: () => unknown,
@@ -112,9 +110,4 @@ export function serialize(value: unknown): string {
 
 export function deserialize(text: string): unknown {
   return devalue.parse(text, devalueRevivers);
-}
-
-export function isClassMethod(val: unknown): boolean {
-  // @ts-ignore
-  return val[isClassMethodSymbol] === true;
 }
