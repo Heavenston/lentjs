@@ -2,10 +2,17 @@ import { serialize } from "@lentjs/core-serialize";
 import { Scope, taskCaptureContextId, type TaskCaptureData, type CapturedReactivityData, createReaction } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type MarkerDirectiveName, ATTRIBUTE_PREFIX, type ResumeAttributesData, type DynamicAttributesData } from "./runtime";
 import { escapeHtml } from "./escape-html";
-import { global_directive_data_array, sharedSSRSerialize } from "./shared-globals";
 import { ChildrenArray, factory, isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, type ComponentFn, type JSXElement, type JSXElementString } from ".";
 import { assert, notNull, unreachable } from "@lentjs/utils";
 import { getHandlerForAttribute } from "./attributes";
+
+const global_directive_data_array: unknown[] = [];
+
+function sharedSSRSerialize(value: unknown): number {
+  const idx = global_directive_data_array.length;
+  global_directive_data_array.push(value);
+  return idx;
+}
 
 function createSSRDirective<K extends MarkerDirectiveName>(name: K): string;
 function createSSRDirective<K extends DirectiveName>(name: K, arg: Directives[K], embed?: boolean): string;
