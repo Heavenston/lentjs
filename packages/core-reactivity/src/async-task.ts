@@ -72,6 +72,7 @@ function internalCreateOrResumeAsyncTask(task: AsyncTaskCallback, resumeWithReac
     if (resumeWithReactivityData) {
       const unsub = resumeReaction(startTask, resumeWithReactivityData);
       parentScope?.onCleanup(unsub);
+      previousCleanup = unsub;
     }
     else {
       startTask();

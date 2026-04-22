@@ -1,4 +1,4 @@
-import type { ClassList, EventHandler, JSXElement, SSRElement } from ".";
+import type { ClassList, EventHandler, JSXElement } from ".";
 import { renderClasslist } from ".";
 import { getScope } from "@lentjs/core-reactivity";
 import type { SSRElementBuilder } from "./render-to-string";

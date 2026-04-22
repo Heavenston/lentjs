@@ -68,21 +68,6 @@ function isChildrenArray<T>(arr: T[]): arr is ChildrenArray<T> {
   return arr instanceof ChildrenArray;
 }
 
-function childrenArrayToArrayOfValues<T>(arr: T[]): SSRElementValueRec<T>[] {
-  if (!isChildrenArray(arr)) return arr.map(value => ({ kind: "static", value }));
-  let result: SSRElementValueRec<T>[] = [];
-  for (let i = 0; i < arr.length; i++) {
-    const cmpt = arr.asComputed(i);
-    if (cmpt !== null) {
-      throw new Error("TODO");
-    }
-    else {
-      result.push({ kind: "static", value: arr[i]! });
-    }
-  }
-  return result;
-}
-
 function toSSRElementChild(el: JSXElement): SSRElementChildValue {
   if (el === null || el === undefined || isJSXElementString(el) || isSSRElement(el))
     return { kind: "static", value: el };
@@ -264,14 +249,15 @@ export class SSRElement {
         value = val;
         if (reactivityData.length > 0)
           dynamicAttributesData.push([reactivityData, propName, propValue.function as any])
-        if (attrHandler.forceResume)
-          attributesResumeData.push([propName, val]);
         break;
       }
       case "static":
         value = propValue.value;
         break;
       }
+
+      if (attrHandler.forceResume)
+        attributesResumeData.push([propName, value]);
 
       attrHandler.setOnSSRElement(builder, propName, value);
     }
@@ -291,36 +277,6 @@ export class SSRElement {
 
 export function createSSRElement(element: string, props: any): SSRElement {
   return new SSRElement(element, props);
-  // const el = new SSRElement(element);
-
-  // // const attributesResumeData: ResumeAttributesData = [];
-  // // const dynamicAttributesData: DynamicAttributesData = [];
-
-  // // for (const propName of Object.keys(props)) {
-  // //   // TODO: Children may be reactive too!(?)
-  // //   if (propName === "children") {
-  // //     builder.appendInnerHTML(stringifyJSXElement((getProperty<any, any>).bind(null, props, "children"), false));
-  // //     continue;
-  // //   }
-
-  // //   const attrHandler = getHandlerForAttribute(propName);
-  // //   if (attrHandler === null) continue;
-  // //   const [val, reactivityData] = startReaction(() => props[propName]);
-  // //   if (reactivityData.length > 0)
-  // //     dynamicAttributesData.push([reactivityData, propName, (getProperty<any, any>).bind(null, props, propName)])
-  // //   if (attrHandler.forceResume)
-  // //     attributesResumeData.push([propName, val]);
-  // //   attrHandler.setOnSSRElement(builder, propName, val);
-  // // }
-
-  // // if (attributesResumeData.length !== 0) {
-  // //   builder.setAttribute(`${ATTRIBUTE_PREFIX}:res-attrs`, sharedSSRSerialize(attributesResumeData).toString());
-  // // }
-  // // if (dynamicAttributesData.length !== 0) {
-  // //   builder.setAttribute(`${ATTRIBUTE_PREFIX}:dyn-attrs`, sharedSSRSerialize(dynamicAttributesData).toString());
-  // // }
-  
-  // return el;
 }
 
 export async function renderToString(el: ComponentFn<{}>): Promise<string> {
