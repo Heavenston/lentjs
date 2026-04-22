@@ -1,6 +1,6 @@
 import type { JSXElement, JSXElementDynamic } from ".";
 import { getHandlerForAttribute } from "./attributes";
-import { changeStateAnchor, cleanupStateNodes, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState, type JSXStateDynamic } from "./patchElement";
+import { changeStateAnchor, cleanupStateNodes, getFirstElement, getLastElement, patchElement, removeStateNodes, type JSXState, type JSXStateDynamic } from "./patch-element";
 import { Scope, resumeAsyncTask, resumeReaction, resumeTask, untrack } from "@lentjs/core-reactivity";
 import type { AsyncTaskCallback, CapturedReactivityData, TaskCaptureData } from "@lentjs/core-reactivity";
 import { assert, noop, notNull, unreachable } from "@lentjs/utils";

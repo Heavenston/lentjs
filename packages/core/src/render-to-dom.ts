@@ -1,5 +1,5 @@
 import { createTask, getScope, Scope, untrack } from "@lentjs/core-reactivity";
-import { cleanupStateNodes, patchElement } from "./patchElement";
+import { cleanupStateNodes, patchElement } from "./patch-element";
 import { factory } from "./factory";
 import type { ComponentFn } from ".";
 import { getHandlerForAttribute } from "./attributes";
