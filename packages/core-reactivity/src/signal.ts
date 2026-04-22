@@ -11,7 +11,7 @@ const signalAccessorSymbol: unique symbol = Symbol("signal-accessor");
 const signalSetterSymbol: unique symbol = Symbol("signal-setter");
 export type SignalData = { signalId: string };
 export type SignalAccessor<V> = (() => V) & { [signalAccessorSymbol]: true } & SignalData;
-export type SignalSetter<V> = ((new_val: V) => void) & { [signalSetterSymbol]: true, update: (cb: (old_val: V) => V) => void } & SignalData;
+export type SignalSetter<V> = ((new_val: V) => void) & { [signalSetterSymbol]: true, update(cb: (old_val: V) => V): void, trigger(): void } & SignalData;
 
 export function createSignal<V>(initialValue: V): [SignalAccessor<V>, SignalSetter<V>] {
   const state: SignalState<V> = { currentValue: initialValue, id: createUid() };
@@ -40,6 +40,9 @@ function createSignalSetter<V>(state: SignalState<V>): SignalSetter<V> {
   setter.signalId = state.id;
   setter.update = (updater: (old_val: V) => V) => {
     setter(updater(state.currentValue));
+  };
+  setter.trigger = () => {
+    triggerSignalCallbacks(state.id);
   };
   defineSerialization(setter, () => state, resumeSignalSetter<V>);
   return setter;

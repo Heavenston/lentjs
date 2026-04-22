@@ -153,6 +153,16 @@ describe("setter.update", () => {
   });
 });
 
+describe("setter.trigger", () => {
+  test("triggers update", () => {
+    const [accessor, setter] = createSignal(null);
+    const onUpdate = jest.fn();
+    registerSignalCallback({ onUpdate }, accessor.signalId);
+    setter.trigger();
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("isSignalAccessor", () => {
   test("true for a real accessor", () => {
     const [accessor] = createSignal(0);
