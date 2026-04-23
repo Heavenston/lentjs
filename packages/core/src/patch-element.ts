@@ -240,7 +240,7 @@ function appendArray(parent: Node, anchorElement: ChildNode | null, child: JSXEl
   };
 }
 
-export function patchElementArrayNew(
+function patchElementArrayNew(
   parent: Node,
   anchorElement: ChildNode | null,
   previousState: JSXStateArray,
@@ -282,7 +282,7 @@ export function patchElement(parent: Node, anchorElement: ChildNode | null, prev
   assert(anchorElement === null || anchorElement.parentNode === parent);
   assert(!isSSRElement(child));
 
-  if (previousState !== null && previousState.element === child) {
+  if (previousState !== null && Object.is(previousState.element, child)) {
     if (!stateIsAnchoredTo(previousState, anchorElement))
       changeStateAnchor(parent, previousState, anchorElement);
     return previousState;

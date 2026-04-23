@@ -22,7 +22,8 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "bun test"
   },
   "peerDependencies": {
     "typescript": "^5"

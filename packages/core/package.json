@@ -36,13 +36,15 @@
     "./package.json": "./package.json"
   },
   "devDependencies": {
+    "@happy-dom/global-registrator": "^20.9.0",
     "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "bun test"
   },
   "dependencies": {
     "csstype": "^3.2.3",
