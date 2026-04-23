@@ -246,10 +246,12 @@ function patchElementArrayNew(
   previousState: JSXStateArray,
   child: JSXElement[],
 ): JSXStateArray {
-  const toKeepMap = new Map<JSXElement, JSXState>;
+  const toKeepMap = new Map<JSXElement, JSXState[]>;
   for (const old of previousState.states) {
     if (old.element == null) { continue; }
-    toKeepMap.set(old.element, old);
+    if (!toKeepMap.has(old.element))
+      toKeepMap.set(old.element, []);
+    toKeepMap.get(old.element)!.push(old);
   }
 
   const states = Array<JSXState>();
@@ -257,7 +259,7 @@ function patchElementArrayNew(
   for (let i = child.length-1; i>=0; i--) {
     const childEl = child instanceof ChildrenArray ? child.getOrComputed(i) : child[i];
 
-    const prev = toKeepMap.get(childEl);
+    const prev = toKeepMap.get(childEl)?.pop();
     toKeepMap.delete(childEl);
     const newState = patchElement(parent, currentAnchor, prev ?? null, childEl);
     currentAnchor = getFirstElement(newState) ?? currentAnchor;
@@ -265,8 +267,9 @@ function patchElementArrayNew(
   }
   states.reverse();
 
-  for (const old of toKeepMap.values()) {
-    removeStateNodes(old);
+  for (const oldA of toKeepMap.values()) {
+    for (const old of oldA)
+      removeStateNodes(old);
   }
   
   return {

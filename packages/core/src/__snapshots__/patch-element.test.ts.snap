@@ -1,669 +1,557 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`Property based testig, patchElement called once, snapshoting dom state 1`] = `
+exports[`Property based testig, patchElement called n times snapshoting dom state 1`] = `
 {
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "0",
-        "id": 1,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": -0,
-}
-`;
-
-exports[`Property based testig, patchElement called once, snapshoting dom state 2`] = `
-{
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "0",
-        "id": 1,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": 0,
-}
-`;
-
-exports[`Property based testig, patchElement called once, snapshoting dom state 3`] = `
-{
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "Infinity",
-        "id": 1,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": Infinity,
-}
-`;
-
-exports[`Property based testig, patchElement called once, snapshoting dom state 4`] = `
-{
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "NaN",
-        "id": 1,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": NaN,
-}
-`;
-
-exports[`Property based testig, patchElement called once, snapshoting dom state 5`] = `
-{
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "",
-        "id": 1,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": "",
-}
-`;
-
-exports[`Property based testig, patchElement called once, snapshoting dom state 6`] = `
-{
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "0",
-        "id": 1,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": "0",
-}
-`;
-
-exports[`Property based testig, patchElement called once, snapshoting dom state 7`] = `
-{
-  "dom": {
-    "attributes": [],
-    "children": [],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": undefined,
-}
-`;
-
-exports[`Property based testig, patchElement called once, snapshoting dom state 8`] = `
-{
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "4844435879290099",
-        "id": 1,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": 4844435879290099,
-}
-`;
-
-exports[`Property based testig, patchElement called once, snapshoting dom state 9`] = `
-{
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "-326646507439673",
-        "id": 1,
-        "kind": "text",
-      },
-      {
-        "content": "L2lt",
-        "id": 2,
-        "kind": "text",
-      },
-      {
-        "content": "8828118",
-        "id": 3,
-        "kind": "text",
-      },
-      {
-        "content": "-8343317281255904",
-        "id": 4,
-        "kind": "text",
-      },
-      {
-        "content": "-2266336421920162",
-        "id": 5,
-        "kind": "text",
-      },
-      {
-        "content": "-6924388650582103",
-        "id": 6,
-        "kind": "text",
-      },
-      {
-        "content": "-1.662641215057291e-30",
-        "id": 7,
-        "kind": "text",
-      },
-      {
-        "content": "-12232.3916015625",
-        "id": 8,
-        "kind": "text",
-      },
-      {
-        "content": "1",
-        "id": 9,
-        "kind": "text",
-      },
-      {
-        "content": "-5801493373723265",
-        "id": 10,
-        "kind": "text",
-      },
-      {
-        "content": "iJCG",
-        "id": 11,
-        "kind": "text",
-      },
-      {
-        "content": "2374058742120448",
-        "id": 12,
-        "kind": "text",
-      },
-      {
-        "content": "2105176978631913",
-        "id": 13,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": [
-    [
-      null,
-      -326646507439673,
-      "L2lt",
-      undefined,
-      8828118,
-      [
-        null,
-        -8343317281255904,
-        null,
-        -2266336421920162,
-        [
-          undefined,
-          -6924388650582103,
-        ],
-        -0.000000000000000000000000000001662641215057291,
-        -12232.3916015625,
-        "1",
-        [],
-        -5801493373723265,
-      ],
-      undefined,
-    ],
-    [Function],
-    [Function],
-    [Function],
-    2105176978631913,
+  "attributes": [],
+  "children": [
+    {
+      "attributes": [],
+      "children": [],
+      "id": 1,
+      "kind": "element",
+      "tag": "DIV",
+    },
   ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
 }
 `;
 
-exports[`Property based testig, patchElement called once, snapshoting dom state 10`] = `
+exports[`Property based testig, patchElement called n times snapshoting dom state 2`] = `
 {
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "J=<a@!",
-        "id": 1,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": "J=<a@!",
-}
-`;
-
-exports[`Property based testig, patchElement called once, snapshoting dom state 11`] = `
-{
-  "dom": {
-    "attributes": [],
-    "children": [],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": [],
-}
-`;
-
-exports[`Property based testig, patchElement called once, snapshoting dom state 12`] = `
-{
-  "dom": {
-    "attributes": [],
-    "children": [],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": null,
-}
-`;
-
-exports[`Property based testig, patchElement called once, snapshoting dom state 13`] = `
-{
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "-1.2468142589649232e-25",
-        "id": 1,
-        "kind": "text",
-      },
-      {
-        "content": "%9Y56u",
-        "id": 2,
-        "kind": "text",
-      },
-      {
-        "content": "N K4(",
-        "id": 3,
-        "kind": "text",
-      },
-      {
-        "content": "2.9034678564181602e+32",
-        "id": 4,
-        "kind": "text",
-      },
-      {
-        "content": "g$r"}",
-        "id": 5,
-        "kind": "text",
-      },
-      {
-        "content": "-1628562203739279",
-        "id": 6,
-        "kind": "text",
-      },
-      {
-        "content": "pT%U",
-        "id": 7,
-        "kind": "text",
-      },
-      {
-        "content": "-6514237588233438",
-        "id": 8,
-        "kind": "text",
-      },
-      {
-        "content": "/G",
-        "id": 9,
-        "kind": "text",
-      },
-      {
-        "content": "-4.655541089356591e-14",
-        "id": 10,
-        "kind": "text",
-      },
-      {
-        "content": "-6850059136437705",
-        "id": 11,
-        "kind": "text",
-      },
-      {
-        "content": "1.3272851187110033e-18",
-        "id": 12,
-        "kind": "text",
-      },
-      {
-        "content": "-1541257342265556",
-        "id": 13,
-        "kind": "text",
-      },
-      {
-        "content": "-8719330035603430",
-        "id": 14,
-        "kind": "text",
-      },
-      {
-        "content": "gJZ'$3",
-        "id": 15,
-        "kind": "text",
-      },
-      {
-        "content": "g,%$N!#E",
-        "id": 16,
-        "kind": "text",
-      },
-      {
-        "content": "-1.7166272040696206e+28",
-        "id": 17,
-        "kind": "text",
-      },
-      {
-        "content": "-2717563561608283",
-        "id": 18,
-        "kind": "text",
-      },
-      {
-        "content": "._j",
-        "id": 19,
-        "kind": "text",
-      },
-      {
-        "content": "?EG0",
-        "id": 20,
-        "kind": "text",
-      },
-      {
-        "content": "-2.1304118969656563e-27",
-        "id": 21,
-        "kind": "text",
-      },
-      {
-        "content": "",
-        "id": 22,
-        "kind": "text",
-      },
-      {
-        "content": "3.831897039258125e-12",
-        "id": 23,
-        "kind": "text",
-      },
-      {
-        "content": "FNBD>Be9",
-        "id": 24,
-        "kind": "text",
-      },
-      {
-        "content": "-2.29775161571244e-12",
-        "id": 25,
-        "kind": "text",
-      },
-      {
-        "content": "6.280937446902428e+37",
-        "id": 26,
-        "kind": "text",
-      },
-      {
-        "content": "TJi[3PE9",
-        "id": 27,
-        "kind": "text",
-      },
-      {
-        "content": "-2275.158203125",
-        "id": 28,
-        "kind": "text",
-      },
-      {
-        "content": "H#(NXZrRv.",
-        "id": 29,
-        "kind": "text",
-      },
-      {
-        "content": "45.97623825073242",
-        "id": 30,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": [
-    [
-      [
-        undefined,
-        [
-          undefined,
-          null,
-          undefined,
-          -0.00000000000000000000000012468142589649232,
-          "%9Y56u",
-          "N K4(",
-          null,
-          null,
-          null,
-          [
-            null,
-            290346785641816020000000000000000,
-            "g$r"}",
-            null,
-            undefined,
-            -1628562203739279,
-            null,
-            undefined,
-            "pT%U",
-            undefined,
-          ],
-        ],
-        null,
-        undefined,
-        -6514237588233438,
-        [
-          "/G",
-        ],
-        -0.00000000000004655541089356591,
-      ],
-      -6850059136437705,
-      0.0000000000000000013272851187110033,
-      -1541257342265556,
-      [Function],
-      [
-        undefined,
-      ],
-      undefined,
-      "gJZ'$3",
-      [
-        "g,%$N!#E",
-        -17166272040696206000000000000,
-        undefined,
-        null,
-        -2717563561608283,
-        undefined,
-        "._j",
-        "?EG0",
-        undefined,
-        undefined,
-      ],
-      undefined,
-    ],
-    -0.0000000000000000000000000021304118969656563,
-    "",
-    0.000000000003831897039258125,
-    [
-      [Function],
-      null,
-      [Function],
-      "FNBD>Be9",
-      -0.00000000000229775161571244,
-      62809374469024280000000000000000000000,
-      "TJi[3PE9",
-      -2275.158203125,
-    ],
-    "H#(NXZrRv.",
-    45.97623825073242,
+  "attributes": [],
+  "children": [
+    {
+      "attributes": [],
+      "children": [],
+      "id": 1,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 2,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 3,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "content": "NaN",
+      "id": 4,
+      "kind": "text",
+    },
   ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
 }
 `;
 
-exports[`Property based testig, patchElement called once, snapshoting dom state 14`] = `
+exports[`Property based testig, patchElement called n times snapshoting dom state 3`] = `
 {
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "7.006492321624085e-45",
-        "id": 1,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": 0.000000000000000000000000000000000000000000007006492321624085,
+  "attributes": [],
+  "children": [
+    {
+      "content": "0",
+      "id": 1,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
 }
 `;
 
-exports[`Property based testig, patchElement called once, snapshoting dom state 15`] = `
+exports[`Property based testig, patchElement called n times snapshoting dom state 4`] = `
 {
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "3270726293272279",
-        "id": 1,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": 3270726293272279,
+  "attributes": [],
+  "children": [
+    {
+      "content": "0",
+      "id": 1,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
 }
 `;
 
-exports[`Property based testig, patchElement called once, snapshoting dom state 16`] = `
+exports[`Property based testig, patchElement called n times snapshoting dom state 5`] = `
 {
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "-8990174275946314",
-        "id": 1,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": [Function],
+  "attributes": [],
+  "children": [
+    {
+      "content": "-Infinity",
+      "id": 1,
+      "kind": "text",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 2,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 3,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "content": "Infinity",
+      "id": 4,
+      "kind": "text",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 5,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "content": "Infinity",
+      "id": 6,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
 }
 `;
 
-exports[`Property based testig, patchElement called once, snapshoting dom state 17`] = `
+exports[`Property based testig, patchElement called n times snapshoting dom state 6`] = `
 {
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "?,_If_e~W",
-        "id": 1,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": [Function],
+  "attributes": [],
+  "children": [
+    {
+      "content": "non empty string",
+      "id": 1,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
 }
 `;
 
-exports[`Property based testig, patchElement called once, snapshoting dom state 18`] = `
+exports[`Property based testig, patchElement called n times snapshoting dom state 7`] = `
 {
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "9007199254740939",
-        "id": 1,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": 9007199254740939,
+  "attributes": [],
+  "children": [
+    {
+      "content": "0",
+      "id": 1,
+      "kind": "text",
+    },
+    {
+      "content": "NaN",
+      "id": 2,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
 }
 `;
 
-exports[`Property based testig, patchElement called once, snapshoting dom state 19`] = `
+exports[`Property based testig, patchElement called n times snapshoting dom state 8`] = `
 {
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "-8004142287586241",
-        "id": 1,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": [Function],
+  "attributes": [],
+  "children": [
+    {
+      "content": "non empty string",
+      "id": 1,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
 }
 `;
 
-exports[`Property based testig, patchElement called once, snapshoting dom state 20`] = `
+exports[`Property based testig, patchElement called n times snapshoting dom state 9`] = `
 {
-  "dom": {
-    "attributes": [],
-    "children": [
-      {
-        "content": "\`cKl)o2_",
-        "id": 1,
-        "kind": "text",
-      },
-    ],
-    "id": 0,
-    "kind": "element",
-    "tag": "DIV",
-  },
-  "val": [Function],
+  "attributes": [],
+  "children": [
+    {
+      "content": "",
+      "id": 1,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
+}
+`;
+
+exports[`Property based testig, patchElement called n times snapshoting dom state 10`] = `
+{
+  "attributes": [],
+  "children": [
+    {
+      "content": "non empty string",
+      "id": 1,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
+}
+`;
+
+exports[`Property based testig, patchElement called n times snapshoting dom state 11`] = `
+{
+  "attributes": [],
+  "children": [
+    {
+      "content": "-9007199254740991",
+      "id": 1,
+      "kind": "text",
+    },
+    {
+      "content": "non empty string",
+      "id": 2,
+      "kind": "text",
+    },
+    {
+      "content": "0",
+      "id": 3,
+      "kind": "text",
+    },
+    {
+      "content": "Infinity",
+      "id": 4,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
+}
+`;
+
+exports[`Property based testig, patchElement called n times snapshoting dom state 12`] = `
+{
+  "attributes": [],
+  "children": [
+    {
+      "content": "non empty string",
+      "id": 1,
+      "kind": "text",
+    },
+    {
+      "content": "Infinity",
+      "id": 2,
+      "kind": "text",
+    },
+    {
+      "content": "Infinity",
+      "id": 3,
+      "kind": "text",
+    },
+    {
+      "content": "",
+      "id": 4,
+      "kind": "text",
+    },
+    {
+      "content": "0",
+      "id": 5,
+      "kind": "text",
+    },
+    {
+      "content": "9007199254740991",
+      "id": 6,
+      "kind": "text",
+    },
+    {
+      "content": "0",
+      "id": 7,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
+}
+`;
+
+exports[`Property based testig, patchElement called n times snapshoting dom state 13`] = `
+{
+  "attributes": [],
+  "children": [
+    {
+      "content": "non empty string",
+      "id": 1,
+      "kind": "text",
+    },
+    {
+      "content": "non empty string",
+      "id": 2,
+      "kind": "text",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 3,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "content": "",
+      "id": 4,
+      "kind": "text",
+    },
+    {
+      "content": "",
+      "id": 5,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
+}
+`;
+
+exports[`Property based testig, patchElement called n times snapshoting dom state 14`] = `
+{
+  "attributes": [],
+  "children": [
+    {
+      "attributes": [],
+      "children": [],
+      "id": 1,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 2,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "content": "non empty string",
+      "id": 3,
+      "kind": "text",
+    },
+    {
+      "content": "non empty string",
+      "id": 4,
+      "kind": "text",
+    },
+    {
+      "content": "",
+      "id": 5,
+      "kind": "text",
+    },
+    {
+      "content": "",
+      "id": 6,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
+}
+`;
+
+exports[`Property based testig, patchElement called n times snapshoting dom state 15`] = `
+{
+  "attributes": [],
+  "children": [
+    {
+      "content": "Infinity",
+      "id": 1,
+      "kind": "text",
+    },
+    {
+      "content": "non empty string",
+      "id": 2,
+      "kind": "text",
+    },
+    {
+      "content": "",
+      "id": 3,
+      "kind": "text",
+    },
+    {
+      "content": "Infinity",
+      "id": 4,
+      "kind": "text",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 5,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "content": "non empty string",
+      "id": 6,
+      "kind": "text",
+    },
+    {
+      "content": "",
+      "id": 7,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
+}
+`;
+
+exports[`Property based testig, patchElement called n times snapshoting dom state 16`] = `
+{
+  "attributes": [],
+  "children": [
+    {
+      "content": "Infinity",
+      "id": 1,
+      "kind": "text",
+    },
+    {
+      "content": "-9007199254740991",
+      "id": 2,
+      "kind": "text",
+    },
+    {
+      "content": "non empty string",
+      "id": 3,
+      "kind": "text",
+    },
+    {
+      "content": "non empty string",
+      "id": 4,
+      "kind": "text",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 5,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "content": "Infinity",
+      "id": 6,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
+}
+`;
+
+exports[`Property based testig, patchElement called n times snapshoting dom state 17`] = `
+{
+  "attributes": [],
+  "children": [
+    {
+      "content": "",
+      "id": 1,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
+}
+`;
+
+exports[`Property based testig, patchElement called n times snapshoting dom state 18`] = `
+{
+  "attributes": [],
+  "children": [
+    {
+      "content": "non empty string",
+      "id": 1,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
+}
+`;
+
+exports[`Property based testig, patchElement called n times snapshoting dom state 19`] = `
+{
+  "attributes": [],
+  "children": [
+    {
+      "content": "non empty string",
+      "id": 1,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
+}
+`;
+
+exports[`Property based testig, patchElement called n times snapshoting dom state 20`] = `
+{
+  "attributes": [],
+  "children": [
+    {
+      "content": "-9007199254740991",
+      "id": 1,
+      "kind": "text",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 2,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "content": "0",
+      "id": 3,
+      "kind": "text",
+    },
+    {
+      "content": "-Infinity",
+      "id": 4,
+      "kind": "text",
+    },
+    {
+      "content": "non empty string",
+      "id": 5,
+      "kind": "text",
+    },
+  ],
+  "id": 0,
+  "kind": "element",
+  "tag": "DIV",
 }
 `;
