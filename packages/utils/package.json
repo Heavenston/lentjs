@@ -22,6 +22,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
+    "build": "bunup",
     "check-types": "tsc --noEmit"
   },
   "peerDependencies": {

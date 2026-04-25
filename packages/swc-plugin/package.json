@@ -2,15 +2,13 @@
   "name": "@lentjs/swc-plugin",
   "version": "0.1.0",
   "author": "",
-  "main_": "target/wasm32-wasip1/release/lentjs_swc_plugin.wasm",
-  "main": "target/wasm32-wasip1/debug/lentjs_swc_plugin.wasm",
+  "main": "dist/lentjs_swc_plugin.wasm",
   "description": "",
-  "files": [],
+  "files": ["dist"],
   "keywords": ["swc-plugin"],
   "license": "ISC",
   "preferUnplugged": true,
   "scripts": {
-    "prepublishOnly": "cargo build-wasip1 --release",
-    "build": "cargo build-wasip1"
+    "build": "cargo build-wasip1 && mkdir -p dist && cp target/wasm32-wasip1/debug/lentjs_swc_plugin.wasm dist/"
   }
 }

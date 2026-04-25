@@ -43,6 +43,7 @@
     "typescript": "^5"
   },
   "scripts": {
+    "build": "bunup",
     "check-types": "tsc --noEmit",
     "test": "bun test"
   },

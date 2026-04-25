@@ -9,10 +9,9 @@
     "turbo": "^2.8.20"
   },
   "scripts": {
+    "build": "turbo build",
     "check-types": "turbo check-types",
     "dev": "turbo dev",
-    "test": "turbo test",
-    "build": "bunup",
-    "watch": "bunup --watch"
+    "test": "turbo test"
   }
 }
