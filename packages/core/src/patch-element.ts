@@ -240,7 +240,7 @@ function appendArray(parent: Node, anchorElement: ChildNode | null, child: JSXEl
   };
 }
 
-function patchElementArrayNew(
+function patchElementArray(
   parent: Node,
   anchorElement: ChildNode | null,
   previousState: JSXStateArray,
@@ -260,7 +260,6 @@ function patchElementArrayNew(
     const childEl = child instanceof ChildrenArray ? child.getOrComputed(i) : child[i];
 
     const prev = toKeepMap.get(childEl)?.pop();
-    toKeepMap.delete(childEl);
     const newState = patchElement(parent, currentAnchor, prev ?? null, childEl);
     currentAnchor = getFirstElement(newState) ?? currentAnchor;
     states.push(newState);
@@ -296,7 +295,7 @@ export function patchElement(parent: Node, anchorElement: ChildNode | null, prev
       if (previousState) removeStateNodes(previousState);
       return appendArray(parent, anchorElement, child);
     }
-    return patchElementArrayNew(parent, anchorElement, previousState, child);
+    return patchElementArray(parent, anchorElement, previousState, child);
   }
 
   if (isJSXElementDynamic(child)) {
