@@ -14,14 +14,14 @@ fc.configureGlobal({
 
 const nodeIds = new Map<unknown, number>;
 
-type SimplifiedDom =
+export type SimplifiedDom =
   | { kind: "text", content: string, id?: number }
   | { kind: "comment", content: string, id?: number }
   | { kind: "element", tag: string, attributes: [string, string][], children: SimplifiedDom[], id?: number }
 ;
-function simplifyDom(n: HTMLElement, enableId?: boolean): SimplifiedDom & { kind: "element" };
-function simplifyDom(n: Node, enableId?: boolean): SimplifiedDom;
-function simplifyDom(n: Node, enableId: boolean = true): SimplifiedDom {
+export function simplifyDom(n: HTMLElement, enableId?: boolean): SimplifiedDom & { kind: "element" };
+export function simplifyDom(n: Node, enableId?: boolean): SimplifiedDom;
+export function simplifyDom(n: Node, enableId: boolean = true): SimplifiedDom {
   const idText = nodeIds.has(n) ? nodeIds.get(n)! : (nodeIds.set(n, nodeIds.size), nodeIds.size-1);
   const id = enableId ? { id: idText } : {};
   if (n instanceof Text) {
@@ -53,7 +53,7 @@ function simplifyDom(n: Node, enableId: boolean = true): SimplifiedDom {
   throw new Error("unsuported node");
 }
 
-function expectedString(el: JSXElement): string {
+export function expectedString(el: JSXElement): string {
   if (el === null || el === undefined)
     return "";
   if (isJSXElementString(el))
@@ -71,7 +71,7 @@ function expectedString(el: JSXElement): string {
   unreachable(el);
 }
 
-function expectedSimplifiedDom(el: JSXElement): SimplifiedDom[] {
+export function expectedSimplifiedDom(el: JSXElement): SimplifiedDom[] {
   if (el === null || el === undefined)
     return [];
   if (isJSXElementString(el))
