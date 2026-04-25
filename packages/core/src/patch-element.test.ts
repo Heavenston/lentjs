@@ -1,127 +1,9 @@
-import { test, expect, describe, afterEach } from "bun:test";
+import { test, expect, describe } from "bun:test";
 import { patchElement, removeStateNodes, type JSXState } from "./patch-element";
-import { isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, isSSRElement, type JSXElement, type JSXElementSingular, type JSXElementString } from ".";
+import type { JSXElement } from ".";
 import { Scope } from "@lentjs/core-reactivity";
 import fc from "fast-check";
-import { assert, unreachable } from "@lentjs/utils";
-
-fc.configureGlobal({
-  seed: 69,
-  numRuns: 200,
-  includeErrorInReport: true,
-  skipEqualValues: true,
-});
-
-const nodeIds = new Map<unknown, number>;
-
-export type SimplifiedDom =
-  | { kind: "text", content: string, id?: number }
-  | { kind: "comment", content: string, id?: number }
-  | { kind: "element", tag: string, attributes: [string, string][], children: SimplifiedDom[], id?: number }
-;
-export function simplifyDom(n: HTMLElement, enableId?: boolean): SimplifiedDom & { kind: "element" };
-export function simplifyDom(n: Node, enableId?: boolean): SimplifiedDom;
-export function simplifyDom(n: Node, enableId: boolean = true): SimplifiedDom {
-  const idText = nodeIds.has(n) ? nodeIds.get(n)! : (nodeIds.set(n, nodeIds.size), nodeIds.size-1);
-  const id = enableId ? { id: idText } : {};
-  if (n instanceof Text) {
-    return {
-      kind: "text",
-      content: n.textContent,
-      ...id,
-    };
-  }
-
-  if (n instanceof Comment) {
-    return {
-      kind: "comment",
-      content: n.textContent,
-      ...id,
-    };
-  }
-
-  if (n instanceof HTMLElement) {
-    return {
-      kind: "element",
-      tag: n.tagName,
-      attributes: [...n.attributes].map(a => [a.name, a.value]),
-      children: [...n.childNodes].map(p => simplifyDom(p, enableId)),
-      ...id,
-    };
-  }
-
-  throw new Error("unsuported node");
-}
-
-export function expectedString(el: JSXElement): string {
-  if (el === null || el === undefined)
-    return "";
-  if (isJSXElementString(el))
-    return el.toString();
-  if (isJSXElementDynamic(el))
-    return expectedString(el());
-  if (isJSXElementWithScope(el))
-    return expectedString(el.fun());
-  if (isSSRElement(el))
-    return el.build();
-  if (Array.isArray(el))
-    return el.map(expectedString).join("");
-  if (el instanceof Node)
-    return el.textContent ?? "";
-  unreachable(el);
-}
-
-export function expectedSimplifiedDom(el: JSXElement): SimplifiedDom[] {
-  if (el === null || el === undefined)
-    return [];
-  if (isJSXElementString(el))
-    return [{ kind: "text", content: el.toString() }];
-  if (isJSXElementDynamic(el))
-    return expectedSimplifiedDom(el());
-  if (isJSXElementWithScope(el))
-    return expectedSimplifiedDom(el.withScope.enter(el.fun));
-  if (isSSRElement(el))
-    assert(false, "todo");
-  if (Array.isArray(el))
-    return el.flatMap(expectedSimplifiedDom);
-  if (el instanceof Node)
-    return [simplifyDom(el, false)];
-  unreachable(el);
-}
-
-function fullReset() {
-  document.body.innerHTML = "";
-  nodeIds.clear();
-}
-
-const { arbitraryJSXElement } = fc.letrec<{
-  arbitraryJSXElementString: JSXElementString,
-  arbitraryJSXElementSingular: JSXElementSingular,
-  arbitraryJSXElement: JSXElement,
-}>(rec => ({
-  arbitraryJSXElementString: fc.oneof(
-    { withCrossShrink: true },
-    fc.constantFrom("", "non empty string"),
-    fc.constantFrom(0,-0,Number.NaN,Number.NEGATIVE_INFINITY,Number.POSITIVE_INFINITY,Number.MIN_SAFE_INTEGER,Number.MAX_SAFE_INTEGER),
-  ),
-  arbitraryJSXElementSingular: fc.oneof(
-    { withCrossShrink: true },
-    rec("arbitraryJSXElementString"),
-    fc.constantFrom(null, undefined),
-    fc.constant("div").map(name => document.createElement(name)),
-    rec("arbitraryJSXElementString").map(t => document.createTextNode(t.toString())),
-  ),
-  arbitraryJSXElement: fc.oneof(
-    { withCrossShrink: true, depthSize: "xsmall", depthIdentifier: "id:arbitraryJSXElement" },
-    rec("arbitraryJSXElementString"),
-    fc.array(rec("arbitraryJSXElementSingular"), { size: "small", depthIdentifier: "id:arbitraryJSXElement" }),
-    rec("arbitraryJSXElement").map(e => {
-      const f = () => e;
-      f.toString = () => `(() => ${fc.stringify(e)})`;
-      return f;
-    }),
-  ),
-}));
+import { expectedSimplifiedDom, expectedString, simplifyDom, arbitraryJSXElement } from "./dom-test-utils";
 
 const jsxElementExamples: JSXElement[] = [
   -0, 0,
@@ -129,19 +11,13 @@ const jsxElementExamples: JSXElement[] = [
   "", "0",
 ];
 
-afterEach(() => {
-  fullReset();
-});
-
 function testWrapper(fn: (container: HTMLElement) => void) {
-  fullReset();
   const container = document.createElement("div");
   const [scope, cleanup] = Scope.createControlled();
   scope.enter(() => {
     fn(container);
   });
   cleanup();
-  fullReset();
 }
 
 describe("Property based testig, patchElement called", () => {
