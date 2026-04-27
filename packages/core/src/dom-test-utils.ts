@@ -124,8 +124,8 @@ const arbitraries = fc.letrec<{
   }),
   arbitraryJSXElement: fc.oneof(
     { withCrossShrink: true, depthSize: "xsmall", depthIdentifier: "id:arbitraryJSXElement" },
-    rec("arbitraryJSXElementString"),
-    fc.array(rec("arbitraryJSXElementSingular"), { size: "small", depthIdentifier: "id:arbitraryJSXElement" }),
+    rec("arbitraryJSXElementSingular"),
+    fc.array(rec("arbitraryJSXElement"), { size: "small", depthIdentifier: "id:arbitraryJSXElement" }),
     rec("arbitraryJSXElementDynamic"),
   ),
 }));

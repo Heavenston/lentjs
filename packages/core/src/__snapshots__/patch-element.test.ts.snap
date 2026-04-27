@@ -3,15 +3,7 @@
 exports[`Property based testig, patchElement called n times snapshoting dom state 1`] = `
 {
   "attributes": [],
-  "children": [
-    {
-      "attributes": [],
-      "children": [],
-      "id": 1,
-      "kind": "element",
-      "tag": "DIV",
-    },
-  ],
+  "children": [],
   "id": 0,
   "kind": "element",
   "tag": "DIV",
@@ -37,15 +29,8 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
       "tag": "DIV",
     },
     {
-      "attributes": [],
-      "children": [],
+      "content": "0",
       "id": 3,
-      "kind": "element",
-      "tag": "DIV",
-    },
-    {
-      "content": "NaN",
-      "id": 4,
       "kind": "text",
     },
   ],
@@ -60,9 +45,11 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
   "attributes": [],
   "children": [
     {
-      "content": "0",
+      "attributes": [],
+      "children": [],
       "id": 1,
-      "kind": "text",
+      "kind": "element",
+      "tag": "DIV",
     },
   ],
   "id": 0,
@@ -76,7 +63,7 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
   "attributes": [],
   "children": [
     {
-      "content": "0",
+      "content": "non empty string",
       "id": 1,
       "kind": "text",
     },
@@ -92,7 +79,7 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
   "attributes": [],
   "children": [
     {
-      "content": "-Infinity",
+      "content": "9007199254740991",
       "id": 1,
       "kind": "text",
     },
@@ -104,11 +91,9 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
       "tag": "DIV",
     },
     {
-      "attributes": [],
-      "children": [],
+      "content": "Infinity",
       "id": 3,
-      "kind": "element",
-      "tag": "DIV",
+      "kind": "text",
     },
     {
       "content": "Infinity",
@@ -116,16 +101,21 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
       "kind": "text",
     },
     {
-      "attributes": [],
-      "children": [],
+      "content": "-9007199254740991",
       "id": 5,
-      "kind": "element",
-      "tag": "DIV",
+      "kind": "text",
     },
     {
-      "content": "Infinity",
+      "content": "",
       "id": 6,
       "kind": "text",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 7,
+      "kind": "element",
+      "tag": "DIV",
     },
   ],
   "id": 0,
@@ -143,6 +133,32 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
       "id": 1,
       "kind": "text",
     },
+    {
+      "content": "-Infinity",
+      "id": 2,
+      "kind": "text",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 3,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 4,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 5,
+      "kind": "element",
+      "tag": "DIV",
+    },
   ],
   "id": 0,
   "kind": "element",
@@ -153,18 +169,7 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
 exports[`Property based testig, patchElement called n times snapshoting dom state 7`] = `
 {
   "attributes": [],
-  "children": [
-    {
-      "content": "0",
-      "id": 1,
-      "kind": "text",
-    },
-    {
-      "content": "NaN",
-      "id": 2,
-      "kind": "text",
-    },
-  ],
+  "children": [],
   "id": 0,
   "kind": "element",
   "tag": "DIV",
@@ -176,7 +181,7 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
   "attributes": [],
   "children": [
     {
-      "content": "non empty string",
+      "content": "9007199254740991",
       "id": 1,
       "kind": "text",
     },
@@ -208,9 +213,11 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
   "attributes": [],
   "children": [
     {
-      "content": "non empty string",
+      "attributes": [],
+      "children": [],
       "id": 1,
-      "kind": "text",
+      "kind": "element",
+      "tag": "DIV",
     },
   ],
   "id": 0,
@@ -222,28 +229,7 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
 exports[`Property based testig, patchElement called n times snapshoting dom state 11`] = `
 {
   "attributes": [],
-  "children": [
-    {
-      "content": "-9007199254740991",
-      "id": 1,
-      "kind": "text",
-    },
-    {
-      "content": "non empty string",
-      "id": 2,
-      "kind": "text",
-    },
-    {
-      "content": "0",
-      "id": 3,
-      "kind": "text",
-    },
-    {
-      "content": "Infinity",
-      "id": 4,
-      "kind": "text",
-    },
-  ],
+  "children": [],
   "id": 0,
   "kind": "element",
   "tag": "DIV",
@@ -265,28 +251,8 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
       "kind": "text",
     },
     {
-      "content": "Infinity",
-      "id": 3,
-      "kind": "text",
-    },
-    {
-      "content": "",
-      "id": 4,
-      "kind": "text",
-    },
-    {
-      "content": "0",
-      "id": 5,
-      "kind": "text",
-    },
-    {
       "content": "9007199254740991",
-      "id": 6,
-      "kind": "text",
-    },
-    {
-      "content": "0",
-      "id": 7,
+      "id": 3,
       "kind": "text",
     },
   ],
@@ -301,31 +267,11 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
   "attributes": [],
   "children": [
     {
-      "content": "non empty string",
-      "id": 1,
-      "kind": "text",
-    },
-    {
-      "content": "non empty string",
-      "id": 2,
-      "kind": "text",
-    },
-    {
       "attributes": [],
       "children": [],
-      "id": 3,
+      "id": 1,
       "kind": "element",
       "tag": "DIV",
-    },
-    {
-      "content": "",
-      "id": 4,
-      "kind": "text",
-    },
-    {
-      "content": "",
-      "id": 5,
-      "kind": "text",
     },
   ],
   "id": 0,
@@ -346,16 +292,16 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
       "tag": "DIV",
     },
     {
-      "attributes": [],
-      "children": [],
+      "content": "0",
       "id": 2,
-      "kind": "element",
-      "tag": "DIV",
+      "kind": "text",
     },
     {
-      "content": "non empty string",
+      "attributes": [],
+      "children": [],
       "id": 3,
-      "kind": "text",
+      "kind": "element",
+      "tag": "DIV",
     },
     {
       "content": "non empty string",
@@ -365,11 +311,6 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
     {
       "content": "",
       "id": 5,
-      "kind": "text",
-    },
-    {
-      "content": "",
-      "id": 6,
       "kind": "text",
     },
   ],
@@ -382,45 +323,7 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
 exports[`Property based testig, patchElement called n times snapshoting dom state 15`] = `
 {
   "attributes": [],
-  "children": [
-    {
-      "content": "Infinity",
-      "id": 1,
-      "kind": "text",
-    },
-    {
-      "content": "non empty string",
-      "id": 2,
-      "kind": "text",
-    },
-    {
-      "content": "",
-      "id": 3,
-      "kind": "text",
-    },
-    {
-      "content": "Infinity",
-      "id": 4,
-      "kind": "text",
-    },
-    {
-      "attributes": [],
-      "children": [],
-      "id": 5,
-      "kind": "element",
-      "tag": "DIV",
-    },
-    {
-      "content": "non empty string",
-      "id": 6,
-      "kind": "text",
-    },
-    {
-      "content": "",
-      "id": 7,
-      "kind": "text",
-    },
-  ],
+  "children": [],
   "id": 0,
   "kind": "element",
   "tag": "DIV",
@@ -432,35 +335,8 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
   "attributes": [],
   "children": [
     {
-      "content": "Infinity",
+      "content": "0",
       "id": 1,
-      "kind": "text",
-    },
-    {
-      "content": "-9007199254740991",
-      "id": 2,
-      "kind": "text",
-    },
-    {
-      "content": "non empty string",
-      "id": 3,
-      "kind": "text",
-    },
-    {
-      "content": "non empty string",
-      "id": 4,
-      "kind": "text",
-    },
-    {
-      "attributes": [],
-      "children": [],
-      "id": 5,
-      "kind": "element",
-      "tag": "DIV",
-    },
-    {
-      "content": "Infinity",
-      "id": 6,
       "kind": "text",
     },
   ],
@@ -475,8 +351,32 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
   "attributes": [],
   "children": [
     {
-      "content": "",
+      "content": "-9007199254740991",
       "id": 1,
+      "kind": "text",
+    },
+    {
+      "content": "non empty string",
+      "id": 2,
+      "kind": "text",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 3,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "attributes": [],
+      "children": [],
+      "id": 4,
+      "kind": "element",
+      "tag": "DIV",
+    },
+    {
+      "content": "Infinity",
+      "id": 5,
       "kind": "text",
     },
   ],
@@ -491,7 +391,7 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
   "attributes": [],
   "children": [
     {
-      "content": "non empty string",
+      "content": "-Infinity",
       "id": 1,
       "kind": "text",
     },
@@ -507,9 +407,11 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
   "attributes": [],
   "children": [
     {
-      "content": "non empty string",
+      "attributes": [],
+      "children": [],
       "id": 1,
-      "kind": "text",
+      "kind": "element",
+      "tag": "DIV",
     },
   ],
   "id": 0,
@@ -523,31 +425,11 @@ exports[`Property based testig, patchElement called n times snapshoting dom stat
   "attributes": [],
   "children": [
     {
-      "content": "-9007199254740991",
-      "id": 1,
-      "kind": "text",
-    },
-    {
       "attributes": [],
       "children": [],
-      "id": 2,
+      "id": 1,
       "kind": "element",
       "tag": "DIV",
-    },
-    {
-      "content": "0",
-      "id": 3,
-      "kind": "text",
-    },
-    {
-      "content": "-Infinity",
-      "id": 4,
-      "kind": "text",
-    },
-    {
-      "content": "non empty string",
-      "id": 5,
-      "kind": "text",
     },
   ],
   "id": 0,
