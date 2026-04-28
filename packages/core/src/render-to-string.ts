@@ -1,6 +1,6 @@
 import { serialize } from "@lentjs/core-serialize";
 import { Scope, taskCaptureContextId, type TaskCaptureData, type CapturedReactivityData, createReaction } from "@lentjs/core-reactivity";
-import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type MarkerDirectiveName, ATTRIBUTE_PREFIX, type ResumeAttributesData, type DynamicAttributesData } from "./runtime";
+import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type MarkerDirectiveName, ATTRIBUTE_PREFIX, type ResumeAttributesData, type DynamicAttributesData, type RuntimeSerializedData, type TaskResumeData } from "./runtime";
 import { escapeHtml } from "./escape-html";
 import { ChildrenArray, factory, isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, type ComponentFn, type JSXElement, type JSXElementString } from ".";
 import { assert, notNull, unreachable } from "@lentjs/utils";
@@ -161,7 +161,7 @@ function stringifySSRElementChild(elValue: SSRElementChildValue, isInsideDynamic
   unreachable(el);
 }
 
-export class SSRElementBuilder {
+class SSRElementBuilder {
   #tag: string;
   #selfClosing: boolean;
   #attributes: string = "";
@@ -197,6 +197,7 @@ export class SSRElementBuilder {
     }
   }
 }
+export type { SSRElementBuilder };
 
 export class SSRElement {
   #tag: string;
@@ -286,7 +287,10 @@ export function createSSRElement(element: string, props: any): SSRElement {
   return new SSRElement(element, props);
 }
 
-export async function renderToString(el: ComponentFn<{}>): Promise<string> {
+export type RenderToStringCfg = {
+  disableDataElement?: boolean,
+};
+export async function renderToString(el: ComponentFn<{}>, cfg: RenderToStringCfg = {}): Promise<string> {
   const [scope, cleanup] = Scope.createControlled();
   const taskCaptureData: TaskCaptureData = { capturedTasks: [], capturedAsyncTasks: [] };
   scope.setContext(taskCaptureContextId, taskCaptureData);
@@ -294,18 +298,21 @@ export async function renderToString(el: ComponentFn<{}>): Promise<string> {
   try {
     const t = scope.enter(() => toSSRElementChild(factory(el)));
     await Promise.allSettled(taskCaptureData.capturedAsyncTasks.map(t => t.promise));
-    const rootScopeDirective = createSSRDirective("sco", scope);
-    const tasksDirective = createSSRDirective("tasks", {
+    const taskResumeData: TaskResumeData = {
       tasks: taskCaptureData.capturedTasks,
       asyncTasks: taskCaptureData.capturedAsyncTasks.map(t => ({
         task: t.task,
         reactivityData: t.capture(),
         parentScope: t.parentScope,
       })),
-    });
+    };
     const html = stringifySSRElementChild(t);
-    const directivesData = `<script lang="application/json" ${ATTRIBUTE_PREFIX}:data>${serialize(global_directive_data_array)}</script>`;
-    return `${directivesData}${rootScopeDirective}${html}${tasksDirective}`;
+    const directivesData = cfg.disableDataElement ? "" : `<script lang="application/json" ${ATTRIBUTE_PREFIX}:data>${serialize({
+      rootScope: scope,
+      directivesData: global_directive_data_array,
+      tasks: taskResumeData,
+    } satisfies RuntimeSerializedData)}</script>`;
+    return `${directivesData}${html}`;
   }
   catch(e) {
     throw e;

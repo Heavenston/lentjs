@@ -13,6 +13,12 @@ const REMOVE_DIRECTIVES = true;
 export const DIRECTIVE_PREFIX = "l";
 export const ATTRIBUTE_PREFIX: `data-${typeof DIRECTIVE_PREFIX}` = `data-${DIRECTIVE_PREFIX}`;
 
+export type RuntimeSerializedData = {
+  rootScope: Scope,
+  directivesData: readonly unknown[],
+  tasks: TaskResumeData,
+};
+
 export type TaskResumeData = {
   tasks: TaskCaptureData["capturedTasks"],
   asyncTasks: {
@@ -23,8 +29,6 @@ export type TaskResumeData = {
 };
 
 export type Directives = {
-  "tasks": TaskResumeData,
-
   "dyn": {
     isComputedInArray: boolean,
     update: JSXElementDynamic,
@@ -72,19 +76,6 @@ type RunCtx = {
 
 function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Comment, parent: Node, d: D) {
   switch (d.name) {
-  case "tasks":
-    ctx.nodesToRemove.push(directiveNode);
-    for (const task of d.data.tasks) {
-      Scope.enter(task.parentScope, () => {
-        resumeTask(task.task, task.reactivityData);
-      });
-    }
-    for (const asyncTask of d.data.asyncTasks) {
-      Scope.enter(asyncTask.parentScope, () => {
-        resumeAsyncTask(asyncTask.task, asyncTask.reactivityData);
-      });
-    }
-    break;
   case "dyn": {
     ctx.dynamicStateStack.push({
       kind: "dynamic-start",
@@ -293,20 +284,36 @@ function domVisitor(ctx: RunCtx, node: ChildNode) {
   });
 }
 
+function resumeTasks(data: TaskResumeData) {
+  for (const task of data.tasks) {
+    Scope.enter(task.parentScope, () => {
+      resumeTask(task.task, task.reactivityData);
+    });
+  }
+  for (const asyncTask of data.asyncTasks) {
+    Scope.enter(asyncTask.parentScope, () => {
+      resumeAsyncTask(asyncTask.task, asyncTask.reactivityData);
+    });
+  }
+}
+
 export function startRuntime(rootElement: HTMLElement): void {
   console.time("startRuntime");
   const dataElement = rootElement.querySelector(`*[${ATTRIBUTE_PREFIX}\\:data]`);
   assert(dataElement !== null, "Could not find the data script element");
   assert(dataElement instanceof HTMLScriptElement && dataElement.lang === "application/json");
-  console.log("Size of data:", dataElement.innerText.toString().length);
+  console.log("Size of data:", dataElement.innerText.length);
+  const serializedData = deserialize(dataElement.innerText) as RuntimeSerializedData;
   const ctx: RunCtx = {
-    directivesData: deserialize(dataElement.innerText) as any,
+    directivesData: serializedData.directivesData,
     nodesToRemove: [dataElement],
     dynamicStateStack: [],
-    scopeStack: [],
+    scopeStack: [serializedData.rootScope],
   };
   domVisitor(ctx, rootElement);
   assert(ctx.dynamicStateStack.length === 0);
+  assert(ctx.scopeStack.length === 1);
+  resumeTasks(serializedData.tasks);
   console.log(ctx.nodesToRemove.length, "total directive nodes and attributes found");
   if (REMOVE_DIRECTIVES && localStorage.getItem("LENTJS_KEEP_DIRECTIVES") !== "true")
     for (const n of ctx.nodesToRemove) {
