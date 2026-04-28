@@ -1,7 +1,7 @@
 import { test, expect, describe } from "bun:test";
 import { patchElement, removeStateNodes, type JSXState } from "./patch-element";
 import type { JSXElement } from ".";
-import { Scope } from "@lentjs/core-reactivity";
+import { createSignal, Scope } from "@lentjs/core-reactivity";
 import fc from "fast-check";
 import { expectedSimplifiedDom, expectedString, simplifyDom, arbitraryJSXElement } from "./dom-test-utils";
 
@@ -121,4 +121,15 @@ test("patchElement should keep text nodes and just change content if possible", 
   patchElement(container, null, state, "second value");
   expect(Object.is(container.firstChild, c)).toBeTrue();
   expect(container.firstChild?.textContent).toBe("second value");
+}));
+
+test("patchElement of a dynamic with signal", () => testWrapper(container => {
+  const [val, setVal] = createSignal<JSXElement>("previous value");
+  const el = () => val();
+  patchElement(container, null, null, el);
+  expect(simplifyDom(container,false).children).toEqual(expectedSimplifiedDom(el));
+  setVal("new value");
+  expect(simplifyDom(container,false).children).toEqual(expectedSimplifiedDom(el));
+  setVal("and again a new value");
+  expect(simplifyDom(container,false).children).toEqual(expectedSimplifiedDom(el));
 }));

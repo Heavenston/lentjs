@@ -1,5 +1,5 @@
 import { afterEach } from "bun:test";
-import { isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, isSSRElement, type JSXElement, type JSXElementDynamic, type JSXElementSingular, type JSXElementString } from ".";
+import { isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, isSSRElement, startReaction, type JSXElement, type JSXElementDynamic, type JSXElementSingular, type JSXElementString } from ".";
 import fc from "fast-check";
 import { assert, unreachable } from "@lentjs/utils";
 
@@ -81,8 +81,16 @@ export function expectedSimplifiedDom(el: JSXElement): SimplifiedDom[] {
     return [];
   if (isJSXElementString(el))
     return [{ kind: "text", content: el.toString() }];
-  if (isJSXElementDynamic(el))
-    return expectedSimplifiedDom(el());
+  if (isJSXElementDynamic(el)) {
+    const [val, reactivityData] = startReaction(el);
+    if (reactivityData.length === 0)
+      return expectedSimplifiedDom(val);
+    return [
+      { kind: "comment", content: "runtime-dyn-start" },
+      ...expectedSimplifiedDom(val),
+      { kind: "comment", content: "runtime-dyn-end" },
+    ];
+  }
   if (isJSXElementWithScope(el))
     return expectedSimplifiedDom(el.withScope.enter(el.fun));
   if (isSSRElement(el))
