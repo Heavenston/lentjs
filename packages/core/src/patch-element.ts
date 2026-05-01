@@ -146,7 +146,7 @@ function patchElementSingular(parent: Node, anchorElement: ChildNode | null, pre
   }
   else {
     const childAsNode = isJSXElementString(child) ? document.createTextNode(child.toString()) : child;
-    if (previousState?.node === childAsNode) {
+    if (previousState.node === childAsNode) {
       if (childAsNode.nextSibling !== anchorElement)
         parent.insertBefore(childAsNode, anchorElement);
     }

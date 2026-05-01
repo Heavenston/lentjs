@@ -60,7 +60,7 @@ register(getProperty, "__lentjs_getProperty");
 
 export function getValueRegistryId(value: unknown): string | null {
   if (isObject(value) && registryIdSymbol in value)
-    return value[registryIdSymbol] as string ?? null;
+    return value[registryIdSymbol] as string;
   return null;
 }
 

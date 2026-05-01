@@ -56,9 +56,9 @@ const resumeSignalSetter = register(<V>(state: SignalState<V>): SignalSetter<V> 
 }, "__lentjs_resumeSignalSetter");
 
 export function isSignalAccessor(val: unknown): val is SignalAccessor<unknown> {
-  return typeof val === "function" && val !== null && signalAccessorSymbol in val && val[signalAccessorSymbol] === true;
+  return typeof val === "function" && signalAccessorSymbol in val && val[signalAccessorSymbol] === true;
 }
 
 export function isSignalSetter(val: unknown): val is SignalSetter<never> {
-  return typeof val === "function" && val !== null && signalSetterSymbol in val && val[signalSetterSymbol] === true;
+  return typeof val === "function" && signalSetterSymbol in val && val[signalSetterSymbol] === true;
 }

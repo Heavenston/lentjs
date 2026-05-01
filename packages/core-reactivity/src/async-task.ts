@@ -58,7 +58,7 @@ function internalCreateOrResumeAsyncTask(task: AsyncTaskCallback, resumeWithReac
       scope,
     };
     const promise = Scope.enter(null, task, ctx);
-    asyncTaskCaptureData?.capturedAsyncTasks.push({
+    asyncTaskCaptureData.capturedAsyncTasks.push({
       task,
       capture: (): CapturedReactivityData => {
         cleanupScope();

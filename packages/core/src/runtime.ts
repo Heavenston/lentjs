@@ -8,7 +8,7 @@ import { deserialize } from "@lentjs/core-serialize";
 import { setResumed } from "./global-signals";
 import { ChildrenArray } from "./children-array";
 
-const REMOVE_DIRECTIVES = true;
+const REMOVE_DIRECTIVES: boolean = true;
 
 export const DIRECTIVE_PREFIX = "l";
 export const ATTRIBUTE_PREFIX: `data-${typeof DIRECTIVE_PREFIX}` = `data-${DIRECTIVE_PREFIX}`;
@@ -74,7 +74,7 @@ type RunCtx = {
   scopeStack: Scope[],
 };
 
-function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Comment, parent: Node, d: D) {
+function handleDirective(ctx: RunCtx, directiveNode: Comment, parent: Node, d: Directive) {
   switch (d.name) {
   case "dyn": {
     ctx.dynamicStateStack.push({

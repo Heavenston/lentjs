@@ -13,7 +13,7 @@ export default defineConfig([
     languageOptions: { globals: {...globals.browser, ...globals.node} },
   },
   tseslint.configs.recommendedTypeChecked,
-  // tseslint.configs.strictTypeChecked,
+  tseslint.configs.strictTypeChecked,
   tseslint.configs.stylisticTypeChecked,
   {
     languageOptions: {
@@ -32,6 +32,7 @@ export default defineConfig([
       "no-empty-function": "off",
       "@typescript-eslint/no-empty-function": "off",
       "@typescript-eslint/no-non-null-assertion": "off",
+      "@typescript-eslint/no-confusing-void-expression": "off",
 
       "@typescript-eslint/consistent-type-definitions": ["error", "type"],
       "@typescript-eslint/consistent-indexed-object-style": ["error", "index-signature"],
@@ -41,6 +42,9 @@ export default defineConfig([
           { from: "package", package: "@lentjs/core-reactivity", name: "ContextId" },
           { from: "file", name: "ContextId" },
         ],
+      }],
+      "@typescript-eslint/no-invalid-void-type": ["error", {
+        allowAsThisParameter: true,
       }],
     },
   },

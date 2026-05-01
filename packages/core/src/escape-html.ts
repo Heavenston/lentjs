@@ -7,5 +7,5 @@ const escapeMap: { [key: string]: string } = {
 };
 
 export function escapeHtml(value: string): string {
-  return String(value).replace(/[&<>"']/g, (match) => escapeMap[match]!);
+  return value.replace(/[&<>"']/g, (match) => escapeMap[match]!);
 }

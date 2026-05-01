@@ -16,7 +16,7 @@ function sharedSSRSerialize(value: unknown): number {
   return idx;
 }
 
-function createSSRDirective<K extends MarkerDirectiveName>(name: K): string;
+function createSSRDirective(name: MarkerDirectiveName): string;
 function createSSRDirective<K extends DirectiveName>(name: K, arg: Directives[K], embed?: boolean): string;
 function createSSRDirective(name: string, arg: unknown = null, embed: boolean = false): string {
   if (arg === null) {
