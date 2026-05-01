@@ -28,7 +28,7 @@ export type JSXElementDynamic = (previous?: JSXElement) => JSXElement;
 export type JSXElementWithScope = { fun: () => JSXElement, withScope: Scope };
 export type JSXElement = JSXElementSingular | JSXElementArray | JSXElementWithScope | JSXElementDynamic;
 export type PropertyValue = string | number | (() => PropertyValue);
-export type ClassList = string | Partial<Record<string, boolean>> | ClassList[];
+export type ClassList = string | Partial<{ [key: string]: boolean }> | ClassList[];
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export type ComponentFn<P = {}> = (props: P) => JSXElement;

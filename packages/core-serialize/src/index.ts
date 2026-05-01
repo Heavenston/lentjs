@@ -70,7 +70,7 @@ export function defineSerialization<O, A>(value: O, ...[reducer, reviver]: Defin
   Object.defineProperty(value, definedSerializationSymbol, { value: [reducer, reviver] });
 }
 
-const devalueReducers: Record<string, (value: any) => any> = {
+const devalueReducers: { [key: string]: (value: any) => any } = {
   reg: (val: unknown) => getValueRegistryId(val) ?? undefined,
   clo: (f: unknown) => {
     if (isFunction(f) && isClosure(f)) {
@@ -91,7 +91,7 @@ const devalueReducers: Record<string, (value: any) => any> = {
   },
 };
 
-const devalueRevivers: Record<string, (value: any) => any> = {
+const devalueRevivers: { [key: string]: (value: any) => any } = {
   reg: (id: string) => {
     assert(registry.has(id), `No values in registry with id '${id}'`);
     return registry.get(id);

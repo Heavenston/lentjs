@@ -1,4 +1,4 @@
-const escapeMap: Record<string, string> = {
+const escapeMap: { [key: string]: string } = {
   '&': '&amp;',
   '<': '&lt;',
   '>': '&gt;',

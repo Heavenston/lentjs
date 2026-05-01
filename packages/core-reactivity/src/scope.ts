@@ -96,8 +96,11 @@ export class Scope {
   #state: ScopeState = "alive";
   #controller: AbortController | null = null;
   #detachingWithParent: boolean = false;
-  #contextValues: Map<unknown, unknown> = new Map;
-  readonly #callbacks: Record<FinalScopeStates, (() => void)[]> = {
+  #contextValues = new Map<unknown, unknown>;
+  // readonly #callbacks: Record<FinalScopeStates, (() => void)[]> = {
+  readonly #callbacks: {
+    [K in FinalScopeStates]: (() => void)[];
+  } = {
     cleaned: [],
     detached: [],
   };

@@ -198,7 +198,7 @@ export type { SSRElementBuilder };
 
 export class SSRElement {
   #tag: string;
-  #props: Map<string, SSRElementValue<unknown>> = new Map;
+  #props = new Map<string, SSRElementValue<unknown>>();
   #children: SSRElementChildValue;
 
   public constructor(tag: string, props: any) {
