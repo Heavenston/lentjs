@@ -1,10 +1,9 @@
-import { test, expect, describe, beforeAll, afterAll } from "bun:test";
+import { test, expect, describe } from "bun:test";
 import { patchElement, removeStateNodes, type JSXState } from "./patch-element";
 import type { JSXElement } from ".";
 import { createSignal, Scope } from "@lentjs/core-reactivity";
 import fc from "fast-check";
-import { expectedSimplifiedDom, expectedString, simplifyDom, arbitraryJSXElement } from "./dom-test-utils";
-import { GlobalRegistrator } from '@happy-dom/global-registrator';
+import { expectedSimplifiedDom, expectedString, simplifyDom, arbitraryJSXElement, registerDocumentTests } from "./dom-test-utils";
 
 const jsxElementExamples: JSXElement[] = [
   -0, 0,
@@ -21,13 +20,7 @@ function testWrapper(fn: (container: HTMLElement) => void) {
   cleanup();
 }
 
-beforeAll(() => {
-  GlobalRegistrator.register();
-})
-
-afterAll(async () => {
-  await GlobalRegistrator.unregister();
-});
+registerDocumentTests();
 
 describe("Property based testig, patchElement called", () => {
   const examples = jsxElementExamples.map<[JSXElement]>(p => [p]);

@@ -1,17 +1,10 @@
-import { test, expect, describe, beforeAll, afterAll } from "bun:test";
+import { test, expect, describe } from "bun:test";
 import fc from "fast-check";
-import { arbitraryHTMLTag, arbitraryJSXElement, expectedSimplifiedDom, expectedString, isValidHTMLAttributeName, simplifyDom } from "./dom-test-utils";
+import { arbitraryHTMLTag, arbitraryJSXElement, expectedSimplifiedDom, expectedString, isValidHTMLAttributeName, registerDocumentTests, simplifyDom } from "./dom-test-utils";
 import { renderToString } from "./render-to-string";
-import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { SSRElement } from "./render-to-string";
 
-beforeAll(() => {
-  GlobalRegistrator.register();
-})
-
-afterAll(async () => {
-  await GlobalRegistrator.unregister();
-});
+registerDocumentTests();
 
 describe("createSSRElement", () => {
   test("element with no props, asserts html gets parsed the same", () => {

@@ -1,9 +1,8 @@
-import { test, expect, describe, afterAll, beforeAll } from "bun:test";
+import { test, expect, describe } from "bun:test";
 import { createHTMLElement, renderToDom } from "./render-to-dom";
 import { isInTrackingContext, Scope } from "@lentjs/core-reactivity";
 import fc from "fast-check";
-import { arbitraryJSXElement, arbitraryJSXElementDynamic, asciiLowercase, expectedSimplifiedDom, isValidAttributeName, simplifyDom } from "./dom-test-utils";
-import { GlobalRegistrator } from "@happy-dom/global-registrator";
+import { arbitraryJSXElement, arbitraryJSXElementDynamic, asciiLowercase, expectedSimplifiedDom, isValidAttributeName, registerDocumentTests, simplifyDom } from "./dom-test-utils";
 
 function testWrapper(fn: () => void) {
   const [scope, cleanup] = Scope.createControlled();
@@ -13,13 +12,7 @@ function testWrapper(fn: () => void) {
   cleanup();
 }
 
-beforeAll(() => {
-  GlobalRegistrator.register();
-})
-
-afterAll(async () => {
-  await GlobalRegistrator.unregister();
-});
+registerDocumentTests();
 
 describe("createHTMLElement", () => {
   test("just a %p and no props", () => {

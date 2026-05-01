@@ -1,8 +1,9 @@
-import { afterEach } from "bun:test";
+import { afterAll, afterEach, beforeAll } from "bun:test";
 import { isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, isSSRElement, SSRElement, startReaction, type JSXElement, type JSXElementDynamic, type JSXElementSingular, type JSXElementString } from ".";
 import fc from "fast-check";
 import { assert, unreachable } from "@lentjs/utils";
 import * as hp from "happy-dom";
+import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
 fc.configureGlobal({
   seed: 69,
@@ -59,6 +60,16 @@ export function isValidHTMLAttributeName(name: string): boolean {
   catch {
     return false;
   }
+}
+
+export function registerDocumentTests(): void {
+  beforeAll(() => {
+    GlobalRegistrator.register();
+  })
+
+  afterAll(async () => {
+    await GlobalRegistrator.unregister();
+  });
 }
 
 const nodeIds = new Map<unknown, number>;
