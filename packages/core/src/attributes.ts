@@ -2,6 +2,7 @@ import type { ClassList, EventHandler, JSXElement } from ".";
 import { renderClasslist } from ".";
 import { getScope } from "@lentjs/core-reactivity";
 import type { SSRElementBuilder } from "./render-to-string";
+import { assert } from "@lentjs/utils";
 
 export type AttributeValue = string | boolean | number | undefined;
 export type Attributes = {
@@ -88,7 +89,8 @@ const handlers: AttributeHandler<any>[] = [
     forceResume: false,
     setOnHTMLElement(el, propName, value) {
       const tk = propName.slice(5);
-      // @ts-ignore
+      assert(tk in el);
+      //@ts-expect-error We trust that this is called with correct key/value for this element
       el[tk] = value;
     },
     setOnSSRElement() { },
@@ -99,7 +101,7 @@ const handlers: AttributeHandler<any>[] = [
     forceResume: false,
     setOnHTMLElement(element, propName, value) {
       if (propName in element)
-        // @ts-ignore
+        //@ts-expect-error We trust that this is called with correct key/value for this element
         element[propName] = value;
       else
         console.warn("Cannot set property:", propName, "is not in", element)

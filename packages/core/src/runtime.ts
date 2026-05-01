@@ -190,8 +190,8 @@ function handleDirective<D extends Directive>(ctx: RunCtx, directiveNode: Commen
   }
   case "chi/": {
     ctx.nodesToRemove.push(directiveNode);
-    let states: JSXState[] = [];
-    let elements = new ChildrenArray<JSXElement>;
+    const states: JSXState[] = [];
+    const elements = new ChildrenArray<JSXElement>;
     while (ctx.dynamicStateStack.length > 0 && ctx.dynamicStateStack.at(-1)?.kind !== "children-array-start") {
       const el = ctx.dynamicStateStack.pop();
       assert(el?.kind === "state");

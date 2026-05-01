@@ -19,7 +19,7 @@ function internalCreateOrResumeTask(task: TaskCallback, resumeWithReactivityData
 
   if (taskCaptureData) {
     assert(resumeWithReactivityData === null, "Cannot resume a task while capturing tasks");
-    const [_void, reactivityData] = startReaction(task);
+    const [,reactivityData] = startReaction(task);
     const captured: CapturedTaskData = { parentScope, reactivityData, task };
     taskCaptureData.capturedTasks.push(captured);
     parentScope?.onCleanup(() => remove(taskCaptureData.capturedTasks, captured));

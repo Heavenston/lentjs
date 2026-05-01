@@ -3,6 +3,7 @@ import { createStore, getStoreId, isStore } from "./store";
 import { listenForSignalReads, registerSignalCallback, type SignalId } from "./signal-internal";
 import { createReaction } from "./reaction";
 import { serialize, deserialize } from "@lentjs/core-serialize";
+import { blackbox } from "@lentjs/utils";
 
 describe("createStore", () => {
   test("get returns property value", () => {
@@ -35,7 +36,7 @@ describe("store get trap", () => {
     const store = createStore({ a: 1 });
     const reads: SignalId[] = [];
     listenForSignalReads(() => {
-      store.a;
+      blackbox(store.a);
     }, reads);
     expect(reads).toBeArrayOfSize(1);
   });
@@ -44,8 +45,8 @@ describe("store get trap", () => {
     const store = createStore({ a: 1, b: 2 });
     const reads: SignalId[] = [];
     listenForSignalReads(() => {
-      store.a;
-      store.b;
+      blackbox(store.a);
+      blackbox(store.b);
     }, reads);
     expect(reads).toBeArrayOfSize(2);
     expect(reads[0]).not.toBe(reads[1]);
@@ -55,7 +56,7 @@ describe("store get trap", () => {
     const store = createStore({ a: 1 });
     const sym = Symbol("test");
     expect(() => {
-      (store as any)[sym];
+      blackbox((store as any)[sym]);
     }).toThrow("Symbol keys inside store are not supported");
   });
 });
@@ -157,7 +158,7 @@ describe("getStoreId", () => {
 describe("store reactivity integration", () => {
   test("createReaction re-runs when store property changes", () => {
     const store = createStore({ count: 0 });
-    const reaction = jest.fn(() => { store.count; });
+    const reaction = jest.fn(() => { blackbox(store.count); });
     const unsub = createReaction(reaction);
     expect(reaction).toHaveBeenCalledTimes(1);
     store.count = 1;
@@ -167,7 +168,7 @@ describe("store reactivity integration", () => {
 
   test("createReaction does not re-run for unread property changes", () => {
     const store = createStore({ a: 0, b: 0 });
-    const reaction = jest.fn(() => { store.a; });
+    const reaction = jest.fn(() => { blackbox(store.a); });
     const unsub = createReaction(reaction);
     expect(reaction).toHaveBeenCalledTimes(1);
     store.b = 99;
@@ -177,7 +178,7 @@ describe("store reactivity integration", () => {
 
   test("createReaction re-runs when a newly added property changes", () => {
     const store = createStore({} as { x?: number });
-    const reaction = jest.fn(() => { store.x; });
+    const reaction = jest.fn(() => { blackbox(store.x); });
     const unsub = createReaction(reaction);
     expect(reaction).toHaveBeenCalledTimes(1);
     store.x = 42;
@@ -201,7 +202,7 @@ describe("store serialization", () => {
     const restored = deserialize(text) as typeof store;
     const reads: SignalId[] = [];
     listenForSignalReads(() => {
-      restored.a;
+      blackbox(restored.a);
     }, reads);
     expect(reads).toBeArrayOfSize(1);
   });

@@ -182,7 +182,7 @@ export function expectedSimplifiedDom(el: JSXElement, parsed: boolean = false): 
     if (parsed) {
       // Concatenates adjacent text nodes into a single big text nodes
       // because that is how html will parse
-      let concated: SimplifiedDom[] = result.length === 0 ? [] : [result[0]!];
+      const concated: SimplifiedDom[] = result.length === 0 ? [] : [result[0]!];
       for (let i = 1; i < result.length; i++) {
         const last = concated.at(-1)!;
         const curr = result[i]!;

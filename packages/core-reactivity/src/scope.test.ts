@@ -270,7 +270,7 @@ describe("parent-child lifecycle propagation", () => {
 
   test("cleaning parent cleans controlled child", () => {
     const [parent, parentCleanup] = Scope.createControlled();
-    const [child, _childCleanup] = Scope.createControlled(parent);
+    const [child,] = Scope.createControlled(parent);
     expect(child.state).toBe("alive");
     parentCleanup();
     expect(child.state).toBe("cleaned");

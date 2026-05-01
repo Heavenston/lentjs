@@ -18,11 +18,12 @@ export function assert(value: boolean | (() => boolean), message?: string) {
   }
 }
 
-export function unreachable(_value: never): never {
-  throw new Error("Reached unreachabble");
+export function unreachable(value: never): never {
+  throw new Error(`Reached unreachable: ${value}`);
 }
 
 export function noop(): void {}
+export function blackbox<T>(val: T): T { return val }
 export function identity<T>(val: T): T { return val }
 export function constant<T>(val: T): (() => T) { return (identity<T>).bind(null, val); }
 export function getProperty<T, K extends keyof T>(val: T, key: K): T[K] { return val[key]; }

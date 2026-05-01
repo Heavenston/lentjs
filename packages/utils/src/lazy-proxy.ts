@@ -6,7 +6,7 @@ export function createLazyProxy<T extends object>(fn: () => T): T {
   function getObject(state: State): T {
     if (!("object" in state))
       state.object = fn();
-    // @ts-ignore This would require exactOptionalPropertyTypes to work properly
+    // @ts-expect-error This would require exactOptionalPropertyTypes to work properly
     return state.object;
   }
 

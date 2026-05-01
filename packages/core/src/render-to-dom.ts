@@ -25,10 +25,10 @@ export function createHTMLElement(element: string, props: any): HTMLElement {
   return el;
 }
 
-export function renderToDom(parent: Node, el: ComponentFn<{}>): void {
+export function renderToDom(parent: Node, el: ComponentFn<object>): void {
   Scope.create().enter(() => {
     const val = patchElement(parent, null, null, factory(el));
-    // @ts-ignore This is useless and just used to prevent val from being gced
+    // @ts-expect-error This is useless and just used to prevent val from being gced
     globalThis[Symbol("gc-prevention")] = val;
   });
 }

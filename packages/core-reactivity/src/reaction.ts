@@ -9,7 +9,7 @@ export function combineReactivityData(a: CapturedReactivityData, b: CapturedReac
 }
 
 function convertReactivityData<T>(val: T): T extends CapturedReactivityData ? SignalId[] : T extends SignalId[] ? CapturedReactivityData : T {
-  // @ts-ignore
+  // @ts-expect-error We make an invalid convertion
   return val;
 }
 

@@ -47,9 +47,6 @@ export function listenForSignalReads<T>(cb: () => T, signalReads: SignalId[]): T
   try {
     return cb();
   }
-  catch(e) {
-    throw e;
-  }
   finally {
     currentSignalListener = previousListener;
   }
@@ -61,9 +58,6 @@ export function untrack<T>(cb: () => T): T {
 
   try {
     return cb();
-  }
-  catch(e) {
-    throw e;
   }
   finally {
     currentSignalListener = old_read_callback;

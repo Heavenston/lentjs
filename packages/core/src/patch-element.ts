@@ -62,13 +62,14 @@ function stateIsAnchoredTo(state: JSXState, anchor: ChildNode | null): boolean {
 
 export function changeStateAnchor(parent: Node, state: JSXState, newAnchor: ChildNode | null): void {
   switch (state.kind) {
-  case "array":
+  case "array": {
     let currentAnchor = newAnchor;
     for (let i = state.states.length-1; i>=0; i--) {
       changeStateAnchor(parent, state.states[i]!, currentAnchor);
       currentAnchor = getFirstElement(state.states[i]!) ?? currentAnchor;
     }
     break;
+  }
   case "singular":
     if (state.node !== null)
       parent.insertBefore(state.node, newAnchor);
@@ -225,7 +226,7 @@ function patchElementDynamic(parent: Node, anchorElement: ChildNode | null, chil
 /// Specialized function for arrays with no previous state (so we just adds the elements)
 function appendArray(parent: Node, anchorElement: ChildNode | null, child: JSXElement[]): JSXStateArray {
   let currentAnchor = anchorElement;
-  let states: JSXState[] = [];
+  const states: JSXState[] = [];
   for (let i = child.length-1; i>=0;i--) {
     const childEl = child instanceof ChildrenArray ? child.getOrComputed(i) : child[i];
     const state = patchElement(parent, currentAnchor, null, childEl);

@@ -30,7 +30,7 @@ describe("createAsyncTask", () => {
   test("task callback runs with Scope.currentScope as null", () => {
     const [scope, cleanup] = Scope.createControlled();
     let currentScopeDuringTask: Scope | null | undefined = undefined;
-    scope.enter(() => createAsyncTask((_ctx) => {
+    scope.enter(() => createAsyncTask(() => {
       currentScopeDuringTask = Scope.currentScope;
       return resolved();
     }));
@@ -77,7 +77,7 @@ describe("createAsyncTask", () => {
   test("does not re-run for untracked signal changes", () => {
     const [, unrelatedSetter] = createSignal(0);
     const [scope, cleanup] = Scope.createControlled();
-    const taskFn = jest.fn((_ctx: AsyncTaskContext) => {
+    const taskFn = jest.fn(() => {
       return resolved();
     });
     scope.enter(() => createAsyncTask(taskFn));
@@ -118,7 +118,7 @@ describe("createAsyncTask", () => {
   });
 
   test("works without a parent scope", () => {
-    const taskFn = jest.fn((_ctx: AsyncTaskContext) => resolved());
+    const taskFn = jest.fn(() => resolved());
     expect(() => createAsyncTask(taskFn)).not.toThrow();
     expect(taskFn).toHaveBeenCalledTimes(1);
   });
@@ -163,7 +163,7 @@ describe("createAsyncTask with capture context", () => {
     const [scope, cleanup] = Scope.createControlled();
     const captureData = createTaskCaptureData();
     scope.setContext(taskCaptureContextId, captureData);
-    scope.enter(() => createAsyncTask((_ctx) => resolved()));
+    scope.enter(() => createAsyncTask(() => resolved()));
     expect(captureData.capturedAsyncTasks).toBeArrayOfSize(1);
     cleanup();
   });
@@ -172,7 +172,7 @@ describe("createAsyncTask with capture context", () => {
     const [scope, cleanup] = Scope.createControlled();
     const captureData = createTaskCaptureData();
     scope.setContext(taskCaptureContextId, captureData);
-    const taskFn = (_ctx: AsyncTaskContext) => resolved();
+    const taskFn = () => resolved();
     scope.enter(() => createAsyncTask(taskFn));
     const captured = captureData.capturedAsyncTasks[0]!;
     expect(captured.task).toBe(taskFn);
@@ -236,7 +236,7 @@ describe("createAsyncTask with capture context", () => {
     const captureData = createTaskCaptureData();
     scope.setContext(taskCaptureContextId, captureData);
     expect(() => {
-      scope.enter(() => resumeAsyncTask((_ctx) => resolved(), reactivityData));
+      scope.enter(() => resumeAsyncTask(() => resolved(), reactivityData));
     }).toThrow("Cannot resume an async task while capturing tasks");
     cleanup();
   });
@@ -264,7 +264,7 @@ describe("resumeAsyncTask", () => {
     const [accessor] = createSignal(0);
     const [, reactivityData] = startReaction(() => accessor());
     const [scope, cleanup] = Scope.createControlled();
-    const taskFn = jest.fn((_ctx: AsyncTaskContext) => resolved());
+    const taskFn = jest.fn(() => resolved());
     scope.enter(() => resumeAsyncTask(taskFn, reactivityData));
     expect(taskFn).toHaveBeenCalledTimes(0);
     cleanup();

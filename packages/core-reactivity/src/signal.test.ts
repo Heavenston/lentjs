@@ -130,7 +130,7 @@ describe("setter.update", () => {
   });
 
   test("receives current value as argument", () => {
-    const [_accessor, setter] = createSignal(42);
+    const [,setter] = createSignal(42);
     const updater = jest.fn((v: number) => v);
     setter.update(updater);
     expect(updater).toHaveBeenCalledWith(42);

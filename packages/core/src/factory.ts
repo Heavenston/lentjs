@@ -5,7 +5,7 @@ import { createHTMLElement } from "./render-to-dom";
 import { createSSRElement } from "./render-to-string";
 
 export function factory(element: string, props?: Attributes): JSXElement;
-export function factory(element: ComponentFn<{}>): JSXElement;
+export function factory(element: ComponentFn<object>): JSXElement;
 export function factory<P>(element: ComponentFn<P>, props: P): JSXElement;
 export function factory<P>(element: string | ComponentFn<P>, props?: P): JSXElement {
   if (typeof element === "string") {

@@ -18,9 +18,9 @@ export type ScopeCleanup = {
 
 export function createContextId<T>(id: string, cfg?: { noSerialize?: boolean }): ContextId<T> {
   if (cfg?.noSerialize)
-    // @ts-ignore Fake convertion
+    // @ts-expect-error Fake convertion
     return Symbol(id);
-  // @ts-ignore Fake convertion
+  // @ts-expect-error Fake convertion
   return id;
 }
 
@@ -87,9 +87,6 @@ export class Scope {
     Scope.#currentScope = scope;
     try {
       return cb(...args);
-    }
-    catch(e) {
-      throw e;
     }
     finally {
       Scope.#currentScope = prev;

@@ -46,7 +46,7 @@ export class ChildrenArray<T> extends Array<T> {
   }
 
   private reducer(): K<T>[] {
-    let result: K<T>[] = [];
+    const result: K<T>[] = [];
     for (let i = 0; i < this.length; i++) {
       const desc = Object.getOwnPropertyDescriptor(this, i)!;
       if (desc.get)

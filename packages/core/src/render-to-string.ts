@@ -95,7 +95,7 @@ function toSSRElementChild(el: JSXElement): SSRElementChildValue {
     return el.withScope.enter(() => toSSRElementChild(el.fun()));
   }
   if (Array.isArray(el) && isChildrenArray(el)) {
-    let c: SSRElementChildArray = [];
+    const c: SSRElementChildArray = [];
     c.wasChildrenArray = true;
     for (let i = 0; i < el.length; i++) {
       // FIXME: This doesn't differenciate computed children elements vs dynamic elements inside the array
@@ -113,7 +113,7 @@ function toSSRElementChild(el: JSXElement): SSRElementChildValue {
 
 function stringifySSRElementChild(elValue: SSRElementChildValue, isInsideDynamic: boolean = false, isComputedInArray: boolean = false): string {
   switch (elValue.kind) {
-  case "dynamic":
+  case "dynamic": {
     const [val, reactivityData] = elValue.unsub();
 
     if (reactivityData.length <= 0 && !isInsideDynamic) {
@@ -127,6 +127,7 @@ function stringifySSRElementChild(elValue: SSRElementChildValue, isInsideDynamic
     });
     const suffix = createSSRDirective("dyn/");
     return `${prefix}${stringifySSRElementChild(val, true)}${suffix}`;
+  }
   case "static":
   }
 
@@ -286,7 +287,7 @@ export function createSSRElement(element: string, props: any): SSRElement {
 export type RenderToStringCfg = {
   disableDataElement?: boolean,
 };
-export async function renderToString(el: ComponentFn<{}>, cfg: RenderToStringCfg = {}): Promise<string> {
+export async function renderToString(el: ComponentFn<object>, cfg: RenderToStringCfg = {}): Promise<string> {
   const [scope, cleanup] = Scope.createControlled();
   const taskCaptureData: TaskCaptureData = { capturedTasks: [], capturedAsyncTasks: [] };
   scope.setContext(taskCaptureContextId, taskCaptureData);
@@ -309,9 +310,6 @@ export async function renderToString(el: ComponentFn<{}>, cfg: RenderToStringCfg
       tasks: taskResumeData,
     } satisfies RuntimeSerializedData)}</script>`;
     return `${directivesData}${html}`;
-  }
-  catch(e) {
-    throw e;
   }
   finally {
     // We need to cleanup after serialization otherwise we serialize the scopes in the cleaned state

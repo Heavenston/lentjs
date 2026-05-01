@@ -30,7 +30,8 @@ export type JSXElement = JSXElementSingular | JSXElementArray | JSXElementWithSc
 export type PropertyValue = string | number | (() => PropertyValue);
 export type ClassList = string | Partial<Record<string, boolean>> | ClassList[];
 
-export type ComponentFn<P> = (props: P) => JSXElement;
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export type ComponentFn<P = {}> = (props: P) => JSXElement;
 
 export type EventHandler<E> = (event: E) => unknown;
 
@@ -69,7 +70,7 @@ export function renderClasslist(list: ClassList): string[] {
     return list.flatMap(renderClasslist);
   return Object.entries(list)
     .filter(([k, v]) => typeof k === "string" && v)
-    .map(([k, _]) => k);
+    .map(([k,]) => k);
 }
 
 export function register$<T extends object>(val: T, id?: string): T {
