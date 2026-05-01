@@ -36,6 +36,7 @@
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.9.0",
         "@types/bun": "latest",
+        "happy-dom": "^20.9.0",
       },
       "peerDependencies": {
         "typescript": "^5",

@@ -34,7 +34,6 @@ const selfClosingHTMLElement = [
   "area",
   "base",
   "br",
-  "col",
   "embed",
   "hr",
   "img",
@@ -45,9 +44,6 @@ const selfClosingHTMLElement = [
   "source",
   "track",
   "wbr",
-  "command",
-  "keygen",
-  "menuitem",
 ];
 
 type SSRElementDynamicValueRec<T> = {

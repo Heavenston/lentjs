@@ -1,8 +1,9 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe, afterAll, beforeAll } from "bun:test";
 import { createHTMLElement, renderToDom } from "./render-to-dom";
 import { isInTrackingContext, Scope } from "@lentjs/core-reactivity";
 import fc from "fast-check";
-import { arbitraryJSXElement, arbitraryJSXElementDynamic, expectedSimplifiedDom, simplifyDom } from "./dom-test-utils";
+import { arbitraryJSXElement, arbitraryJSXElementDynamic, asciiLowercase, expectedSimplifiedDom, isValidAttributeName, simplifyDom } from "./dom-test-utils";
+import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
 function testWrapper(fn: () => void) {
   const [scope, cleanup] = Scope.createControlled();
@@ -12,19 +13,13 @@ function testWrapper(fn: () => void) {
   cleanup();
 }
 
-function asciiLowercase(name: string): string {
-  return name.replace(/[A-Z]/g, c => String.fromCharCode(c.charCodeAt(0) + 32));
-}
+beforeAll(() => {
+  GlobalRegistrator.register();
+})
 
-function isValidAttributeName(name: string): boolean {
-  try {
-    document.createElement("div").setAttribute(name, "");
-    return true;
-  }
-  catch {
-    return false;
-  }
-}
+afterAll(async () => {
+  await GlobalRegistrator.unregister();
+});
 
 describe("createHTMLElement", () => {
   test("just a %p and no props", () => {
@@ -71,7 +66,7 @@ describe("createHTMLElement", () => {
   });
 
   test("children property yields correct children simplified dom", () => {
-    fc.assert(fc.property(arbitraryJSXElement, children => testWrapper(() => {
+    fc.assert(fc.property(arbitraryJSXElement(), children => testWrapper(() => {
       const h = createHTMLElement("div", {
         children,
       });
@@ -114,7 +109,7 @@ describe("renderToDom", () => {
   });
 
   test("works with any JSXElement, assert valid simplidiedDom", () => {
-    fc.assert(fc.property(arbitraryJSXElementDynamic, el => {
+    fc.assert(fc.property(arbitraryJSXElementDynamic(), el => {
       const container = document.createElement("div");
       renderToDom(container, () => el);
       expect(simplifyDom(container, false).children).toEqual(expectedSimplifiedDom(el));

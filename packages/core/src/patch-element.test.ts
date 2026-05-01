@@ -1,9 +1,10 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe, beforeAll, afterAll } from "bun:test";
 import { patchElement, removeStateNodes, type JSXState } from "./patch-element";
 import type { JSXElement } from ".";
 import { createSignal, Scope } from "@lentjs/core-reactivity";
 import fc from "fast-check";
 import { expectedSimplifiedDom, expectedString, simplifyDom, arbitraryJSXElement } from "./dom-test-utils";
+import { GlobalRegistrator } from '@happy-dom/global-registrator';
 
 const jsxElementExamples: JSXElement[] = [
   -0, 0,
@@ -20,11 +21,19 @@ function testWrapper(fn: (container: HTMLElement) => void) {
   cleanup();
 }
 
+beforeAll(() => {
+  GlobalRegistrator.register();
+})
+
+afterAll(async () => {
+  await GlobalRegistrator.unregister();
+});
+
 describe("Property based testig, patchElement called", () => {
   const examples = jsxElementExamples.map<[JSXElement]>(p => [p]);
 
   test("twice with same value, should not change anything", () => {;
-    fc.assert(fc.property(arbitraryJSXElement, val => testWrapper(container => {
+    fc.assert(fc.property(arbitraryJSXElement(), val => testWrapper(container => {
       const state1 = patchElement(container, null, null, val);
       const beforeDom = simplifyDom(container);
       const beforeTxt = container.innerText;
@@ -35,7 +44,7 @@ describe("Property based testig, patchElement called", () => {
   });
 
   test("twice with equivalent value, should not change anything (but may re-create elements)", () => {
-    fc.assert(fc.property(fc.clone(arbitraryJSXElement, 2), ([val1, val2]) => testWrapper(container => {
+    fc.assert(fc.property(fc.clone(arbitraryJSXElement(), 2), ([val1, val2]) => testWrapper(container => {
       const state1 = patchElement(container, null, null, val1);
       const beforeDom = simplifyDom(container,false);
       const beforeTxt = container.innerText;
@@ -46,7 +55,7 @@ describe("Property based testig, patchElement called", () => {
   });
 
   test("n times snapshoting dom state", () => {
-    fc.assert(fc.property(fc.array(arbitraryJSXElement, { minLength: 1, maxLength: 3 }), vals => testWrapper(container => {
+    fc.assert(fc.property(fc.array(arbitraryJSXElement(), { minLength: 1, maxLength: 3 }), vals => testWrapper(container => {
       let state: JSXState | null = null;
       vals.map(val => {
         state = patchElement(container, null, state, val);
@@ -56,7 +65,7 @@ describe("Property based testig, patchElement called", () => {
   });
 
   test("n times changing the value, asserting finished innerText", () => {
-    fc.assert(fc.property(fc.array(arbitraryJSXElement, { minLength: 1 }), vals => testWrapper(container => {
+    fc.assert(fc.property(fc.array(arbitraryJSXElement(), { minLength: 1 }), vals => testWrapper(container => {
       let state: JSXState | null = null;
       vals.map(val => {
         state = patchElement(container, null, state, val);
@@ -66,7 +75,7 @@ describe("Property based testig, patchElement called", () => {
   });
 
   test("n times changing the value, asserting finished dom", () => {
-    fc.assert(fc.property(fc.array(arbitraryJSXElement, { minLength: 1 }), vals => testWrapper(container => {
+    fc.assert(fc.property(fc.array(arbitraryJSXElement(), { minLength: 1 }), vals => testWrapper(container => {
       let state: JSXState | null = null;
       vals.map(val => {
         state = patchElement(container, null, state, val);
@@ -85,7 +94,7 @@ describe("Property based testig, patchElement called", () => {
   });
 
   test("n times changing the value, than calling removeStateNodes, asserting empty body", () => {
-    fc.assert(fc.property(fc.array(arbitraryJSXElement, { minLength: 1 }), vals => testWrapper(container => {
+    fc.assert(fc.property(fc.array(arbitraryJSXElement(), { minLength: 1 }), vals => testWrapper(container => {
       let state: JSXState | null = null;
       vals.map(val => {
         state = patchElement(container, null, state, val);
