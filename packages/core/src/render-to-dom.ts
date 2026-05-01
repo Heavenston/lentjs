@@ -1,10 +1,10 @@
 import { createTask, getScope, Scope, untrack } from "@lentjs/core-reactivity";
 import { cleanupStateNodes, patchElement } from "./patch-element";
-import { factory } from "./factory";
+import { factory, type HTMLElementProps } from "./factory";
 import type { ComponentFn } from ".";
 import { getHandlerForAttribute } from "./attributes";
 
-export function createHTMLElement(element: string, props: any): HTMLElement {
+export function createHTMLElement(element: string, props: HTMLElementProps): HTMLElement {
   const el = document.createElement(element);
   for (const propName of Object.keys(props)) {
     if (propName === "children") {

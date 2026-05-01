@@ -111,6 +111,7 @@ const handlers: AttributeHandler<any>[] = [
         builder.appendAttribute(propName);
       }
       else if (value != null && value !== false) {
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string
         builder.appendAttribute(propName, value.toString());
       }
     },

@@ -2,9 +2,11 @@ import { serialize } from "@lentjs/core-serialize";
 import { Scope, taskCaptureContextId, type TaskCaptureData, type CapturedReactivityData, createReaction } from "@lentjs/core-reactivity";
 import { DIRECTIVE_PREFIX, type DirectiveName, type Directives, type MarkerDirectiveName, ATTRIBUTE_PREFIX, type ResumeAttributesData, type DynamicAttributesData, type RuntimeSerializedData, type TaskResumeData } from "./runtime";
 import { escapeHtml } from "./escape-html";
-import { ChildrenArray, factory, isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, type ComponentFn, type JSXElement, type JSXElementString } from ".";
+import { factory, isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, type ComponentFn, type JSXElement, type JSXElementDynamic, type JSXElementString } from ".";
 import { assert, notNull, unreachable } from "@lentjs/utils";
 import { getHandlerForAttribute } from "./attributes";
+import { isChildrenArray } from "./children-array";
+import type { HTMLElementProps } from "./factory";
 
 const global_directive_data_array: unknown[] = [];
 
@@ -66,11 +68,6 @@ type SSRElementChildArray = SSRElementChildValue[] & { wasChildrenArray?: boolea
 type SSRElementChild = null | undefined | JSXElementString | SSRElementChildArray | SSRElement;
 type SSRElementChildValue = SSRElementValueRec<SSRElementChild>;
 
-// Better than just 'arr instanceof ChildrenArray' because is keep 'T'
-function isChildrenArray<T>(arr: T[]): arr is ChildrenArray<T> {
-  return arr instanceof ChildrenArray;
-}
-
 function toSSRElementChild(el: JSXElement): SSRElementChildValue {
   if (el === null || el === undefined || isJSXElementString(el) || isSSRElement(el))
     return { kind: "static", value: el };
@@ -122,7 +119,7 @@ function stringifySSRElementChild(elValue: SSRElementChildValue, isInsideDynamic
 
     const prefix = createSSRDirective("dyn", {
       isComputedInArray,
-      update: elValue.function as any,
+      update: elValue.function as JSXElementDynamic,
       reactivityData: reactivityData,
     });
     const suffix = createSSRDirective("dyn/");
@@ -201,7 +198,7 @@ export class SSRElement {
   #props = new Map<string, SSRElementValue<unknown>>();
   #children: SSRElementChildValue;
 
-  public constructor(tag: string, props: any) {
+  public constructor(tag: string, props: HTMLElementProps) {
     this.#tag = tag;
 
     for (const propName of Object.keys(props)) {
@@ -217,7 +214,8 @@ export class SSRElement {
         });
         this.#props.set(propName, {
           kind: "dynamic",
-          function: descriptor.get as any,
+          // eslint-disable-next-line @typescript-eslint/unbound-method
+          function: descriptor.get,
           unsub: () => {
             const reactivityData = unsub();
             return [latestVal, reactivityData];
@@ -232,7 +230,7 @@ export class SSRElement {
       }
     }
 
-    this.#children = toSSRElementChild(props["children"]);
+    this.#children = toSSRElementChild(props.children);
   }
 
   public build(): string {
@@ -280,7 +278,7 @@ export class SSRElement {
   }
 }
 
-export function createSSRElement(element: string, props: any): SSRElement {
+export function createSSRElement(element: string, props: HTMLElementProps): SSRElement {
   return new SSRElement(element, props);
 }
 

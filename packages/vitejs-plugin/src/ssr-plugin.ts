@@ -41,12 +41,15 @@ const shouldSsrRender = (req: Connect.IncomingMessage) => {
   return true;
 };
 
+export type RenderFunction = (req: Connect.IncomingMessage) => Promise<string>;
+
 export function ssrPlugin(): PluginOption {
   return {
     name: "lentjs-ssr",
     enforce: "pre",
 
     configureServer: (server) => {
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
       server.middlewares.use(async (req, res, next) => {
         if (!shouldSsrRender(req))
           return next();
@@ -64,7 +67,7 @@ export function ssrPlugin(): PluginOption {
           html = await server.transformIndexHtml(req.url!, html);
 
           try {
-            const { render } = await server.ssrLoadModule("src/entry-server.ts");
+            const { render } = await server.ssrLoadModule("src/entry-server.ts") as { render: RenderFunction };
             html = html.replace("<!--ssr-outlet-->", await render(req));
           }
           catch(e) {

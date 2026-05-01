@@ -19,7 +19,7 @@ describe("createStore", () => {
   });
 
   test("get undefined property returns undefined", () => {
-    const store = createStore({} as { x?: number });
+    const store = createStore<{ x?: number }>({});
     expect(store.x).toBeUndefined();
   });
 
@@ -53,10 +53,10 @@ describe("store get trap", () => {
   });
 
   test("get with symbol key throws", () => {
-    const store = createStore({ a: 1 });
     const sym = Symbol("test");
+    const store = createStore<{ a: number, [sym]?: unknown }>({ a: 1 });
     expect(() => {
-      blackbox((store as any)[sym]);
+      blackbox(store[sym]);
     }).toThrow("Symbol keys inside store are not supported");
   });
 });
@@ -81,15 +81,15 @@ describe("store set trap", () => {
   });
 
   test("set with symbol key throws", () => {
-    const store = createStore({ a: 1 });
     const sym = Symbol("test");
+    const store = createStore<{ a: number, [sym]?: unknown }>({ a: 1 });
     expect(() => {
-      (store as any)[sym] = "value";
+      store[sym] = "value";
     }).toThrow("Symbol keys inside store are not supported");
   });
 
   test("adding a new property works and triggers", () => {
-    const store = createStore({} as { x?: number });
+    const store = createStore<{ x?: number }>({});
     const storeId = getStoreId(store);
     const onUpdate = jest.fn();
     registerSignalCallback({ onUpdate }, `${storeId}_x`);
@@ -177,7 +177,7 @@ describe("store reactivity integration", () => {
   });
 
   test("createReaction re-runs when a newly added property changes", () => {
-    const store = createStore({} as { x?: number });
+    const store = createStore<{ x?: number }>({});
     const reaction = jest.fn(() => { blackbox(store.x); });
     const unsub = createReaction(reaction);
     expect(reaction).toHaveBeenCalledTimes(1);

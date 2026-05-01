@@ -8,6 +8,7 @@ function reducer(p: object): ReducedProps {
   const descriptors = Object.getOwnPropertyDescriptors(p);
   for (const [k, desc] of Object.entries(descriptors)) {
     if (desc.get) {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       result.push(["g", k, desc.get]);
     }
     else {

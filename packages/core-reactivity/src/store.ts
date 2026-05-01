@@ -9,6 +9,10 @@ const storeReviver = register(([storeId, obj]: [string, object]) => {
   return resumeStore(storeId, obj);
 }, "__lentjs_storeReviver");
 function resumeStore<S extends object>(storeId: string, obj: S): Store<S> {
+  /* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                    @typescript-eslint/no-unsafe-assignment,
+                    @typescript-eslint/no-unsafe-return */
+
   return new Proxy<any>(obj, {
     has: (obj, prop) => {
       return prop === storeIdSymbol ||
@@ -35,7 +39,7 @@ function resumeStore<S extends object>(storeId: string, obj: S): Store<S> {
       triggerSignalRead(`${storeId}_${prop}`);
       return obj[prop];
     },
-  });
+  }) as Store<S>;
 }
 
 export function createStore<S extends object>(obj: S): Store<S> {

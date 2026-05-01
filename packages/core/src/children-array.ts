@@ -2,6 +2,13 @@ import { defineSerialization, register } from "@lentjs/core-serialize";
 
 type K<T> = ["g", ()=>T] | ["v", T];
 
+/**
+ * Wrapper around 'arr instanceof ChildrenArray' but keeps the array's element type
+ */
+export function isChildrenArray<T>(arr: T[]): arr is ChildrenArray<T> {
+  return arr instanceof ChildrenArray;
+}
+
 export class ChildrenArray<T> extends Array<T> {
   constructor() {
     super();
@@ -31,6 +38,7 @@ export class ChildrenArray<T> extends Array<T> {
     const desc = Object.getOwnPropertyDescriptor(this, idx);
     if (!desc) throw new Error("Out of bound access");
     if (desc.get)
+      /* eslint-disable-next-line @typescript-eslint/unbound-method */
       return desc.get;
     else
       return null;
@@ -40,8 +48,10 @@ export class ChildrenArray<T> extends Array<T> {
     const desc = Object.getOwnPropertyDescriptor(this, idx);
     if (!desc) throw new Error("Out of bound access");
     if (desc.get)
+      /* eslint-disable-next-line @typescript-eslint/unbound-method */
       return desc.get;
     else
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
       return desc.value;
   }
 
@@ -50,6 +60,7 @@ export class ChildrenArray<T> extends Array<T> {
     for (let i = 0; i < this.length; i++) {
       const desc = Object.getOwnPropertyDescriptor(this, i)!;
       if (desc.get)
+        /* eslint-disable-next-line @typescript-eslint/unbound-method */
         result.push(["g", desc.get]);
       else
         result.push(["v", desc.value]);
@@ -57,7 +68,7 @@ export class ChildrenArray<T> extends Array<T> {
     return result;
   }
 
-  private static reviver<T>(val: K<T>[]): ChildrenArray<T> {
+  private static reviver<T>(this: void, val: K<T>[]): ChildrenArray<T> {
     const result = new ChildrenArray<T>;
     for (const i of val) {
       if (i[0] === "g") {

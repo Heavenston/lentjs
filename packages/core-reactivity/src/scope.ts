@@ -8,7 +8,7 @@ declare const ContextIdSymbol: unique symbol;
 /**
  * Opaque type representing the id for a context value
  */
-export type ContextId<T> = { [ContextIdSymbol]: T };
+export type ContextId<T> = { [ContextIdSymbol]: T, toString(): string };
 
 export type ScopeCleanup = {
   scope: Scope;
@@ -34,7 +34,7 @@ type ReducedScope = {
 export class Scope {
   static #currentScope: Scope | null = null;
 
-  private static reducer(scope: Scope): ReducedScope {
+  private static reducer(this: void, scope: Scope): ReducedScope {
     return {
       parent: scope.parent,
       state: scope.state,
@@ -43,15 +43,15 @@ export class Scope {
     };
   }
 
-  private static reviver(reduced: ReducedScope): Scope {
+  private static reviver(this: void, reduced: ReducedScope): Scope {
     return new Scope(reduced);
   }
   static { register(Scope.reviver, "__lentjs_scope.reviver") }
 
-  private static cleanupReducer(cleanup: ScopeCleanup): Scope {
+  private static cleanupReducer(this: void, cleanup: ScopeCleanup): Scope {
     return cleanup.scope;
   }
-  private static cleanupReviver(scope: Scope): ScopeCleanup {
+  private static cleanupReviver(this: void, scope: Scope): ScopeCleanup {
     return scope.#createCleanup();
   }
   static { register(Scope.cleanupReviver, "__lentjs_scope.cleanupReviver") }

@@ -19,6 +19,7 @@ export function assert(value: boolean | (() => boolean), message?: string) {
 }
 
 export function unreachable(value: never): never {
+  // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
   throw new Error(`Reached unreachable: ${value}`);
 }
 

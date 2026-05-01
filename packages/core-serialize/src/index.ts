@@ -14,7 +14,7 @@ export function closure<A extends any[], B extends any[], R>(og_fn: (...args: [.
 
 export function bind<A extends any[], B extends any[], T, R>(og_fn: (this: T, ...args: [...A, ...B]) => R, thisarg: T, ...values_: A): Closure<(...args: B) => R> {
   const values = Object.freeze(Array.from(values_) as A);
-  const nfn: Closure<(...args: B) => R> = Function.prototype.bind.call(og_fn, thisarg, ...values) as any;
+  const nfn = Function.prototype.bind.call(og_fn, thisarg, ...values) as Closure<(...args: B) => R>;
   Object.defineProperties(nfn, {
     [closureDataSymbol]: {
       value: Object.freeze({
@@ -86,7 +86,7 @@ const devalueReducers: { [key: string]: (value: any) => any } = {
   },
   fun: (f: unknown) => {
     if (isFunction(f)) {
-      throw new Error(`Cannot stringify function ${f}`);
+      throw new Error(`Cannot stringify function ${f.toString()}`);
     }
   },
 };

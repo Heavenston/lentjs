@@ -4,6 +4,12 @@ import { register } from "@lentjs/core-serialize";
 import { createHTMLElement } from "./render-to-dom";
 import { createSSRElement } from "./render-to-string";
 
+export type HTMLElementProps = {
+  children?: JSXElement,
+} & {
+  [k in string]?: unknown;
+};
+
 export function factory(element: string, props?: Attributes): JSXElement;
 export function factory(element: ComponentFn<object>): JSXElement;
 export function factory<P>(element: ComponentFn<P>, props: P): JSXElement;

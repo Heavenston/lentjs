@@ -9,7 +9,9 @@ export function randomIdPlugin(): PluginOption {
       },
       async handler(code, id) {
         function toBase64(arr: Uint8Array): string {
-          return (arr as any).toBase64();
+          // @ts-expect-error toBase64 only available very recently
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+          return arr.toBase64();
         }
         const prefix = toBase64(new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(`${id}\n${code}`)))).replace(/[+/=]/g, "").slice(0,16);
         let i = 0;

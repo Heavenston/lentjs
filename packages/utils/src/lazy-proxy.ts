@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return,
+                  @typescript-eslint/no-unsafe-argument */
 
 /// This returns a proxy, that should act and behave like T, but only creates
 /// the actual T object by calling the function when needed once than stores it

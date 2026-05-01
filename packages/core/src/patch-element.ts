@@ -1,6 +1,7 @@
-import { ChildrenArray, isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular, type JSXElementWithScope } from ".";
+import { isJSXElementDynamic, isJSXElementString, isJSXElementWithScope, isSSRElement, type JSXElement, type JSXElementArray, type JSXElementDynamic, type JSXElementSingular, type JSXElementWithScope } from ".";
 import { assert, unreachable } from "@lentjs/utils";
 import { isInTrackingContext, untrack, getScope, startReaction, resumeReaction } from "@lentjs/core-reactivity";
+import { isChildrenArray } from "./children-array";
 
 export type JSXStateCommon = { kind: string, element: JSXElement };
 export type JSXStateSingular = JSXStateCommon & { kind: "singular", element: JSXElementSingular, node: ChildNode | null };
@@ -123,7 +124,7 @@ export function cleanupStateNodes(state: JSXState): void {
 
 function patchElementSingular(parent: Node, anchorElement: ChildNode | null, previousState: JSXStateSingular | null, child: JSXElementSingular): JSXStateSingular {
   assert(anchorElement === null || anchorElement.parentNode === parent, "Invalid end anchor");
-  assert(previousState === null || previousState.node === null || previousState.node.parentNode === parent, "Invalid node");
+  assert(previousState?.node == null || previousState.node.parentNode === parent, "Invalid node");
   assert(!isSSRElement(child), "Unexpected ssr element during rendering");
 
   if (child == null) {
@@ -228,7 +229,7 @@ function appendArray(parent: Node, anchorElement: ChildNode | null, child: JSXEl
   let currentAnchor = anchorElement;
   const states: JSXState[] = [];
   for (let i = child.length-1; i>=0;i--) {
-    const childEl = child instanceof ChildrenArray ? child.getOrComputed(i) : child[i];
+    const childEl = isChildrenArray(child) ? child.getOrComputed(i) : child[i];
     const state = patchElement(parent, currentAnchor, null, childEl);
     states.push(state);
     currentAnchor = getFirstElement(state) ?? currentAnchor;
@@ -258,7 +259,7 @@ function patchElementArray(
   const states = Array<JSXState>();
   let currentAnchor = anchorElement;
   for (let i = child.length-1; i>=0; i--) {
-    const childEl = child instanceof ChildrenArray ? child.getOrComputed(i) : child[i];
+    const childEl = isChildrenArray(child) ? child.getOrComputed(i) : child[i];
 
     const prev = toKeepMap.get(childEl)?.pop();
     const newState = patchElement(parent, currentAnchor, prev ?? null, childEl);
