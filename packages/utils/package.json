@@ -23,7 +23,8 @@
   },
   "scripts": {
     "build": "bunup",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "lint": "eslint 'src/**/*.{js,mjs,cjs,ts,tsx,jsx,mts,cts}'"
   },
   "peerDependencies": {
     "typescript": "^5"
